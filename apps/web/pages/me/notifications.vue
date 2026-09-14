@@ -1,27 +1,27 @@
 <template>
   <div>
-    <header class="flex flex-col gap-4 border-b-2 border-[#171717] pb-5 sm:flex-row sm:items-end sm:justify-between">
-      <div><h2 class="text-3xl font-black tracking-[-0.04em]">通知中心</h2></div>
-      <button v-if="unreadCount" class="focus-ring border border-[#171717] px-4 py-2 text-xs font-bold" @click="readAll">全部標為已讀</button>
+    <header class="flex flex-col gap-4 border-b border-[#ded7cb] pb-5 sm:flex-row sm:items-end sm:justify-between">
+      <div><p class="eyebrow-modern text-[#d84a36]">Notifications</p><h2 class="mt-1 text-3xl font-black tracking-[-0.04em]">通知中心</h2></div>
+      <UiButton v-if="unreadCount" variant="outline" size="sm" @click="readAll">全部標為已讀</UiButton>
     </header>
 
     <div class="mt-5 flex gap-2">
-      <button v-for="item in filters" :key="item.value" class="focus-ring border px-4 py-2 text-sm font-bold" :class="filter === item.value ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-[#faf8f3]'" @click="filter = item.value; page = 1; load()">{{ item.label }}</button>
+      <button v-for="item in filters" :key="item.value" type="button" class="focus-ring rounded-full border px-4 py-2 text-sm font-bold transition" :class="filter === item.value ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-[#faf8f3] hover:border-[#171717]'" @click="filter = item.value; page = 1; load()">{{ item.label }}</button>
     </div>
 
-    <div v-if="loading" class="mt-5 space-y-3"><div v-for="item in 3" :key="item" class="h-28 animate-pulse bg-[#e5e0d6]" /></div>
-    <p v-else-if="pageError" class="mt-5 border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm">{{ pageError }}</p>
-    <div v-else-if="notifications.length" class="mt-5 divide-y divide-[#d7d1c6] border-y-2 border-[#171717] bg-[#faf8f3]">
-      <NuxtLink v-for="item in notifications" :key="item.id" :to="item.topicId ? `/topic/${item.topicId}` : '/me'" class="focus-ring block px-5 py-5 hover:bg-white" @click="markRead(item)">
+    <div v-if="loading" class="mt-5 space-y-3"><div v-for="item in 3" :key="item" class="h-28 animate-pulse rounded-2xl bg-[#e5e0d6]" /></div>
+    <p v-else-if="pageError" class="rounded-2xl border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm">{{ pageError }}</p>
+    <div v-else-if="notifications.length" class="mt-5 space-y-3">
+      <NuxtLink v-for="item in notifications" :key="item.id" :to="item.topicId ? `/topic/${item.topicId}` : '/me'" class="focus-ring block rounded-2xl border px-5 py-4 transition" :class="item.readAt ? 'border-[#ded7cb] bg-[#faf8f3]' : 'border-[#b7c6ee] bg-[#eef1fb]'" @click="markRead(item)">
         <div class="flex items-start justify-between gap-4">
-          <div><div class="flex items-center gap-2"><span v-if="!item.readAt" class="h-2 w-2 bg-[#d84a36]" /><h3 class="font-black">{{ item.title }}</h3></div><p class="mt-2 text-sm leading-6 text-[#6d6861]">{{ item.message }}</p></div>
+          <div class="min-w-0"><div class="flex items-center gap-2"><span v-if="!item.readAt" class="size-2 shrink-0 rounded-full bg-[#d84a36]" /><h3 class="font-black">{{ item.title }}</h3></div><p class="mt-2 text-sm leading-6 text-[#6d6861]">{{ item.message }}</p></div>
           <time class="shrink-0 text-xs text-[#8b857d]">{{ formatTime(item.createdAt) }}</time>
         </div>
       </NuxtLink>
     </div>
-    <p v-else class="mt-5 border border-[#d7d1c6] bg-[#faf8f3] px-6 py-16 text-center text-sm text-[#77716a]">{{ filter === 'true' ? '目前沒有未讀通知。' : '目前沒有通知。' }}</p>
+    <p v-else class="surface-card mt-5 px-6 py-16 text-center text-sm text-[#77716a]">{{ filter === 'true' ? '目前沒有未讀通知。' : '目前沒有通知。' }}</p>
 
-    <div v-if="pages > 1" class="mt-6 flex items-center justify-center gap-4 text-sm font-bold"><button class="focus-ring disabled:opacity-30" :disabled="page <= 1" @click="page--; load()">&larr; 上一頁</button><span>{{ page }} / {{ pages }}</span><button class="focus-ring disabled:opacity-30" :disabled="page >= pages" @click="page++; load()">下一頁 &rarr;</button></div>
+    <div v-if="pages > 1" class="mt-6 flex items-center justify-center gap-4 text-sm font-bold"><button type="button" class="focus-ring rounded-full disabled:opacity-30" :disabled="page <= 1" @click="page--; load()">&larr; 上一頁</button><span>{{ page }} / {{ pages }}</span><button type="button" class="focus-ring rounded-full disabled:opacity-30" :disabled="page >= pages" @click="page++; load()">下一頁 &rarr;</button></div>
   </div>
 </template>
 
