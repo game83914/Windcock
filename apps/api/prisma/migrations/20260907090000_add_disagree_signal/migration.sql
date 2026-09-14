@@ -1,0 +1,1 @@
+ALTER TYPE "TopicStanceSignalType" ADD VALUE 'DISAGREE';

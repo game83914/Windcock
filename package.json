@@ -1,0 +1,39 @@
+{
+  "name": "windcock",
+  "private": true,
+  "version": "0.1.0",
+  "description": "輿論測風向 - 社群投票平台 (monorepo)",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run prisma:generate",
+    "dev:api": "./scripts/ensure-port-free.sh 3001 API http://localhost:3001/api/v1/health windcock-api && npm run dev -w apps/api || [ $? -eq 3 ]",
+    "predev:api": "./scripts/devdb.sh start",
+    "dev:web": "./scripts/ensure-port-free.sh 3000 Web http://localhost:3000 && npm run dev -w apps/web || [ $? -eq 3 ]",
+    "dev": "npm-run-all --parallel dev:api dev:web",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "prisma:generate": "npm run prisma:generate -w apps/api",
+    "prisma:migrate": "npm run prisma:migrate -w apps/api",
+    "prisma:studio": "npm run prisma:studio -w apps/api",
+    "typecheck": "npm run typecheck -w apps/web"
+  },
+  "overrides": {
+    "@nestjs/cli": {
+      "glob": "10.5.0"
+    },
+    "@nestjs/config": {
+      "lodash": "4.18.1"
+    },
+    "@nestjs/swagger": {
+      "js-yaml": "4.3.2",
+      "lodash": "4.18.1"
+    },
+    "body-parser": "1.20.6",
+    "multer": "2.3.0",
+    "qs": "6.16.0"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}

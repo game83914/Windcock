@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.nuxt/
+.nuxt-build/
+.output/
+.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma generated client (re-generated)
+apps/api/node_modules/.prisma
+apps/api/node_modules/@prisma
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Caches
+.cache/
+
+# Local dev database binaries & data (PostgreSQL/Redis installed to workspace)
+.local/

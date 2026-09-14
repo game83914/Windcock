@@ -1,0 +1,1095 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum MembershipTier {
+  NEW
+  SENIOR
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum OrganizationMembershipRole {
+  MEMBER
+  MANAGER
+  OWNER
+}
+
+enum OrganizationMembershipStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AssignmentRole {
+  TOPIC_TEAM
+}
+
+enum AssignmentScope {
+  GLOBAL
+  ORGANIZATION
+  TOPIC
+}
+
+enum TopicApplicationApplicantType {
+  MEMBER
+  ORGANIZATION
+}
+
+enum TopicApplicationStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum TopicKind {
+  FORMAL
+  QUICK
+}
+
+enum TopicType {
+  BINARY
+  MULTIPLE
+  SPECTRUM
+}
+
+enum TopicStatus {
+  DRAFT
+  OPEN
+  LOCKED
+  SETTLED
+  CANCELLED
+}
+
+enum TopicModerationStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum TopicContentBlockType {
+  BACKGROUND
+  CASE
+  DATA
+  SOURCE
+  PERSPECTIVES
+}
+
+enum NotificationType {
+  TOPIC_REVISION_APPROVED
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  NON_BINARY
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum OccupationCategory {
+  STUDENT
+  PUBLIC_SERVICE
+  HEALTHCARE
+  TECHNOLOGY
+  FINANCE
+  MANUFACTURING
+  SERVICE
+  AGRICULTURE
+  CULTURE_MEDIA
+  FREELANCE
+  HOMEMAKER
+  UNEMPLOYED
+  RETIRED
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum PersonalityType {
+  INTJ
+  INTP
+  ENTJ
+  ENTP
+  INFJ
+  INFP
+  ENFJ
+  ENFP
+  ISTJ
+  ISFJ
+  ESTJ
+  ESFJ
+  ISTP
+  ISFP
+  ESTP
+  ESFP
+  PREFER_NOT_TO_SAY
+}
+
+enum EmploymentStatus {
+  FULL_TIME
+  PART_TIME
+  SELF_EMPLOYED
+  EMPLOYER
+  STUDENT
+  HOMEMAKER_CAREGIVER
+  UNEMPLOYED
+  RETIRED
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum IndustryCategory {
+  PUBLIC_ADMINISTRATION
+  EDUCATION
+  HEALTHCARE
+  TECHNOLOGY
+  FINANCE
+  MANUFACTURING
+  RETAIL_ECOMMERCE
+  HOSPITALITY_TOURISM
+  CONSTRUCTION_REAL_ESTATE
+  TRANSPORT_LOGISTICS
+  PROFESSIONAL_SERVICES
+  CULTURE_MEDIA
+  AGRICULTURE
+  NONPROFIT
+  OTHER
+  NOT_APPLICABLE
+  PREFER_NOT_TO_SAY
+}
+
+enum AnnualIncomeBand {
+  UNDER_300K
+  TWD_300K_499K
+  TWD_500K_799K
+  TWD_800K_1199K
+  TWD_1200K_1999K
+  TWD_2000K_PLUS
+  NO_FIXED_INCOME
+  PREFER_NOT_TO_SAY
+}
+
+enum EducationLevel {
+  MIDDLE_SCHOOL_OR_BELOW
+  HIGH_SCHOOL_VOCATIONAL
+  ASSOCIATE
+  BACHELOR
+  MASTER
+  DOCTORATE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum RelationshipStatus {
+  SINGLE
+  DATING
+  MARRIED
+  SEPARATED_DIVORCED
+  WIDOWED
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum LivingArrangement {
+  ALONE
+  WITH_PARTNER
+  WITH_PARENTS_RELATIVES
+  WITH_PARTNER_CHILDREN
+  SINGLE_PARENT_CHILDREN
+  THREE_GENERATION
+  ROOMMATES_DORM
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum ParentingStage {
+  NO_CHILDREN
+  EXPECTING
+  PRESCHOOL
+  PRIMARY_SCHOOL
+  SECONDARY_SCHOOL
+  ADULT_CHILDREN
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum HousingStatus {
+  OWN_OUTRIGHT
+  MORTGAGE
+  RENT
+  SOCIAL_HOUSING
+  DORMITORY
+  LIVING_WITH_FAMILY
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum AgeBand {
+  UNDER_18
+  AGE_18_24
+  AGE_25_34
+  AGE_35_44
+  AGE_45_54
+  AGE_55_64
+  AGE_65_PLUS
+}
+
+enum WesternZodiac {
+  ARIES
+  TAURUS
+  GEMINI
+  CANCER
+  LEO
+  VIRGO
+  LIBRA
+  SCORPIO
+  SAGITTARIUS
+  CAPRICORN
+  AQUARIUS
+  PISCES
+}
+
+enum ChineseZodiac {
+  RAT
+  OX
+  TIGER
+  RABBIT
+  DRAGON
+  SNAKE
+  HORSE
+  GOAT
+  MONKEY
+  ROOSTER
+  DOG
+  PIG
+}
+
+enum GuardianConsentStatus {
+  NOT_REQUIRED
+  PENDING
+  VERIFIED
+  REVOKED
+}
+
+enum DemographicDimension {
+  AGE_BAND
+  GENDER
+  OCCUPATION
+  REGION
+  DISTRICT
+  PERSONALITY_TYPE
+  EMPLOYMENT_STATUS
+  INDUSTRY
+  ANNUAL_INCOME
+  EDUCATION
+  RELATIONSHIP
+  LIVING_ARRANGEMENT
+  PARENTING_STAGE
+  HOUSING_STATUS
+  WESTERN_ZODIAC
+  CHINESE_ZODIAC
+}
+
+enum PointTxType {
+  VOTE_REWARD
+  MEME_USAGE_REWARD
+}
+
+enum PointTxReferenceType {
+  VOTE
+  MEME_USAGE
+}
+
+enum MemeUsageTargetType {
+  POST
+  COMMENT
+}
+
+enum MemeUsageRewardStatus {
+  REWARDED
+  SELF_USE
+  OFFICIAL
+  DUPLICATE_DAILY_USE
+  ACTOR_DAILY_LIMIT
+  CREATOR_DAILY_LIMIT
+}
+
+enum MemeStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  TAKEN_DOWN
+}
+
+enum MemeOrigin {
+  USER
+  OFFICIAL
+}
+
+enum MemeReportReason {
+  COPYRIGHT
+  INAPPROPRIATE
+  OTHER
+}
+
+enum MemeReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum TopicStanceSignalType {
+  AGREE
+  DISAGREE
+}
+
+enum TopicStanceStatus {
+  ACTIVE
+  TAKEN_DOWN
+}
+
+enum TopicStanceReportReason {
+  HARASSMENT
+  INAPPROPRIATE
+  FALSE_INFO
+  OTHER
+}
+
+enum TopicStanceReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id              BigInt         @id @default(autoincrement())
+  phoneNumber     String         @unique @map("phone_number")
+  nickname        String
+  avatarUrl       String?        @map("avatar_url")
+  pointsBalance   BigInt         @default(0) @map("points_balance")
+  isPhoneVerified Boolean        @default(false) @map("is_phone_verified")
+  status          UserStatus     @default(ACTIVE)
+  role            UserRole       @default(USER)
+  membershipTier  MembershipTier @default(NEW) @map("membership_tier")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  votes                      Vote[]
+  posts                      Post[]
+  comments                   Comment[]
+  likes                      Like[]
+  pointTransactions          PointTransaction[]
+  createdTopics              Topic[]                     @relation("TopicCreator")
+  reviewedTopics             Topic[]                     @relation("TopicReviewer")
+  notifications              Notification[]
+  demographicProfile         UserDemographicProfile?
+  demographicAudits          DemographicAnalysisAudit[]  @relation("DemographicAnalysisAdmin")
+  createdMemes               Meme[]                      @relation("MemeCreator")
+  reviewedMemes              Meme[]                      @relation("MemeReviewer")
+  takenDownMemes             Meme[]                      @relation("MemeTakedownAdmin")
+  memeCollections            MemeCollection[]
+  memeReports                MemeReport[]
+  topicFollows               TopicFollow[]
+  createdStances             TopicStance[]               @relation("StanceCreator")
+  stanceSignals              TopicStanceSignal[]
+  stanceReports              TopicStanceReport[]
+  takenDownStances           TopicStance[]               @relation("StanceTakedownAdmin")
+  organizationMemberships    OrganizationMembership[]
+  roleAssignments            RoleAssignment[]            @relation("RoleAssignmentUser")
+  grantedRoles               RoleAssignment[]            @relation("RoleAssignmentGrantor")
+  topicApplications          TopicApplication[]          @relation("TopicApplicationSubmitter")
+  stanceApplications         StanceApplication[]         @relation("StanceApplicationSubmitter")
+  reviewedStanceApplications StanceApplication[]         @relation("StanceApplicationReviewer")
+  reviewedStanceRevisions    StanceApplicationRevision[] @relation("StanceRevisionReviewer")
+  reviewedTopicRevisions     TopicApplicationRevision[]  @relation("TopicRevisionReviewer")
+  memeUsageActions           MemeUsageEvent[]            @relation("MemeUsageActor")
+  memeUsageRewards           MemeUsageEvent[]            @relation("MemeUsageCreator")
+
+  @@map("users")
+}
+
+model Category {
+  key       String   @id
+  label     String
+  eyebrow   String
+  color     String
+  soft      String
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  topics Topic[]
+
+  @@map("categories")
+}
+
+model Topic {
+  id               BigInt                @id @default(autoincrement())
+  title            String
+  description      String?
+  category         String
+  categoryMeta     Category              @relation(fields: [category], references: [key])
+  featuredOrder    Int?                  @unique @map("featured_order")
+  kind             TopicKind             @default(FORMAL)
+  topicType        TopicType             @default(BINARY) @map("topic_type")
+  status           TopicStatus           @default(DRAFT)
+  moderationStatus TopicModerationStatus @default(APPROVED) @map("moderation_status")
+  creatorId        BigInt?               @map("creator_id")
+  creator          User?                 @relation("TopicCreator", fields: [creatorId], references: [id])
+  reviewedById     BigInt?               @map("reviewed_by_id")
+  reviewer         User?                 @relation("TopicReviewer", fields: [reviewedById], references: [id])
+  reviewedAt       DateTime?             @map("reviewed_at")
+  moderationNote   String?               @map("moderation_note")
+  voteDurationDays Int                   @default(7) @map("vote_duration_days")
+  voteDurationHours Int?                 @map("vote_duration_hours")
+  voteEndAt        DateTime?             @map("vote_end_at")
+  minVotes         Int?                  @map("min_votes")
+  totalVotes       BigInt                @default(0) @map("total_votes")
+  voterCount       BigInt                @default(0) @map("voter_count")
+  spectrumMedian   Decimal?              @map("spectrum_median") @db.Decimal(5, 2)
+  spectrumStddev   Decimal?              @map("spectrum_stddev") @db.Decimal(5, 2)
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  options            TopicOption[]
+  contentBlocks      TopicContentBlock[]
+  votes              Vote[]
+  posts              Post[]
+  notifications      Notification[]
+  demographicAudits  DemographicAnalysisAudit[]
+  followers          TopicFollow[]
+  stances            TopicStance[]
+  stanceApplications StanceApplication[]
+  roleAssignments    RoleAssignment[]
+  applicationResults TopicApplicationResult[]
+
+  @@index([status, voteEndAt])
+  @@index([kind, status, voteEndAt])
+  @@index([kind, createdAt(sort: Desc)])
+  @@index([moderationStatus, createdAt(sort: Desc)])
+  @@index([creatorId, createdAt(sort: Desc)])
+  @@map("topics")
+}
+
+model Organization {
+  id        BigInt             @id @default(autoincrement())
+  name      String
+  slug      String             @unique
+  status    OrganizationStatus @default(ACTIVE)
+  isPartner Boolean            @default(false) @map("is_partner")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  memberships       OrganizationMembership[]
+  roleAssignments   RoleAssignment[]
+  topicApplications TopicApplication[]
+
+  @@index([status, isPartner])
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  organizationId BigInt                       @map("organization_id")
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         BigInt                       @map("user_id")
+  user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrganizationMembershipRole   @default(MEMBER)
+  status         OrganizationMembershipStatus @default(ACTIVE)
+  createdAt      DateTime                     @default(now()) @map("created_at")
+  updatedAt      DateTime                     @updatedAt @map("updated_at")
+
+  @@id([organizationId, userId])
+  @@index([userId, status])
+  @@map("organization_memberships")
+}
+
+model RoleAssignment {
+  id             BigInt          @id @default(autoincrement())
+  userId         BigInt          @map("user_id")
+  user           User            @relation("RoleAssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  role           AssignmentRole
+  scope          AssignmentScope @default(GLOBAL)
+  organizationId BigInt?         @map("organization_id")
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  topicId        BigInt?         @map("topic_id")
+  topic          Topic?          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  active         Boolean         @default(true)
+  expiresAt      DateTime?       @map("expires_at")
+  grantedById    BigInt?         @map("granted_by_id")
+  grantedBy      User?           @relation("RoleAssignmentGrantor", fields: [grantedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  @@index([userId, active, expiresAt])
+  @@index([organizationId])
+  @@index([topicId])
+  @@map("role_assignments")
+}
+
+model TopicApplication {
+  id               BigInt                        @id @default(autoincrement())
+  applicantType    TopicApplicationApplicantType @map("applicant_type")
+  status           TopicApplicationStatus        @default(PENDING)
+  submitterId      BigInt                        @map("submitter_id")
+  submitter        User                          @relation("TopicApplicationSubmitter", fields: [submitterId], references: [id], onDelete: Restrict)
+  organizationId   BigInt?                       @map("organization_id")
+  organization     Organization?                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  title            String
+  description      String?
+  category         String
+  topicType        TopicType                     @map("topic_type")
+  options          Json?
+  blocks           Json?
+  voteDurationDays Int                           @default(7) @map("vote_duration_days")
+  note             String?
+  revisionNumber   Int                           @default(1) @map("revision_number")
+  createdAt        DateTime                      @default(now()) @map("created_at")
+  updatedAt        DateTime                      @updatedAt @map("updated_at")
+
+  revisions TopicApplicationRevision[]
+  results   TopicApplicationResult[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([submitterId, createdAt(sort: Desc)])
+  @@index([organizationId, status, createdAt(sort: Desc)])
+  @@map("topic_applications")
+}
+
+model TopicApplicationRevision {
+  id               BigInt                 @id @default(autoincrement())
+  applicationId    BigInt                 @map("application_id")
+  application      TopicApplication       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  revisionNumber   Int                    @map("revision_number")
+  status           TopicApplicationStatus @default(PENDING)
+  title            String
+  description      String?
+  category         String
+  topicType        TopicType              @map("topic_type")
+  options          Json?
+  blocks           Json?
+  voteDurationDays Int                    @map("vote_duration_days")
+  note             String?
+  reviewNote       String?                @map("review_note")
+  reviewedById     BigInt?                @map("reviewed_by_id")
+  reviewer         User?                  @relation("TopicRevisionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?              @map("reviewed_at")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  @@unique([applicationId, revisionNumber])
+  @@map("topic_application_revisions")
+}
+
+model TopicApplicationResult {
+  applicationId BigInt           @map("application_id")
+  application   TopicApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  topicId       BigInt           @map("topic_id")
+  topic         Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  @@id([applicationId, topicId])
+  @@index([topicId])
+  @@map("topic_application_results")
+}
+
+model TopicFollow {
+  userId               BigInt   @map("user_id")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId              BigInt   @map("topic_id")
+  topic                Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  notificationsEnabled Boolean  @default(true) @map("notifications_enabled")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@id([userId, topicId])
+  @@index([topicId, createdAt(sort: Desc)])
+  @@map("topic_follows")
+}
+
+model TopicStance {
+  id                BigInt            @id @default(autoincrement())
+  topicId           BigInt            @map("topic_id")
+  topic             Topic             @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  parentId          BigInt?           @map("parent_id")
+  parent            TopicStance?      @relation("StanceChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children          TopicStance[]     @relation("StanceChildren")
+  creatorId         BigInt            @map("creator_id")
+  creator           User              @relation("StanceCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  title             String
+  rationale         String?
+  depth             Int               @default(0)
+  status            TopicStanceStatus @default(ACTIVE)
+  agreementCount    Int               @default(0) @map("agreement_count")
+  disagreementCount Int               @default(0) @map("disagreement_count")
+  takenDownById     BigInt?           @map("taken_down_by_id")
+  takenDownBy       User?             @relation("StanceTakedownAdmin", fields: [takenDownById], references: [id], onDelete: Restrict)
+  takenDownAt       DateTime?         @map("taken_down_at")
+  takedownReason    String?           @map("takedown_reason")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  signals             TopicStanceSignal[]
+  reports             TopicStanceReport[]
+  posts               Post[]
+  pendingApplications StanceApplication[]       @relation("ApplicationParentStance")
+  applicationResults  StanceApplicationResult[]
+
+  @@index([topicId, depth, createdAt(sort: Desc)])
+  @@index([parentId])
+  @@map("topic_stances")
+}
+
+model StanceApplication {
+  id             BigInt                 @id @default(autoincrement())
+  status         TopicApplicationStatus @default(PENDING)
+  submitterId    BigInt                 @map("submitter_id")
+  submitter      User                   @relation("StanceApplicationSubmitter", fields: [submitterId], references: [id], onDelete: Restrict)
+  topicId        BigInt                 @map("topic_id")
+  topic          Topic                  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  parentStanceId BigInt?                @map("parent_stance_id")
+  parentStance   TopicStance?           @relation("ApplicationParentStance", fields: [parentStanceId], references: [id], onDelete: Restrict)
+  title          String
+  rationale      String?
+  note           String?
+  reviewNote     String?                @map("review_note")
+  reviewedById   BigInt?                @map("reviewed_by_id")
+  reviewer       User?                  @relation("StanceApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?              @map("reviewed_at")
+  revisionNumber Int                    @default(1) @map("revision_number")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  revisions StanceApplicationRevision[]
+  results   StanceApplicationResult[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([submitterId, createdAt(sort: Desc)])
+  @@index([topicId, status, createdAt(sort: Desc)])
+  @@index([parentStanceId])
+  @@map("stance_applications")
+}
+
+model StanceApplicationRevision {
+  id             BigInt                 @id @default(autoincrement())
+  applicationId  BigInt                 @map("application_id")
+  application    StanceApplication      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  revisionNumber Int                    @map("revision_number")
+  status         TopicApplicationStatus @default(PENDING)
+  title          String
+  rationale      String?
+  note           String?
+  reviewNote     String?                @map("review_note")
+  reviewedById   BigInt?                @map("reviewed_by_id")
+  reviewer       User?                  @relation("StanceRevisionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?              @map("reviewed_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  @@unique([applicationId, revisionNumber])
+  @@map("stance_application_revisions")
+}
+
+model StanceApplicationResult {
+  applicationId BigInt            @map("application_id")
+  application   StanceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  stanceId      BigInt            @map("stance_id")
+  stance        TopicStance       @relation(fields: [stanceId], references: [id], onDelete: Cascade)
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  @@id([applicationId, stanceId])
+  @@index([stanceId])
+  @@map("stance_application_results")
+}
+
+model TopicStanceSignal {
+  id        BigInt                @id @default(autoincrement())
+  stanceId  BigInt                @map("stance_id")
+  stance    TopicStance           @relation(fields: [stanceId], references: [id], onDelete: Cascade)
+  userId    BigInt                @map("user_id")
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signal    TopicStanceSignalType
+  createdAt DateTime              @default(now()) @map("created_at")
+
+  @@unique([stanceId, userId, signal])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("topic_stance_signals")
+}
+
+model TopicStanceReport {
+  id         BigInt                  @id @default(autoincrement())
+  stanceId   BigInt                  @map("stance_id")
+  stance     TopicStance             @relation(fields: [stanceId], references: [id], onDelete: Cascade)
+  reporterId BigInt                  @map("reporter_id")
+  reporter   User                    @relation(fields: [reporterId], references: [id], onDelete: Restrict)
+  reason     TopicStanceReportReason
+  detail     String?
+  status     TopicStanceReportStatus @default(OPEN)
+  createdAt  DateTime                @default(now()) @map("created_at")
+  resolvedAt DateTime?               @map("resolved_at")
+
+  @@unique([stanceId, reporterId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("topic_stance_reports")
+}
+
+model Notification {
+  id        BigInt           @id @default(autoincrement())
+  userId    BigInt           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  topicId   BigInt?          @map("topic_id")
+  topic     Topic?           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model UserDemographicProfile {
+  userId                BigInt                @id @map("user_id")
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birthDateCiphertext   String?               @map("birth_date_ciphertext")
+  birthDateIv           String?               @map("birth_date_iv")
+  birthDateAuthTag      String?               @map("birth_date_auth_tag")
+  birthDateKeyVersion   Int?                  @map("birth_date_key_version")
+  gender                Gender?
+  occupation            OccupationCategory?
+  region                String?
+  district              String?
+  personalityType       PersonalityType?      @map("personality_type")
+  employmentStatus      EmploymentStatus?     @map("employment_status")
+  industry              IndustryCategory?
+  annualIncome          AnnualIncomeBand?     @map("annual_income")
+  education             EducationLevel?
+  relationship          RelationshipStatus?
+  livingArrangement     LivingArrangement?    @map("living_arrangement")
+  parentingStage        ParentingStage?       @map("parenting_stage")
+  housingStatus         HousingStatus?        @map("housing_status")
+  westernZodiac         WesternZodiac?        @map("western_zodiac")
+  chineseZodiac         ChineseZodiac?        @map("chinese_zodiac")
+  isMinor               Boolean?              @map("is_minor")
+  analyticsConsent      Boolean               @default(false) @map("analytics_consent")
+  consentVersion        String?               @map("consent_version")
+  consentedAt           DateTime?             @map("consented_at")
+  withdrawnAt           DateTime?             @map("withdrawn_at")
+  guardianConsentStatus GuardianConsentStatus @default(NOT_REQUIRED) @map("guardian_consent_status")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  guardianConsent GuardianConsent?
+
+  @@map("user_demographic_profiles")
+}
+
+model GuardianConsent {
+  profileUserId      BigInt                 @id @map("profile_user_id")
+  profile            UserDemographicProfile @relation(fields: [profileUserId], references: [userId], onDelete: Cascade)
+  guardianPhoneHash  String                 @map("guardian_phone_hash")
+  guardianPhoneLast4 String                 @map("guardian_phone_last4")
+  consentVersion     String                 @map("consent_version")
+  verifiedAt         DateTime               @map("verified_at")
+  revokedAt          DateTime?              @map("revoked_at")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+
+  @@map("guardian_consents")
+}
+
+model VoteDemographicSnapshot {
+  voteId            BigInt              @id @map("vote_id")
+  vote              Vote                @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  ageBand           AgeBand             @map("age_band")
+  gender            Gender?
+  occupation        OccupationCategory?
+  region            String?
+  district          String?
+  personalityType   PersonalityType?    @map("personality_type")
+  employmentStatus  EmploymentStatus?   @map("employment_status")
+  industry          IndustryCategory?
+  annualIncome      AnnualIncomeBand?   @map("annual_income")
+  education         EducationLevel?
+  relationship      RelationshipStatus?
+  livingArrangement LivingArrangement?  @map("living_arrangement")
+  parentingStage    ParentingStage?     @map("parenting_stage")
+  housingStatus     HousingStatus?      @map("housing_status")
+  westernZodiac     WesternZodiac?      @map("western_zodiac")
+  chineseZodiac     ChineseZodiac?      @map("chinese_zodiac")
+  isMinor           Boolean             @map("is_minor")
+  consentVersion    String              @map("consent_version")
+  capturedAt        DateTime            @default(now()) @map("captured_at")
+
+  @@map("vote_demographic_snapshots")
+}
+
+model DemographicAnalysisAudit {
+  id        BigInt               @id @default(autoincrement())
+  adminId   BigInt               @map("admin_id")
+  admin     User                 @relation("DemographicAnalysisAdmin", fields: [adminId], references: [id])
+  topicId   BigInt               @map("topic_id")
+  topic     Topic                @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  dimension DemographicDimension
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  @@index([adminId, createdAt(sort: Desc)])
+  @@index([topicId, createdAt(sort: Desc)])
+  @@map("demographic_analysis_audits")
+}
+
+model TopicContentBlock {
+  id          BigInt                @id @default(autoincrement())
+  topicId     BigInt                @map("topic_id")
+  topic       Topic                 @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  type        TopicContentBlockType @default(CASE) @map("block_type")
+  title       String
+  content     String                @map("summary")
+  sourceLabel String?               @map("source_label")
+  sourceUrl   String?               @map("source_url")
+  occurredAt  DateTime?             @map("occurred_at")
+  sortOrder   Int                   @default(0) @map("sort_order")
+  createdAt   DateTime              @default(now()) @map("created_at")
+
+  @@index([topicId, sortOrder])
+  @@map("topic_content_blocks")
+}
+
+model TopicOption {
+  id        BigInt   @id @default(autoincrement())
+  topicId   BigInt   @map("topic_id")
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  label     String
+  voteCount BigInt   @default(0) @map("vote_count")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  votes Vote[]
+
+  @@index([topicId])
+  @@map("topic_options")
+}
+
+model Vote {
+  id                  BigInt                   @id @default(autoincrement())
+  userId              BigInt                   @map("user_id")
+  user                User                     @relation(fields: [userId], references: [id])
+  topicId             BigInt                   @map("topic_id")
+  topic               Topic                    @relation(fields: [topicId], references: [id])
+  optionId            BigInt?                  @map("option_id")
+  option              TopicOption?             @relation(fields: [optionId], references: [id])
+  spectrumValue       Int?                     @map("spectrum_value")
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  demographicSnapshot VoteDemographicSnapshot?
+
+  @@unique([userId, topicId])
+  @@index([topicId, userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("votes")
+}
+
+model PointTransaction {
+  id             BigInt      @id @default(autoincrement())
+  userId         BigInt      @map("user_id")
+  user           User        @relation(fields: [userId], references: [id])
+  amount         BigInt
+  balanceBefore  BigInt      @map("balance_before")
+  balanceAfter   BigInt      @map("balance_after")
+  txType         PointTxType          @map("tx_type")
+  referenceType  PointTxReferenceType @map("reference_type")
+  referenceId    String               @map("reference_id")
+  idempotencyKey String      @unique @map("idempotency_key")
+  note           String?
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  memeUsageReward MemeUsageEvent?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("point_transactions")
+}
+
+model Post {
+  id        BigInt      @id @default(autoincrement())
+  topicId   BigInt      @map("topic_id")
+  topic     Topic       @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  stanceId  BigInt      @map("stance_id")
+  stance    TopicStance @relation(fields: [stanceId], references: [id], onDelete: Restrict)
+  authorId  BigInt      @map("author_id")
+  author    User        @relation(fields: [authorId], references: [id])
+  content   String
+  likeCount BigInt      @default(0) @map("like_count")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  comments        Comment[]
+  memeAttachments PostMemeAttachment[]
+
+  @@index([topicId, createdAt(sort: Desc)])
+  @@index([stanceId, createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+model Comment {
+  id        BigInt   @id @default(autoincrement())
+  postId    BigInt   @map("post_id")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  BigInt   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  memeAttachments CommentMemeAttachment[]
+
+  @@index([postId, createdAt])
+  @@map("comments")
+}
+
+model Like {
+  id         BigInt   @id @default(autoincrement())
+  userId     BigInt   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  targetType String   @map("target_type") // 'post' | 'comment'
+  targetId   BigInt   @map("target_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, targetType, targetId])
+  @@map("likes")
+}
+
+model Meme {
+  id               BigInt     @id @default(autoincrement())
+  creatorId        BigInt     @map("creator_id")
+  creator          User       @relation("MemeCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  title            String
+  origin           MemeOrigin @default(USER)
+  storageKey       String     @unique @map("storage_key")
+  mimeType         String     @default("image/gif") @map("mime_type")
+  byteSize         Int        @map("byte_size")
+  width            Int
+  height           Int
+  frameCount       Int        @map("frame_count")
+  durationMs       Int        @map("duration_ms")
+  sha256           String
+  collectionCount  BigInt     @default(0) @map("collection_count")
+  usageCount       BigInt     @default(0) @map("usage_count")
+  rewardedUseCount BigInt     @default(0) @map("rewarded_use_count")
+  status           MemeStatus @default(PENDING_REVIEW)
+  rightsAttestedAt DateTime   @map("rights_attested_at")
+  reviewedById     BigInt?    @map("reviewed_by_id")
+  reviewer         User?      @relation("MemeReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  reviewedAt       DateTime?  @map("reviewed_at")
+  moderationNote   String?    @map("moderation_note")
+  takenDownById    BigInt?    @map("taken_down_by_id")
+  takenDownBy      User?      @relation("MemeTakedownAdmin", fields: [takenDownById], references: [id], onDelete: Restrict)
+  takenDownAt      DateTime?  @map("taken_down_at")
+  takedownReason   String?    @map("takedown_reason")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  collections        MemeCollection[]
+  reports            MemeReport[]
+  postAttachments    PostMemeAttachment[]
+  commentAttachments CommentMemeAttachment[]
+  usageEvents        MemeUsageEvent[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([creatorId, createdAt(sort: Desc)])
+  @@index([sha256])
+  @@map("memes")
+}
+
+model MemeCollection {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memeId    BigInt   @map("meme_id")
+  meme      Meme     @relation(fields: [memeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, memeId])
+  @@index([memeId])
+  @@map("meme_collections")
+}
+
+model PostMemeAttachment {
+  postId    BigInt @map("post_id")
+  post      Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  memeId    BigInt @map("meme_id")
+  meme      Meme   @relation(fields: [memeId], references: [id], onDelete: Restrict)
+  sortOrder Int    @default(0) @map("sort_order")
+
+  @@id([postId, memeId])
+  @@index([memeId])
+  @@map("post_meme_attachments")
+}
+
+model CommentMemeAttachment {
+  commentId BigInt  @map("comment_id")
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  memeId    BigInt  @map("meme_id")
+  meme      Meme    @relation(fields: [memeId], references: [id], onDelete: Restrict)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  @@id([commentId, memeId])
+  @@index([memeId])
+  @@map("comment_meme_attachments")
+}
+
+model MemeReport {
+  id         BigInt           @id @default(autoincrement())
+  memeId     BigInt           @map("meme_id")
+  meme       Meme             @relation(fields: [memeId], references: [id], onDelete: Restrict)
+  reporterId BigInt           @map("reporter_id")
+  reporter   User             @relation(fields: [reporterId], references: [id], onDelete: Restrict)
+  reason     MemeReportReason
+  detail     String?
+  status     MemeReportStatus @default(OPEN)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  resolvedAt DateTime?        @map("resolved_at")
+
+  @@unique([memeId, reporterId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("meme_reports")
+}
+
+model MemeUsageEvent {
+  id                 BigInt                @id @default(autoincrement())
+  memeId             BigInt                @map("meme_id")
+  meme               Meme                  @relation(fields: [memeId], references: [id], onDelete: Restrict)
+  actorUserId        BigInt                @map("actor_user_id")
+  actor              User                  @relation("MemeUsageActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  creatorId          BigInt                @map("creator_id")
+  creator            User                  @relation("MemeUsageCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  targetType         MemeUsageTargetType   @map("target_type")
+  targetId           BigInt                @map("target_id")
+  rewardDate         DateTime              @map("reward_date") @db.Date
+  rewardPoints       BigInt                @default(0) @map("reward_points")
+  rewardStatus       MemeUsageRewardStatus @map("reward_status")
+  pointTransactionId BigInt?               @unique @map("point_transaction_id")
+  pointTransaction   PointTransaction?     @relation(fields: [pointTransactionId], references: [id], onDelete: Restrict)
+  createdAt          DateTime              @default(now()) @map("created_at")
+
+  @@unique([targetType, targetId, memeId])
+  @@index([actorUserId, rewardDate, rewardStatus])
+  @@index([creatorId, rewardDate, rewardStatus])
+  @@index([memeId, createdAt(sort: Desc)])
+  @@map("meme_usage_events")
+}
