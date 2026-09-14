@@ -23,12 +23,11 @@
     </section>
 
     <div v-if="isInitialLoading" class="space-y-8" aria-live="polite">
-      <div class="grid min-h-[500px] animate-pulse gap-px bg-[#d7d1c6] motion-reduce:animate-none lg:grid-cols-[minmax(0,1.75fr)_minmax(280px,0.75fr)]">
-        <div class="bg-[#252525]" />
-        <div class="bg-[#e9e5dc]" />
+      <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div v-for="item in 3" :key="item" class="h-72 animate-pulse rounded-2xl bg-[#e5e0d6] motion-reduce:animate-none" />
       </div>
       <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        <div v-for="item in 3" :key="item" class="h-72 animate-pulse bg-[#e5e0d6] motion-reduce:animate-none" />
+        <div v-for="item in 6" :key="item" class="h-72 animate-pulse rounded-2xl bg-[#e5e0d6] motion-reduce:animate-none" />
       </div>
       <p class="sr-only">議題載入中</p>
     </div>
@@ -41,11 +40,16 @@
       </button>
     </section>
 
-<template v-else-if="featured || topics.length || hasActiveFilters">
-    <section v-if="featured" class="grid gap-px bg-[#171717] lg:grid-cols-[minmax(0,1.75fr)_minmax(290px,0.75fr)]">
-      <HomeFeaturedCarousel :topics="featuredTopics" />
-      <div v-if="trending.length" class="hidden lg:block">
-        <HomeTrendingList :topics="trending" />
+<template v-else-if="featuredTopics.length || topics.length || hasActiveFilters">
+    <section v-if="featuredTopics.length">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p class="eyebrow-modern text-[#d84a36]">編輯嚴選</p>
+          <h2 class="mt-1 text-xl font-black sm:text-2xl">置頂議題</h2>
+        </div>
+      </div>
+      <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <HomeTopicCard v-for="topic in featuredTopics.slice(0, 3)" :key="topic.id" :topic="topic" />
       </div>
     </section>
 
@@ -62,29 +66,11 @@
         >＋ 發起快問</NuxtLink>
       </div>
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <NuxtLink
-          v-for="t in quickTopics"
-          :key="t.id"
-          :to="`/topic/${t.id}`"
-          class="focus-ring group flex h-full flex-col border border-[#e0c9a0] bg-white p-4 transition hover:-translate-y-1 hover:border-[#b0761f] hover:shadow-[5px_5px_0_#e8d9b8]"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[10px] font-black tracking-[0.12em] text-[#b0761f]">快問</span>
-            <span class="text-xs font-bold text-[#77716a]">{{ deadlineLabel(t.voteEndAt, deadlineNow) }}</span>
-          </div>
-          <h3 class="mt-2 flex-1 text-base font-black leading-snug transition group-hover:text-[#b0761f]">{{ t.title }}</h3>
-          <div class="mt-4 space-y-2 border-t border-[#f0e6d2] pt-3">
-            <div v-for="o in leadingOptions(t, 2)" :key="o.id" class="flex items-center justify-between gap-2 text-xs">
-              <span class="truncate font-medium">{{ o.label }}</span>
-              <strong class="shrink-0 tabular-nums text-[#8f5d14]">{{ formatCompactNumber(t.totalVotes) }} 票</strong>
-            </div>
-          </div>
-        </NuxtLink>
+        <QuickPollCard v-for="t in quickTopics" :key="t.id" :topic="t" />
       </div>
     </section>
 
     <section
-        ref="resultsSection"
         :id="activeCategory === 'all' ? 'hot-topics' : `category-${activeCategory}`"
         class="scroll-mt-28 py-12 sm:py-16"
         :aria-busy="status === 'pending'"
@@ -143,38 +129,12 @@
           <HomeTopicCard v-for="topic in topics" :key="topic.id" :topic="topic" />
         </div>
         <p v-else class="border border-[#d7d1c6] bg-[#faf8f3] py-16 text-center text-sm text-[#77716a]">{{ emptyMessage }}</p>
-        <nav v-if="status === 'success' && totalPages > 1" class="mt-10 flex items-center justify-center gap-2" aria-label="議題分頁">
-          <button
-            type="button"
-            class="focus-ring border border-[#171717] px-3.5 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-30"
-            :disabled="topicPage <= 1"
-            aria-label="上一頁"
-            @click="changePage(topicPage - 1)"
-          >&larr; 上一頁</button>
-          <template v-for="item in paginationItems" :key="item">
-            <span v-if="typeof item !== 'number'" class="grid min-w-6 place-items-center text-[#77716a]" aria-hidden="true">&hellip;</span>
-            <button
-              v-else
-              type="button"
-              class="focus-ring min-w-10 border px-3 py-2 text-sm font-bold"
-              :class="item === topicPage ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-white hover:bg-[#ebe6dc]'"
-              :aria-label="`第 ${item} 頁`"
-              :aria-current="item === topicPage ? 'page' : undefined"
-              @click="changePage(item)"
-            >{{ item }}</button>
-          </template>
-          <button
-            type="button"
-            class="focus-ring border border-[#171717] px-3.5 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-30"
-            :disabled="topicPage >= totalPages"
-            aria-label="下一頁"
-            @click="changePage(topicPage + 1)"
-          >下一頁 &rarr;</button>
-        </nav>
-      </section>
-
-      <section v-if="trending.length" class="lg:hidden" aria-label="熱門議題排行">
-        <HomeTrendingList :topics="trending.slice(0, 3)" />
+        <div v-if="status === 'success' && topicPage < totalPages" class="mt-10 flex flex-col items-center gap-3">
+          <UiButton variant="outline" :disabled="loadingMore" @click="loadMore">
+            {{ loadingMore ? '載入更多中…' : '載入更多議題' }}
+          </UiButton>
+          <p class="text-xs text-[#77716a]">已顯示 {{ topics.length }} / {{ data.pagination.total }} 筆</p>
+        </div>
       </section>
     </template>
 
@@ -188,7 +148,7 @@
 import type { Topic, TopicListResponse } from '~/types/topic';
 import type { CommentActivity } from '~/composables/useRealtime';
 import { useCategories } from '~/composables/useCategories';
-import { contrastTextColor, deadlineLabel, formatCompactNumber, leadingOptions } from '~/utils/topic';
+import { contrastTextColor } from '~/utils/topic';
 
 useSeoMeta({
   title: '輿論測風向｜看見真實民意',
@@ -206,10 +166,9 @@ const activeCategory = ref(initialCategory);
 const searchInput = ref(initialSearch);
 const searchTerm = ref(initialSearch);
 const topicPage = ref(initialPage);
-const resultsSection = ref<HTMLElement | null>(null);
 
 const { active: activeCategories, refresh: refreshCategories } = useCategories();
-const [topicState, featuredState, trendingState, commentState, quickState] = await Promise.all([
+const [topicState, featuredState, commentState, quickState] = await Promise.all([
   useAsyncData(
     'homepage-topics',
     () => api.get<TopicListResponse>('/topics', {
@@ -219,17 +178,12 @@ const [topicState, featuredState, trendingState, commentState, quickState] = awa
       search: searchTerm.value || undefined,
       sort: 'POPULAR',
     }),
-    { default: () => emptyTopicList(9), watch: [topicPage, activeCategory, searchTerm] },
+    { default: () => emptyTopicList(9), watch: [activeCategory, searchTerm] },
   ),
   useAsyncData(
     'homepage-featured',
     () => api.get<Topic[]>('/topics/featured'),
     { default: () => [] },
-  ),
-  useAsyncData(
-    'homepage-trending',
-    () => api.get<TopicListResponse>('/topics', { limit: 8, sort: 'POPULAR' }),
-    { default: () => emptyTopicList(8) },
   ),
   useAsyncData(
     'recent-comment-activity',
@@ -245,38 +199,22 @@ const [topicState, featuredState, trendingState, commentState, quickState] = awa
 
 const { data, status, error, refresh } = topicState;
 const { data: featuredData, refresh: refreshFeatured } = featuredState;
-const { data: trendingData, refresh: refreshTrending } = trendingState;
 const { data: quickTopics, refresh: refreshQuick } = quickState;
 const { data: initialCommentActivities, refresh: refreshComments } = commentState;
 const commentActivities = ref<CommentActivity[]>(initialCommentActivities.value);
 const { onCommentActivity, cleanup: cleanupRealtime } = useRealtime();
 
-const topics = computed(() => data.value.items);
-const featuredTopics = computed<Topic[]>(() => {
-  const list = featuredData.value ?? [];
-  if (list.length) return list;
-  return trendingData.value.items[0] ? [trendingData.value.items[0]] : [];
-});
-const featuredIds = computed(() => new Set(featuredTopics.value.map((topic) => topic.id)));
-const featured = computed<Topic | null>(() => featuredTopics.value[0] ?? null);
-const trending = computed(() => trendingData.value.items.filter((topic) => !featuredIds.value.has(topic.id)).slice(0, 4));
+const loadingMore = ref(false);
+const visibleTopics = ref<Topic[]>([]);
+watch(() => data.value, (list) => {
+  if (list) visibleTopics.value = [...list.items];
+}, { immediate: true });
+const topics = computed(() => visibleTopics.value);
+const featuredTopics = computed<Topic[]>(() => featuredData.value ?? []);
 const categoryCounts = computed(() => data.value.categoryCounts ?? {});
 const allTopicCount = computed(() => Object.values(categoryCounts.value).reduce((sum, count) => sum + count, 0));
 const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const totalPages = computed(() => Math.max(1, data.value.pagination.pages));
-const paginationItems = computed<Array<number | string>>(() => {
-  if (totalPages.value <= 7) return Array.from({ length: totalPages.value }, (_, index) => index + 1);
-  const pages = [...new Set([1, totalPages.value, topicPage.value - 1, topicPage.value, topicPage.value + 1])]
-    .filter((page) => page >= 1 && page <= totalPages.value)
-    .sort((a, b) => a - b);
-  const items: Array<number | string> = [];
-  for (const page of pages) {
-    const previous = items.at(-1);
-    if (typeof previous === 'number' && page - previous > 1) items.push(`gap-${previous}`);
-    items.push(page);
-  }
-  return items;
-});
 const selectedCategory = computed(() => activeCategories.value.find((category) => category.key === activeCategory.value));
 const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : (selectedCategory.value?.label ?? '議題'));
 const hasActiveFilters = computed(() => activeCategory.value !== 'all' || Boolean(searchTerm.value));
@@ -364,13 +302,26 @@ function selectCategory(category: string) {
   topicPage.value = 1;
 }
 
-function changePage(page: number) {
-  if (page < 1 || page > totalPages.value || page === topicPage.value) return;
-  topicPage.value = page;
-  nextTick(() => resultsSection.value?.scrollIntoView({
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-    block: 'start',
-  }));
+async function loadMore() {
+  if (loadingMore.value) return;
+  const pages = data.value.pagination.pages;
+  if (topicPage.value >= pages) return;
+  loadingMore.value = true;
+  try {
+    const res = await api.get<TopicListResponse>('/topics', {
+      page: topicPage.value + 1,
+      limit: 9,
+      category: activeCategory.value === 'all' ? undefined : activeCategory.value,
+      search: searchTerm.value || undefined,
+      sort: 'POPULAR',
+    });
+    visibleTopics.value.push(...res.items);
+    topicPage.value += 1;
+  } catch {
+    // 載入失敗時保留現有列表，讓使用者可按鈕重試。
+  } finally {
+    loadingMore.value = false;
+  }
 }
 
 function syncRouteQuery() {
@@ -390,7 +341,7 @@ function syncRouteQuery() {
 }
 
 async function refreshHomepage() {
-  await Promise.all([refresh(), refreshFeatured(), refreshTrending(), refreshComments(), refreshCategories(), refreshQuick()]);
+  await Promise.all([refresh(), refreshFeatured(), refreshComments(), refreshCategories(), refreshQuick()]);
 }
 
 function commentSnippet(content: string) {
