@@ -38,79 +38,115 @@
       </button>
     </nav>
 
-    <section v-show="activeSection === 'vote'" class="max-w-3xl border-2 border-[#171717] bg-[#faf8f3] shadow-[6px_6px_0_#d7d1c6]">
-      <header class="border-b border-[#d7d1c6] px-5 py-4 sm:px-6">
-        <p class="eyebrow text-[#d84a36]">{{ showResults ? '投票結果' : '你的選擇' }}</p>
+    <section v-show="activeSection === 'vote'" class="max-w-3xl overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] shadow-[0_8px_28px_rgba(23,23,23,0.08)]">
+      <header class="border-b border-[#ded7cb] px-5 py-4 sm:px-6">
+        <p class="eyebrow-modern text-[#d84a36]">{{ showResults ? '投票結果' : '你的選擇' }}</p>
         <h2 class="mt-1 text-xl font-black">{{ showResults ? '目前風向' : '請選擇你的立場' }}</h2>
       </header>
 
       <div class="p-5 sm:p-6">
-        <template v-if="!showResults && isVotingOpen">
-          <div v-if="!auth.isAuthed" class="border-l-4 border-[#3157d5] bg-[#e7ecff] p-4">
-            <NuxtLink :to="loginUrl" class="focus-ring inline-block bg-[#171717] px-5 py-3 text-sm font-black text-white hover:bg-[#d84a36]">門號登入後投票</NuxtLink>
+        <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-4">
+          <p class="text-sm font-bold text-[#2746b4]">登入後即可投票，一人一票，還能獲得點數。</p>
+          <UiButton :to="loginUrl" variant="data" size="sm" class="mt-3">門號登入後投票</UiButton>
+        </div>
+
+        <div v-else-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
+        <div v-else-if="!showResults && isVotingOpen && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">此身份僅供工作或資訊查閱，不能參與投票。</div>
+
+        <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'SPECTRUM'">
+          <div class="flex items-end justify-between">
+            <span class="text-sm font-bold text-[#6d6861]">目前選擇</span>
+            <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ spectrumValue }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
           </div>
-
-          <div v-else-if="!participationReady" class="h-24 animate-pulse bg-[#e5e0d6]" />
-          <div v-else-if="!auth.canVote" class="border-l-4 border-[#9a5b12] bg-[#fff0d7] p-4 text-sm font-bold">此身份僅供工作或資訊查閱，不能參與投票。</div>
-          <template v-else-if="topic.topicType === 'SPECTRUM'">
-            <div class="flex items-end justify-between">
-              <span class="text-sm font-bold text-[#6d6861]">目前選擇</span>
-              <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ spectrumValue }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
-            </div>
-            <input v-model.number="spectrumValue" type="range" min="0" max="100" class="focus-ring mt-5 w-full accent-[#3157d5]" />
-            <div class="mt-2 flex justify-between text-xs font-bold text-[#77716a]"><span>0</span><span>50</span><span>100</span></div>
-            <button class="focus-ring mt-6 w-full bg-[#3157d5] px-6 py-3 text-sm font-black text-white disabled:opacity-50 sm:w-auto" :disabled="voting" @click="requestVote(null)">
-              {{ voting ? '提交中…' : `確認送出 ${spectrumValue} 分` }}
-            </button>
-          </template>
-
-          <template v-else>
-            <div class="grid gap-3">
-              <button
-                v-for="o in topic.options"
-                :key="o.id"
-                type="button"
-                class="focus-ring flex min-h-12 items-center justify-between border-2 px-4 py-3 text-left font-bold transition"
-                :class="selectedOptionId === o.id ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#cfc8bc] bg-white hover:border-[#171717]'"
-                :aria-pressed="selectedOptionId === o.id"
-                :disabled="voting"
-                @click="selectedOptionId = o.id"
-              >
-                <span>{{ o.label }}</span>
-                <span aria-hidden="true">{{ selectedOptionId === o.id ? '✓' : '○' }}</span>
-              </button>
-            </div>
-            <div class="mt-5 flex flex-col gap-3 border-t border-[#d7d1c6] pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <p class="text-xs leading-5 text-[#77716a]">送出後無法修改，請確認你的選擇。</p>
-              <button class="focus-ring bg-[#3157d5] px-6 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40" :disabled="!selectedOption || voting" @click="selectedOption && requestVote(selectedOption)">
-                {{ voting ? '提交中…' : selectedOption ? `確認投下「${selectedOption.label}」` : '請先選擇' }}
-              </button>
-            </div>
-          </template>
+          <input v-model.number="spectrumValue" type="range" min="0" max="100" class="focus-ring mt-5 w-full accent-[#3157d5]" />
+          <div class="mt-2 flex justify-between text-xs font-bold text-[#77716a]"><span>0</span><span>50</span><span>100</span></div>
+          <UiButton variant="data" block class="mt-6" :disabled="voting || confirmingSpectrum" @click="confirmingSpectrum = true">
+            確認送出 {{ spectrumValue }} 分
+          </UiButton>
         </template>
 
-        <template v-else-if="topic.topicType === 'SPECTRUM'">
-          <div class="flex items-end justify-between gap-4">
-            <span class="text-sm font-bold text-[#6d6861]">社群中位數</span>
-            <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ Math.round(Number(topic.spectrumMedian || 0)) }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
+        <template v-else-if="!showResults && isVotingOpen">
+          <div class="space-y-2.5">
+            <button
+              v-for="o in topic.options"
+              :key="o.id"
+              type="button"
+              class="focus-ring flex min-h-12 w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left font-bold transition"
+              :class="selectedOptionId === o.id ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb] bg-white hover:border-[#171717]'"
+              :disabled="voting"
+              @click="onOptionTap(o.id)"
+            >
+              <span>{{ o.label }}</span>
+              <span class="flex items-center gap-2">
+                <span v-if="voting && votingTargetId === o.id" class="size-4 animate-spin rounded-full border-2 border-[#3157d5] border-t-transparent" aria-hidden="true" />
+                <span v-else aria-hidden="true">{{ selectedOptionId === o.id ? '✓' : '○' }}</span>
+              </span>
+            </button>
           </div>
-          <div class="relative mt-5 h-3 bg-[#dfdad0]"><div class="h-full bg-[#3157d5]" :style="{ width: `${Number(topic.spectrumMedian || 0)}%` }" /></div>
-          <p v-if="topic.myVote" class="mt-4 border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+
+          <div v-if="confirmingOptionId" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedOption?.label }}」？送出後無法修改。</p>
+            <div class="flex shrink-0 gap-2">
+              <UiButton variant="outline" size="sm" :disabled="voting" @click="resetVoteIntents">重選</UiButton>
+              <UiButton variant="data" size="sm" :disabled="voting" @click="submitVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
+            </div>
+          </div>
+          <div v-if="confirmingSpectrum" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm font-bold text-[#2746b4]">確定送出 {{ spectrumValue }} 分？送出後無法修改。</p>
+            <div class="flex shrink-0 gap-2">
+              <UiButton variant="outline" size="sm" :disabled="voting" @click="confirmingSpectrum = false">重選</UiButton>
+              <UiButton variant="data" size="sm" :disabled="voting" @click="submitVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="isQuick && isVotingOpen && showResults">
+          <p class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
+            <span aria-hidden="true">✓</span> 已投票 — 快問結果即時更新，點選其他選項即可更改票。
+          </p>
+          <div class="space-y-2.5">
+            <button
+              v-for="o in topic.options"
+              :key="o.id"
+              type="button"
+              class="focus-ring block w-full overflow-hidden rounded-xl border-2 text-left transition"
+              :class="myVoteOptionId === o.id ? 'border-[#b0761f] bg-[#fff8ec]' : 'border-[#ded7cb] bg-white hover:border-[#b0761f]'"
+              :disabled="voting"
+              @click="onOptionTap(o.id)"
+            >
+              <span class="flex items-center justify-between px-4 py-3 text-sm font-bold">
+                <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+                <span class="flex items-center gap-2 tabular-nums">
+                  <span v-if="voting && votingTargetId === o.id" class="size-4 animate-spin rounded-full border-2 border-[#b0761f] border-t-transparent" aria-hidden="true" />
+                  <template v-else>{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</template>
+                </span>
+              </span>
+              <span class="block h-1.5 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
+            </button>
+          </div>
         </template>
 
         <template v-else>
-          <div class="space-y-5">
-            <div v-for="o in topic.options" :key="o.id">
-              <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="font-bold">{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
-              <div class="h-2 bg-[#dfdad0]"><div class="h-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></div>
+          <template v-if="topic.topicType === 'SPECTRUM'">
+            <div class="flex items-end justify-between gap-4">
+              <span class="text-sm font-bold text-[#6d6861]">社群中位數</span>
+              <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ Math.round(Number(topic.spectrumMedian || 0)) }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
             </div>
-          </div>
-          <p v-if="topic.myVote" class="mt-5 border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+            <div class="relative mt-5 h-3 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5]" :style="{ width: `${Number(topic.spectrumMedian || 0)}%` }" /></div>
+            <p v-if="topic.myVote" class="mt-4 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+          </template>
+          <template v-else>
+            <div class="space-y-5">
+              <div v-for="o in topic.options" :key="o.id">
+                <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="font-bold">{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
+                <div class="h-2 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></div>
+              </div>
+            </div>
+            <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+          </template>
         </template>
 
-        <p v-if="votingSuccess" class="mt-5 border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold text-[#2f6547]">{{ votingSuccess }}</p>
-        <p v-if="votingError" class="mt-5 border-l-4 border-[#d84a36] bg-[#fbe9e5] p-3 text-sm font-bold text-[#a63222]">{{ votingError }}</p>
-        <p v-if="auth.isAuthed && participationReady && !auth.canVote" class="mt-5 border-l-4 border-[#9a5b12] bg-[#fff0d7] p-3 text-sm font-bold">此身份僅供工作或資訊查閱，投票結果為唯讀。</p>
+        <p v-if="!isQuick && !showResults && isVotingOpen" class="mt-4 border-t border-[#ded7cb] pt-4 text-xs leading-5 text-[#77716a]">送出後無法修改。投票後可立即查看即時風向。</p>
       </div>
     </section>
 
@@ -150,29 +186,6 @@
 
     <StanceStatistics v-if="activeSection === 'statistics' && topicId" :topic-id="topicId" />
 
-    <div
-      v-if="confirmingVote"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-vote-title"
-      class="fixed inset-0 z-50 flex items-end justify-center bg-[#171717]/50 p-4 sm:items-center"
-      @click.self="cancelVote"
-      @keydown.esc="cancelVote"
-    >
-      <div class="w-full max-w-md border-2 border-[#171717] bg-[#faf8f3] p-6 shadow-[6px_6px_0_#171717]">
-        <p class="eyebrow text-[#3157d5]">送出前確認</p>
-        <h2 id="confirm-vote-title" class="mt-1 text-xl font-black">確定要送出你的選擇嗎？</h2>
-        <p class="mt-4 text-sm leading-6 text-[#5f5a53]">{{ confirmVoteText }}</p>
-        <p class="mt-3 border-l-4 border-[#d84a36] bg-[#fbe9e5] p-3 text-xs font-bold text-[#a63222]">送出後無法修改。</p>
-        <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button ref="cancelVoteButton" type="button" class="focus-ring border border-[#cfc8bc] px-5 py-3 text-sm font-black text-[#5f5a53] hover:border-[#171717]" @click="cancelVote">取消</button>
-          <button type="button" class="focus-ring bg-[#3157d5] px-5 py-3 text-sm font-black text-white disabled:opacity-40" :disabled="voting" @click="confirmVote">
-            {{ voting ? '提交中…' : '確定送出' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
   </div>
 </template>
 
@@ -184,6 +197,7 @@ const route = useRoute();
 const router = useRouter();
 const api = useApi();
 const auth = useAuthStore();
+const { success: toastSuccess, error: toastError } = useToast();
 const topicId = computed(() => route.params.id as string);
 const loginUrl = computed(() => `/login?redirect=${encodeURIComponent(route.fullPath)}`);
 
@@ -201,19 +215,13 @@ const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabil
 const showResults = computed(() => !!topic.value && (topic.value.hasVoted || !isVotingOpen.value || (participationReady.value && !auth.canVote)));
 const totalVotes = ref('0');
 const voting = ref(false);
-const votingError = ref('');
-const votingSuccess = ref('');
+const votingTargetId = ref<string | null>(null);
 const spectrumValue = ref(50);
 const selectedOptionId = ref<string | null>(null);
 const selectedOption = computed(() => topic.value?.options.find((option) => option.id === selectedOptionId.value) ?? null);
-const confirmingVote = ref<{ option: TopicOption | null; spectrumValue: number | null } | null>(null);
-const cancelVoteButton = ref<HTMLButtonElement | null>(null);
-const confirmVoteText = computed(() => {
-  const intent = confirmingVote.value;
-  if (!intent) return '';
-  if (intent.option) return `將對「${topic.value?.title ?? ''}」投下「${intent.option.label}」。`;
-  return `將對「${topic.value?.title ?? ''}」送出 ${intent.spectrumValue} / 100 分。`;
-});
+const confirmingOptionId = ref<string | null>(null);
+const confirmingSpectrum = ref(false);
+const myVoteOptionId = computed(() => topic.value?.options.find((option) => option.label === topic.value?.myVote?.choice)?.id ?? null);
 const isQuick = computed(() => topic.value?.kind === 'QUICK');
 const sections = computed<Array<{ value: TopicSection; label: string; count: number | null }>>(() => {
   if (isQuick.value) return [{ value: 'vote', label: '即時結果', count: null }];
@@ -296,34 +304,85 @@ async function load() {
   }
 }
 
-function requestVote(option: TopicOption | null) {
-  confirmingVote.value = { option, spectrumValue: option ? null : spectrumValue.value };
+function resetVoteIntents() {
+  selectedOptionId.value = null;
+  confirmingOptionId.value = null;
+  confirmingSpectrum.value = false;
+  votingTargetId.value = null;
 }
 
-function cancelVote() {
-  confirmingVote.value = null;
+function onOptionTap(optionId: string) {
+  if (!auth.isAuthed || voting.value || !isVotingOpen.value) return;
+  const option = topic.value?.options.find((item) => item.id === optionId);
+  if (!option) return;
+  if (topic.value?.hasVoted) {
+    void changeQuickVote(option);
+    return;
+  }
+  if (isQuick.value) {
+    void submitQuickVote(option);
+    return;
+  }
+  selectedOptionId.value = optionId;
+  confirmingOptionId.value = option.id;
 }
 
-async function confirmVote() {
-  const intent = confirmingVote.value;
-  if (!intent) return;
+async function submitVote() {
+  if (voting.value) return;
+  const isSpectrum = topic.value?.topicType === 'SPECTRUM';
+  if (!isSpectrum && !selectedOption.value) return;
   voting.value = true;
-  votingError.value = '';
-  votingSuccess.value = '';
+  votingTargetId.value = selectedOption.value?.id ?? null;
   try {
-    const body = intent.option
-      ? { optionId: intent.option.id }
-      : { spectrumValue: intent.spectrumValue };
+    const body = isSpectrum
+      ? { spectrumValue: spectrumValue.value }
+      : { optionId: selectedOption.value!.id };
     const res = await api.post<{ newBalance: string; rewardPoints: number }>(`/topics/${topicId.value}/vote`, body);
     auth.updatePoints(res.newBalance);
-    const choice = intent.option?.label ?? `${intent.spectrumValue} 分`;
-    votingSuccess.value = `已投下「${choice}」${res.rewardPoints > 0 ? `，獲得 ${res.rewardPoints} 點` : ''}。`;
-    confirmingVote.value = null;
+    const choice = isSpectrum ? `${spectrumValue.value} 分` : selectedOption.value!.label;
+    toastSuccess(res.rewardPoints > 0 ? `已投下「${choice}」，獲得 ${res.rewardPoints} 點` : `已投下「${choice}」`);
+    resetVoteIntents();
     await load();
-    if (topic.value?.kind !== 'QUICK') await setSection('stances');
   } catch (e) {
-    votingError.value = errorMessage(e);
-    confirmingVote.value = null;
+    resetVoteIntents();
+    toastError(errorMessage(e));
+    await load();
+  } finally {
+    voting.value = false;
+  }
+}
+
+async function submitQuickVote(option: TopicOption) {
+  voting.value = true;
+  votingTargetId.value = option.id;
+  try {
+    const res = await api.post<{ newBalance: string; rewardPoints: number }>(`/topics/${topicId.value}/vote`, { optionId: option.id });
+    auth.updatePoints(res.newBalance);
+    votingTargetId.value = null;
+    toastSuccess('已投票，快問結果即時更新');
+    await load();
+  } catch (e) {
+    votingTargetId.value = null;
+    toastError(errorMessage(e));
+    await load();
+  } finally {
+    voting.value = false;
+  }
+}
+
+async function changeQuickVote(option: TopicOption) {
+  if (voting.value || option.id === myVoteOptionId.value) return;
+  voting.value = true;
+  votingTargetId.value = option.id;
+  try {
+    const res = await api.patch<{ newBalance: string; rewardPoints: number }>(`/topics/${topicId.value}/vote`, { optionId: option.id });
+    auth.updatePoints(res.newBalance);
+    votingTargetId.value = null;
+    toastSuccess(`已更改為「${option.label}」`);
+    await load();
+  } catch (e) {
+    votingTargetId.value = null;
+    toastError(errorMessage(e));
     await load();
   } finally {
     voting.value = false;
@@ -341,17 +400,10 @@ onMounted(async () => {
 watch(topicId, async (nextId, previousId) => {
   leaveTopic(previousId);
   selectedStance.value = null;
-  selectedOptionId.value = null;
-  confirmingVote.value = null;
+  resetVoteIntents();
   activeSection.value = validSections.includes(route.query.section as TopicSection) ? route.query.section as TopicSection : 'vote';
   await load();
   joinTopic(nextId);
-});
-watch(confirmingVote, async (open, wasOpen) => {
-  if (open && !wasOpen) {
-    await nextTick();
-    cancelVoteButton.value?.focus();
-  }
 });
 watch(() => route.query.section, async (section) => {
   if (validSections.includes(section as TopicSection) && (section !== 'statistics' || auth.canViewAnalytics)) {
