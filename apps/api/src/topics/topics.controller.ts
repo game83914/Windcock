@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ParsedIdPipe } from '../common/parsed-id.pipe';
@@ -164,5 +164,16 @@ export class TopicsController {
     @Body() dto: VoteDto,
   ) {
     return this.topicsService.vote(id, user.userId, dto);
+  }
+
+  @Patch(':id/vote')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  revote(
+    @Param('id', ParsedIdPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: VoteDto,
+  ) {
+    return this.topicsService.revote(id, user.userId, dto);
   }
 }

@@ -817,6 +817,100 @@ export class TopicsService {
     };
   }
 
+  async revote(topicId: bigint, userId: bigint, dto: VoteDto): Promise<VoteResult> {
+    await this.policy.assertPublicAction(userId, 'VOTE');
+
+    interface RevoteTransaction {
+      voteId: bigint;
+      optionId: string | null;
+      spectrumValue: number | null;
+      newBalance: bigint;
+    }
+
+    const result = await this.prisma.$transaction(async (tx): Promise<RevoteTransaction> => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${userId})`;
+      const lockedTopic = await tx.$queryRaw<Array<{ id: bigint }>>`SELECT id FROM topics WHERE id = ${topicId} FOR UPDATE`;
+      if (!lockedTopic.length) throw new NotFoundException('議題不存在');
+      const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: true } });
+      if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.kind !== TopicKind.QUICK) throw new ForbiddenException('此議題送出後不可更改');
+      if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
+      if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
+      if (!topic.voteEndAt) throw new ForbiddenException('議題尚未設定投票期限');
+      if (topic.voteEndAt.getTime() <= Date.now()) throw new ForbiddenException('議題已截止投票');
+
+      const existing = await tx.vote.findUnique({ where: { userId_topicId: { userId, topicId } } });
+      if (!existing) throw new NotFoundException('尚未投票，無法更改');
+
+      let optionId: bigint | null = null;
+      let spectrumValue: number | null = null;
+      if (topic.topicType === 'SPECTRUM') {
+        if (dto.spectrumValue === undefined || dto.spectrumValue === null) {
+          throw new BadRequestException('光譜題必須提供 spectrumValue（0~100）');
+        }
+        spectrumValue = dto.spectrumValue;
+      } else {
+        if (!dto.optionId) throw new BadRequestException('必須選擇一個選項');
+        const chosenOptionId = BigInt(dto.optionId);
+        const valid = topic.options.some((o) => o.id === chosenOptionId);
+        if (!valid) throw new BadRequestException('選項不存在於此議題');
+        optionId = chosenOptionId;
+      }
+      if (existing.optionId !== null && existing.optionId === optionId) {
+        const unchanged = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
+        return {
+          voteId: existing.id,
+          optionId: existing.optionId.toString(),
+          spectrumValue: existing.spectrumValue,
+          newBalance: unchanged?.pointsBalance ?? BigInt(0),
+        };
+      }
+
+      if (existing.optionId) {
+        await tx.topicOption.update({
+          where: { id: existing.optionId },
+          data: { voteCount: { decrement: 1 } },
+        });
+      }
+      await tx.vote.delete({ where: { id: existing.id } });
+      const createdVote = await tx.vote.create({ data: { userId, topicId, optionId, spectrumValue } });
+      if (optionId) {
+        await tx.topicOption.update({
+          where: { id: optionId },
+          data: { voteCount: { increment: 1 } },
+        });
+      }
+
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
+      return {
+        voteId: createdVote.id,
+        optionId: optionId?.toString() ?? null,
+        spectrumValue,
+        newBalance: user?.pointsBalance ?? BigInt(0),
+      };
+    });
+
+    const snapshotPromise = this.createDemographicSnapshot(result.voteId, userId);
+    if (result.spectrumValue !== null) {
+      await Promise.all([snapshotPromise, this.recomputeSpectrum(topicId)]);
+    } else {
+      await snapshotPromise;
+    }
+    const [optionCounts, updatedTopic] = await Promise.all([
+      this.loadOptionCounts(topicId),
+      this.prisma.topic.findUnique({ where: { id: topicId }, select: { totalVotes: true } }),
+    ]);
+    await this.realtime.broadcastTopicVotes(topicId, optionCounts, updatedTopic?.totalVotes);
+
+    return {
+      success: true,
+      optionId: result.optionId,
+      spectrumValue: result.spectrumValue,
+      rewardPoints: 0,
+      newBalance: result.newBalance.toString(),
+    };
+  }
+
   private async createDemographicSnapshot(voteId: bigint, userId: bigint) {
     try {
       const profile = await this.prisma.userDemographicProfile.findUnique({ where: { userId }, include: { guardianConsent: true } });
