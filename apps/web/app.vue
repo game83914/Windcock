@@ -9,6 +9,36 @@
           </span>
         </NuxtLink>
 
+        <div v-if="showCreateButton" ref="createAreaEl" class="relative shrink-0">
+          <button
+            type="button"
+            class="focus-ring grid size-9 place-items-center rounded-xl bg-[#171717] text-white transition hover:bg-[#d84a36]"
+            aria-haspopup="menu"
+            :aria-expanded="createMenuOpen"
+            @click="createMenuOpen = !createMenuOpen"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+          <Transition name="create-drop">
+            <div v-if="createMenuOpen" role="menu" aria-label="選擇要建立的內容類型" class="absolute left-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] p-1.5 shadow-[0_12px_36px_rgba(23,23,23,0.16)]">
+              <NuxtLink
+                v-if="canCreateTopic"
+                role="menuitem"
+                to="/topics/create"
+                class="focus-ring block px-3 py-2.5 text-sm font-black text-[#d84a36] hover:bg-[#fbe9e5]"
+                @click="createMenuOpen = false"
+              >建立議題</NuxtLink>
+              <NuxtLink
+                v-if="canCreateQuick"
+                role="menuitem"
+                to="/topics/quick"
+                class="focus-ring block px-3 py-2.5 text-sm font-black text-[#b0761f] hover:bg-[#fff0d7]"
+                @click="createMenuOpen = false"
+              >發起快問</NuxtLink>
+            </div>
+          </Transition>
+        </div>
+
         <NuxtLink to="/search" class="focus-ring grid size-9 shrink-0 place-items-center rounded-xl border border-[#ded7cb] bg-white text-[#171717] transition hover:border-[#b0761f] hover:text-[#b0761f]" aria-label="搜尋議題" title="搜尋議題">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
         </NuxtLink>
@@ -59,6 +89,12 @@ const authed = computed(() => auth.isAuthed);
 const api = useApi();
 const unreadCount = ref(0);
 
+const createAreaEl = ref<HTMLElement | null>(null);
+const createMenuOpen = ref(false);
+const canCreateTopic = computed(() => authed.value && (auth.canAuthorTopics || auth.canSubmitTopicApplication));
+const canCreateQuick = computed(() => authed.value && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
+const showCreateButton = computed(() => canCreateTopic.value || canCreateQuick.value);
+
 async function loadUnreadCount() {
   if (!authed.value) {
     unreadCount.value = 0;
@@ -94,10 +130,14 @@ onMounted(() => {
   loadCapabilities();
   window.addEventListener('notifications-read', updateUnreadCount);
   window.addEventListener('identity-changed', refreshIdentityData);
+  window.addEventListener('pointerdown', onOutsidePointerDown);
+  window.addEventListener('keydown', onEscape, true);
 });
 onUnmounted(() => {
   window.removeEventListener('notifications-read', updateUnreadCount);
   window.removeEventListener('identity-changed', refreshIdentityData);
+  window.removeEventListener('pointerdown', onOutsidePointerDown);
+  window.removeEventListener('keydown', onEscape, true);
 });
 watch(authed, () => { loadUnreadCount(); loadCapabilities(); });
 
@@ -105,4 +145,35 @@ async function logout() {
   auth.clear();
   await navigateTo('/');
 }
+
+function onOutsidePointerDown(event: PointerEvent) {
+  if (!createMenuOpen.value) return;
+  const el = createAreaEl.value;
+  if (el && !(event.target as Node).isConnected) return;
+  if (el && !el.contains(event.target as Node)) createMenuOpen.value = false;
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape' && createMenuOpen.value) createMenuOpen.value = false;
+}
 </script>
+
+<style scoped>
+.create-drop-enter-active,
+.create-drop-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.create-drop-enter-from,
+.create-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .create-drop-enter-active,
+  .create-drop-leave-active {
+    transition: none;
+  }
+}
+</style>
