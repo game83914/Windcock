@@ -18,7 +18,6 @@
           <template v-if="authed">
             <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring rounded-lg bg-[#b0761f] px-3 py-2 text-xs font-bold text-white lg:hidden">快問</NuxtLink>
             <NuxtLink v-if="auth.canAuthorTopics || auth.canSubmitTopicApplication" to="/topics/create" class="focus-ring rounded-lg bg-[#d84a36] px-3 py-2 text-xs font-bold text-white lg:hidden">{{ auth.canAuthorTopics ? '建立' : '提案' }}</NuxtLink>
-            <NuxtLink to="/me/notifications" class="focus-ring relative rounded-lg px-2 py-1.5 text-xs font-bold hover:bg-[#ebe6dc] hover:text-[#d84a36]">通知<span v-if="unreadCount" class="ml-1 inline-grid min-w-4 place-items-center rounded-full bg-[#d84a36] px-1 text-[9px] text-white">{{ unreadCount > 9 ? '9+' : unreadCount }}</span></NuxtLink>
             <details class="group relative">
               <summary class="focus-ring flex cursor-pointer list-none items-center gap-2 rounded-xl border border-[#ded7cb] bg-white px-2 py-1.5 hover:border-[#b9b0a3] [&::-webkit-details-marker]:hidden">
                 <UserAvatar :nickname="auth.nickname" :avatar-url="auth.avatarUrl" size="sm" />
@@ -27,6 +26,7 @@
               </summary>
               <div class="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] p-1.5 shadow-[0_12px_36px_rgba(23,23,23,0.16)]">
                 <NuxtLink to="/me" class="focus-ring block px-3 py-2 text-sm font-black hover:bg-[#ebe6dc]">會員中心</NuxtLink>
+                <NuxtLink to="/me/notifications" class="focus-ring flex items-center justify-between px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">通知<span v-if="unreadCount" class="inline-grid min-w-4 place-items-center rounded-full bg-[#d84a36] px-1 text-[9px] text-white">{{ unreadCount > 9 ? '9+' : unreadCount }}</span></NuxtLink>
                 <NuxtLink to="/me/votes" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">投票紀錄</NuxtLink>
                 <NuxtLink to="/me/topics" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">我的議題</NuxtLink>
                 <NuxtLink to="/me/applications" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">我的提案</NuxtLink>
