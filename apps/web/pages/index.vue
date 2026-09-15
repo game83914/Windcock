@@ -82,28 +82,7 @@
                 <option value="NEWEST">建立時間</option>
               </select>
             </label>
-            <button
-              type="button"
-              class="focus-ring grid size-9 shrink-0 place-items-center rounded-2xl border transition"
-              :class="showSearch || searchActive ? 'border-[#d84a36] bg-[#fbe9e5] text-[#d84a36]' : 'border-[#d3cbc0] bg-white text-[#5f5a53] hover:border-[#b9b0a3]'"
-              :aria-expanded="showSearch"
-              :aria-label="showSearch ? '收起搜尋' : '展開搜尋'"
-              @click="toggleSearch"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-            </button>
           </div>
-          <Transition name="search-drop">
-            <div v-if="showSearch" class="mt-2.5">
-              <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-3 pr-2">
-                <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                <input ref="searchInputEl" v-model="searchInput" type="search" maxlength="100" placeholder="搜尋議題標題或描述" aria-label="搜尋議題" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none" />
-                <button v-if="searchInput" type="button" class="focus-ring grid size-6 shrink-0 place-items-center rounded-full text-[#77716a] hover:bg-[#ebe6dc] hover:text-[#171717]" aria-label="清除搜尋" @click="clearSearch">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
-                </button>
-              </label>
-            </div>
-          </Transition>
         </div>
         </div>
         <p class="sr-only" aria-live="polite">{{ resultsAnnouncement }}</p>
@@ -158,19 +137,13 @@ const api = useApi();
 const route = useRoute();
 const router = useRouter();
 const initialCategory = queryText(route.query.category) || 'all';
-const initialSearch = queryText(route.query.search);
 const initialPage = 1;
 const initialSort = (['POPULAR', 'NEWEST', 'ACTIVITY'] as const).includes(queryText(route.query.sort) as 'POPULAR' | 'NEWEST' | 'ACTIVITY')
   ? (queryText(route.query.sort) as 'POPULAR' | 'NEWEST' | 'ACTIVITY')
   : 'ACTIVITY';
 const activeCategory = ref(initialCategory);
-const searchInput = ref(initialSearch);
-const searchTerm = ref(initialSearch);
 const topicPage = ref(initialPage);
 const sort = ref<'POPULAR' | 'NEWEST' | 'ACTIVITY'>(initialSort);
-const showSearch = ref(Boolean(initialSearch));
-const searchInputEl = ref<HTMLInputElement | null>(null);
-const searchActive = computed(() => Boolean(searchTerm.value));
 
 const { active: activeCategories, refresh: refreshCategories } = useCategories();
 const kindForFetch = computed<'FORMAL' | 'QUICK' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : 'FORMAL');
@@ -181,11 +154,10 @@ const [topicState, featuredState, commentState] = await Promise.all([
       page: topicPage.value,
       limit: 9,
       category: kindForFetch.value === 'FORMAL' ? activeCategory.value : undefined,
-      search: searchTerm.value || undefined,
       sort: sort.value,
       kind: kindForFetch.value,
     }),
-    { default: () => emptyTopicList(9), watch: [activeCategory, searchTerm, sort] },
+    { default: () => emptyTopicList(9), watch: [activeCategory, sort] },
   ),
   useAsyncData(
     'homepage-featured',
@@ -217,9 +189,8 @@ const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投�
 const filterChips = computed(() => [quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
 const selectedCategory = computed(() => activeCategories.value.find((category) => category.key === activeCategory.value));
 const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : activeCategory.value === 'quick' ? '快問' : (selectedCategory.value?.label ?? '議題'));
-const hasActiveFilters = computed(() => activeCategory.value !== 'all' || Boolean(searchTerm.value));
+const hasActiveFilters = computed(() => activeCategory.value !== 'all');
 const emptyMessage = computed(() => {
-  if (searchTerm.value) return `找不到符合「${searchTerm.value}」的議題`;
   if (activeCategory.value === 'quick') return '目前沒有進行中的快問投票';
   return `${sectionHeading.value}目前沒有進行中的議題`;
 });
@@ -233,30 +204,14 @@ const isInitialLoading = computed(() => status.value === 'pending' && !hasLoaded
 const fatalError = computed(() => Boolean(error.value) && !hasLoaded.value);
 const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
 
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let deadlineTimer: ReturnType<typeof setInterval> | null = null;
 let syncingFromRoute = false;
 let intersectionObserver: IntersectionObserver | null = null;
 let observedSentinel: Element | null = null;
 const loadMoreSentinel = ref<HTMLElement | null>(null);
 
-watch(searchInput, (value) => {
-  if (syncingFromRoute) return;
-  if (searchTimer) clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    searchTimer = null;
-    searchTerm.value = value.trim();
-    topicPage.value = 1;
-  }, 300);
-});
 watch(status, (nextStatus) => {
   if (nextStatus === 'success') hasLoaded.value = true;
-});
-watch(searchTerm, (value) => {
-  if (value) showSearch.value = true;
-});
-watch(showSearch, (open) => {
-  if (open) nextTick(() => searchInputEl.value?.focus());
 });
 watch(() => data.value.pagination.pages, (pages) => {
   if (pages === 0 && topicPage.value !== 1) topicPage.value = 1;
@@ -268,15 +223,12 @@ watch(activeCategories, (categories) => {
     topicPage.value = 1;
   }
 });
-watch([activeCategory, searchTerm, topicPage], syncRouteQuery);
+watch([activeCategory, topicPage], syncRouteQuery);
 watch(() => route.query, (query) => {
   syncingFromRoute = true;
   const category = queryText(query.category) || 'all';
-  const search = queryText(query.search);
   const nextSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(query.sort)) ? queryText(query.sort) : 'ACTIVITY';
   if (activeCategory.value !== category) activeCategory.value = category;
-  if (searchTerm.value !== search) searchTerm.value = search;
-  if (searchInput.value !== search) searchInput.value = search;
   if (sort.value !== nextSort) sort.value = nextSort as 'POPULAR' | 'NEWEST' | 'ACTIVITY';
   nextTick(() => { syncingFromRoute = false; });
 });
@@ -311,7 +263,6 @@ onUnmounted(() => {
   intersectionObserver?.disconnect();
   intersectionObserver = null;
   observedSentinel = null;
-  if (searchTimer) clearTimeout(searchTimer);
   if (deadlineTimer) clearInterval(deadlineTimer);
 });
 
@@ -324,25 +275,12 @@ function queryText(value: unknown) {
 }
 
 function selectCategory(category: string) {
-  if (searchTimer) clearTimeout(searchTimer);
-  searchTerm.value = searchInput.value.trim();
   activeCategory.value = category;
   topicPage.value = 1;
 }
 
 function selectSort() {
   topicPage.value = 1;
-}
-
-function toggleSearch() {
-  showSearch.value = !showSearch.value;
-}
-
-function clearSearch() {
-  searchInput.value = '';
-  searchTerm.value = '';
-  topicPage.value = 1;
-  showSearch.value = false;
 }
 
 async function loadMore() {
@@ -355,7 +293,6 @@ async function loadMore() {
       page: topicPage.value + 1,
       limit: 9,
       category: kindForFetch.value === 'FORMAL' ? activeCategory.value : undefined,
-      search: searchTerm.value || undefined,
       sort: sort.value,
       kind: kindForFetch.value,
     });
@@ -371,14 +308,11 @@ async function loadMore() {
 function syncRouteQuery() {
   if (!import.meta.client) return;
   const currentCategory = queryText(route.query.category) || 'all';
-  const currentSearch = queryText(route.query.search);
   const currentSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(route.query.sort)) ? queryText(route.query.sort) : 'ACTIVITY';
-  if (currentCategory === activeCategory.value && currentSearch === searchTerm.value && currentSort === sort.value) return;
+  if (currentCategory === activeCategory.value && currentSort === sort.value) return;
   const query = { ...route.query };
   if (activeCategory.value === 'all') delete query.category;
   else query.category = activeCategory.value;
-  if (searchTerm.value) query.search = searchTerm.value;
-  else delete query.search;
   delete query.page;
   if (sort.value === 'ACTIVITY') delete query.sort;
   else query.sort = sort.value;
@@ -406,17 +340,6 @@ function commentSnippet(content: string) {
 
 @keyframes ticker-scroll {
   to { transform: translateX(-50%); }
-}
-
-.search-drop-enter-active,
-.search-drop-leave-active {
-  transition: opacity 0.16s ease, transform 0.16s ease;
-}
-
-.search-drop-enter-from,
-.search-drop-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
 }
 
 @media (prefers-reduced-motion: reduce) {
