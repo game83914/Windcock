@@ -212,7 +212,7 @@ const selectedStance = ref<string | null>(typeof route.query.stance === 'string'
 const selectedStanceTab = computed(() => route.query.tab === 'discussion' ? 'DISCUSSION' as const : 'DETAIL' as const);
 const isVotingOpen = computed(() => topic.value?.status === 'OPEN' && !!topic.value.voteEndAt && new Date(topic.value.voteEndAt).getTime() > Date.now());
 const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabilitySummary?.participation));
-const showResults = computed(() => !!topic.value && (topic.value.hasVoted || !isVotingOpen.value || (participationReady.value && !auth.canVote)));
+const showResults = computed(() => !!topic.value && (topic.value.hasVoted || !isVotingOpen.value || (auth.isAuthed && participationReady.value && !auth.canVote)));
 const totalVotes = ref('0');
 const voting = ref(false);
 const votingTargetId = ref<string | null>(null);
