@@ -64,6 +64,17 @@
             <span class="text-xs font-bold tabular-nums text-[#77716a]">{{ status === 'pending' ? '載入中' : `${data.pagination.total} 筆` }}</span>
           </div>
           <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+            <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white px-3 py-1.5 sm:w-40">
+              <span class="text-xs font-bold text-[#77716a]">分類</span>
+              <select v-model="activeCategory" class="min-w-0 flex-1 bg-transparent py-1 text-sm font-bold outline-none" aria-label="議題分類" @change="selectCategory(activeCategory)">
+                <option value="all">全部（{{ allTopicCount }}）</option>
+                <option
+                  v-for="category in filterChips"
+                  :key="category.key"
+                  :value="category.key"
+                >{{ category.key === 'quick' ? '⚡ 快問' : `${category.label}（${categoryCounts[category.key] ?? 0}）` }}</option>
+              </select>
+            </label>
             <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white px-3 py-1.5 sm:w-44">
               <span class="text-xs font-bold text-[#77716a]">排序</span>
               <select v-model="sort" class="min-w-0 flex-1 bg-transparent py-1 text-sm font-bold outline-none" @change="selectSort">
@@ -84,32 +95,6 @@
               />
             </label>
           </div>
-        </div>
-        <div class="-mx-4 mb-7 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="議題分類">
-          <button
-            type="button"
-            class="focus-ring shrink-0 border px-4 py-2.5 text-sm font-bold transition"
-            :class="activeCategory === 'all' ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-[#faf8f3] hover:border-[#171717]'"
-            :aria-pressed="activeCategory === 'all'"
-            @click="selectCategory('all')"
-          >
-            全部 <span class="ml-1 opacity-60">{{ allTopicCount }}</span>
-          </button>
-          <button
-            v-for="category in filterChips"
-            :key="category.key"
-            type="button"
-            class="focus-ring shrink-0 border px-4 py-2.5 text-sm font-bold transition"
-            :style="activeCategory === category.key
-              ? { borderColor: category.color, backgroundColor: category.color, color: contrastTextColor(category.color) }
-              : { borderColor: '#cfc8bc', backgroundColor: '#faf8f3' }"
-            :aria-pressed="activeCategory === category.key"
-            @click="selectCategory(category.key)"
-          >
-            <span v-if="activeCategory !== category.key" class="mr-2 inline-block h-2 w-2 rounded-full" :style="{ backgroundColor: category.color }" />
-            {{ category.key === 'quick' ? '⚡ ' : '' }}{{ category.label }}
-            <span v-if="category.key !== 'quick'" class="ml-1 opacity-60">{{ categoryCounts[category.key] ?? 0 }}</span>
-          </button>
         </div>
         <p class="sr-only" aria-live="polite">{{ resultsAnnouncement }}</p>
         <div v-if="error" role="alert" class="border border-[#9c3b3b] bg-[#f6e7e7] px-5 py-8 text-center text-sm text-[#7c2f2f]">
@@ -147,7 +132,6 @@
 import type { Topic, TopicListResponse } from '~/types/topic';
 import type { CommentActivity } from '~/composables/useRealtime';
 import { useCategories } from '~/composables/useCategories';
-import { contrastTextColor } from '~/utils/topic';
 import HomeTopicCard from '~/components/home/TopicCard.vue';
 import QuickPollCard from '~/components/home/QuickPollCard.vue';
 
