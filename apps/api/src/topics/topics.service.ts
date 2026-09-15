@@ -65,6 +65,7 @@ export class TopicsService {
     if (search) where.OR = [
       { title: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
+      { options: { some: { label: { contains: search, mode: 'insensitive' } } } },
     ];
     if (participation === 'VOTED') where.votes = { some: { userId: userId! } };
     if (participation === 'UNVOTED') where.votes = { none: { userId: userId! } };
