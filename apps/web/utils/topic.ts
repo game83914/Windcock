@@ -87,7 +87,7 @@ export const TOPIC_TYPE_LABEL: Record<string, string> = {
 };
 
 export function isOptionPickType(topicType?: string) {
-  return !!topicType && !['SPECTRUM', 'SHORT_ANSWER'].includes(topicType);
+  return !!topicType && ['BINARY', 'MULTIPLE'].includes(topicType);
 }
 
 export function topicTypeLabel(topicType?: string) {
