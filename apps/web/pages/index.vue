@@ -59,7 +59,7 @@
       >
         <div class="mb-6 grid gap-3 border-b border-[#171717] pb-4 sm:flex sm:items-end sm:justify-between">
           <div class="flex flex-wrap items-baseline gap-3">
-            <h2 class="text-2xl font-black tracking-[-0.035em] sm:text-3xl">{{ sectionHeading }}</h2>
+            <h2 class="text-xl font-black tracking-[-0.035em] sm:text-2xl">{{ sectionHeading }}</h2>
             <span class="text-xs font-bold tabular-nums text-[#77716a]">{{ status === 'pending' ? '載入中' : `${data.pagination.total} 筆` }}</span>
           </div>
           <div class="min-w-0">
