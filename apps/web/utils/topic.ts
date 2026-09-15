@@ -74,6 +74,26 @@ export function optionPercentage(option: TopicOption, topic: Topic) {
   return total > 0 ? Math.round((Number(option.voteCount) / total) * 100) : 0;
 }
 
+export const TOPIC_TYPE_LABEL: Record<string, string> = {
+  BINARY: '二選一',
+  MULTIPLE: '多選項',
+  SPECTRUM: '光譜題',
+  SHORT_ANSWER: '簡答題',
+  MATCHING: '連連看',
+  PUZZLE: '拼圖題',
+  SCRATCH: '刮刮樂',
+  SPIN_WHEEL: '轉盤抽獎',
+  LOTTERY: '日式搖獎',
+};
+
+export function isOptionPickType(topicType?: string) {
+  return !!topicType && !['SPECTRUM', 'SHORT_ANSWER'].includes(topicType);
+}
+
+export function topicTypeLabel(topicType?: string) {
+  return TOPIC_TYPE_LABEL[topicType ?? ''] ?? '選項題';
+}
+
 export function leadingOptions(topic: Topic, limit = 2) {
   return [...topic.options]
     .sort((a, b) => Number(b.voteCount) - Number(a.voteCount))

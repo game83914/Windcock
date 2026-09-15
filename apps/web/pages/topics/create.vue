@@ -489,7 +489,7 @@ onMounted(async () => {
     title.value = topic.title;
     description.value = topic.description || '';
     category.value = topic.category;
-    topicType.value = topic.topicType;
+    topicType.value = topic.topicType as TopicType;
     await nextTick();
     options.value = topic.options.map((item) => item.label);
     voteDurationDays.value = topic.voteDurationDays;

@@ -24,6 +24,7 @@ export interface VoteResult {
   success: boolean;
   optionId: string | null;
   spectrumValue: number | null;
+  answerText: string | null;
   rewardPoints: number;
   newBalance: string;
 }
@@ -200,7 +201,24 @@ export class TopicsService {
       }
     }
 
-    return { ...this.serialize(topic, hasVoted, isFollowing), myVote };
+    return { ...this.serialize(topic, hasVoted, isFollowing), myVote, responses: await this.loadResponses(topic) };
+  }
+
+  private async loadResponses(topic: any) {
+    if (topic.topicType !== 'SHORT_ANSWER') return [];
+    const votes = await this.prisma.vote.findMany({
+      where: { topicId: topic.id, answerText: { not: null } },
+      select: { id: true, answerText: true, createdAt: true, user: { select: { nickname: true, avatarUrl: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 300,
+    });
+    return votes.map((vote) => ({
+      id: vote.id.toString(),
+      nickname: vote.user.nickname,
+      avatarUrl: vote.user.avatarUrl,
+      answerText: vote.answerText,
+      createdAt: vote.createdAt,
+    }));
   }
 
   async follow(topicId: bigint, userId: bigint) {
@@ -289,16 +307,50 @@ export class TopicsService {
     await this.policy.assertSeniorMember(userId);
     const title = dto.title.trim();
     const optionLabels = (dto.options || []).map((label) => label.trim()).filter(Boolean);
+    const matchLabels = (dto.matches || []).map((label) => label.trim()).filter(Boolean);
+    const weights = (dto.weights || []).filter((weight) => Number.isFinite(weight) && weight > 0);
     assertClean(title, '標題');
     optionLabels.forEach((label) => assertClean(label, '選項'));
-    if (dto.topicType === TopicType.BINARY && optionLabels.length !== 2) {
-      throw new BadRequestException('二元題必須設定 2 個選項');
+
+    const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
+    const noOptionTypes: TopicType[] = [TopicType.SPECTRUM, TopicType.SHORT_ANSWER];
+    if (optionTypes.includes(dto.topicType) && !optionLabels.length) {
+      throw new BadRequestException('此題型必須設定選項');
     }
-    if (dto.topicType === TopicType.MULTIPLE && (optionLabels.length < 2 || optionLabels.length > 4)) {
-      throw new BadRequestException('多選題必須設定 2 到 4 個選項');
+    if (noOptionTypes.includes(dto.topicType) && optionLabels.length) {
+      throw new BadRequestException('此題型不需設定選項');
     }
-    if (new Set(optionLabels).size !== optionLabels.length) {
+    switch (dto.topicType) {
+      case TopicType.BINARY:
+        if (optionLabels.length !== 2) throw new BadRequestException('選項題（二選一）必須正好 2 個選項');
+        break;
+      case TopicType.MULTIPLE:
+        if (optionLabels.length < 2 || optionLabels.length > 10) throw new BadRequestException('選項題必須設定 2 到 10 個選項');
+        break;
+      case TopicType.MATCHING:
+        if (optionLabels.length < 2 || optionLabels.length > 6) throw new BadRequestException('連連看必須設定 2 到 6 組配對');
+        if (matchLabels.length !== optionLabels.length) throw new BadRequestException('連連看的右側配對需與左側一一對應、數量相同');
+        matchLabels.forEach((label) => assertClean(label, '配對'));
+        break;
+      case TopicType.PUZZLE:
+        if (optionLabels.length < 2 || optionLabels.length > 4) throw new BadRequestException('拼圖題必須設定 2 到 4 個提示');
+        break;
+      case TopicType.SCRATCH:
+        if (optionLabels.length < 1 || optionLabels.length > 9) throw new BadRequestException('刮刮樂必須設定 1 到 9 張卡片');
+        break;
+      case TopicType.SPIN_WHEEL:
+        if (optionLabels.length < 2 || optionLabels.length > 8) throw new BadRequestException('轉盤抽獎必須設定 2 到 8 個選項');
+        if (weights.length !== 0 && weights.length !== optionLabels.length) throw new BadRequestException('轉盤權重數量需與選項相同');
+        break;
+      case TopicType.LOTTERY:
+        if (optionLabels.length < 2 || optionLabels.length > 10) throw new BadRequestException('日式搖獎必須設定 2 到 10 顆球');
+        break;
+    }
+    if (optionLabels.length && new Set(optionLabels).size !== optionLabels.length) {
       throw new BadRequestException('選項不可重複');
+    }
+    if (matchLabels.length && new Set(matchLabels).size !== matchLabels.length) {
+      throw new BadRequestException('右側配對不可重複');
     }
     await this.categories.assertActiveCategory(dto.category ?? 'quick');
     await this.checkQuickCreationRateLimit(userId);
@@ -309,18 +361,26 @@ export class TopicsService {
     });
     if (duplicate) throw new ConflictException('已有相同標題的議題，請先參與既有討論');
 
+    const optionCreates = optionLabels.map((label, index) => {
+      const optionData: Record<string, string | number> = {};
+      if (matchLabels.length === optionLabels.length) optionData.match = matchLabels[index];
+      if (weights.length === optionLabels.length) optionData.weight = weights[index];
+      return { label, ...(Object.keys(optionData).length ? { data: optionData } : {}) };
+    });
+
     const data: Prisma.TopicUncheckedCreateInput = {
       title,
       kind: TopicKind.QUICK,
       category: dto.category ?? 'quick',
       topicType: dto.topicType,
+      description: dto.topicType === TopicType.SHORT_ANSWER ? dto.prompt?.trim() || null : null,
       status: 'OPEN',
       moderationStatus: 'APPROVED',
       creatorId: userId,
       voteDurationHours: dto.voteDurationHours,
       minVotes: dto.minVotes ?? null,
       voteEndAt: new Date(Date.now() + dto.voteDurationHours * 3_600_000),
-      options: { create: optionLabels.map((label) => ({ label })) },
+      options: { create: optionCreates },
     };
 
     const topic = await this.prisma.topic.create({
@@ -750,12 +810,17 @@ export class TopicsService {
 
       let optionId: bigint | null = null;
       let spectrumValue: number | null = null;
+      let answerText: string | null = null;
 
       if (topic.topicType === 'SPECTRUM') {
         if (dto.spectrumValue === undefined || dto.spectrumValue === null) {
           throw new BadRequestException('光譜題必須提供 spectrumValue（0~100）');
         }
         spectrumValue = dto.spectrumValue;
+      } else if (topic.topicType === 'SHORT_ANSWER') {
+        const text = dto.answerText?.trim();
+        if (!text) throw new BadRequestException('簡答題必須提供文字回答');
+        answerText = text;
       } else {
         if (!dto.optionId) throw new BadRequestException('必須選擇一個選項');
         const chosenOptionId = BigInt(dto.optionId);
@@ -764,7 +829,7 @@ export class TopicsService {
         optionId = chosenOptionId;
       }
 
-      const createdVote = await tx.vote.create({ data: { userId, topicId, optionId, spectrumValue } });
+      const createdVote = await tx.vote.create({ data: { userId, topicId, optionId, spectrumValue, answerText } });
 
       if (optionId) {
         await tx.topicOption.update({
@@ -798,7 +863,7 @@ export class TopicsService {
         await tx.user.update({ where: { id: userId }, data: { pointsBalance: after } });
       }
 
-      return { voteId: createdVote.id, votedAt: createdVote.createdAt, after, optionId: optionId?.toString() ?? null, rewardPoints, topicType: topic.topicType };
+      return { voteId: createdVote.id, votedAt: createdVote.createdAt, after, optionId: optionId?.toString() ?? null, answerText, rewardPoints, topicType: topic.topicType };
     });
 
     const snapshotPromise = this.createDemographicSnapshot(result.voteId, userId);
@@ -818,6 +883,7 @@ export class TopicsService {
       success: true,
       optionId: result.optionId,
       spectrumValue: dto.spectrumValue ?? null,
+      answerText: result.answerText,
       rewardPoints: result.rewardPoints,
       newBalance: result.after.toString(),
     };
@@ -830,7 +896,9 @@ export class TopicsService {
       voteId: bigint;
       optionId: string | null;
       spectrumValue: number | null;
+      answerText: string | null;
       newBalance: bigint;
+      changed: boolean;
     }
 
     const result = await this.prisma.$transaction(async (tx): Promise<RevoteTransaction> => {
@@ -850,11 +918,16 @@ export class TopicsService {
 
       let optionId: bigint | null = null;
       let spectrumValue: number | null = null;
+      let answerText: string | null = null;
       if (topic.topicType === 'SPECTRUM') {
         if (dto.spectrumValue === undefined || dto.spectrumValue === null) {
           throw new BadRequestException('光譜題必須提供 spectrumValue（0~100）');
         }
         spectrumValue = dto.spectrumValue;
+      } else if (topic.topicType === 'SHORT_ANSWER') {
+        const text = dto.answerText?.trim();
+        if (!text) throw new BadRequestException('簡答題必須提供文字回答');
+        answerText = text;
       } else {
         if (!dto.optionId) throw new BadRequestException('必須選擇一個選項');
         const chosenOptionId = BigInt(dto.optionId);
@@ -862,13 +935,18 @@ export class TopicsService {
         if (!valid) throw new BadRequestException('選項不存在於此議題');
         optionId = chosenOptionId;
       }
-      if (existing.optionId !== null && existing.optionId === optionId) {
+      const sameAnswer = topic.topicType === 'SHORT_ANSWER'
+        ? existing.answerText === answerText
+        : existing.optionId !== null && existing.optionId === optionId;
+      if (sameAnswer) {
         const unchanged = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
         return {
           voteId: existing.id,
-          optionId: existing.optionId.toString(),
+          optionId: existing.optionId?.toString() ?? null,
           spectrumValue: existing.spectrumValue,
+          answerText: existing.answerText,
           newBalance: unchanged?.pointsBalance ?? BigInt(0),
+          changed: false,
         };
       }
 
@@ -879,7 +957,7 @@ export class TopicsService {
         });
       }
       await tx.vote.delete({ where: { id: existing.id } });
-      const createdVote = await tx.vote.create({ data: { userId, topicId, optionId, spectrumValue } });
+      const createdVote = await tx.vote.create({ data: { userId, topicId, optionId, spectrumValue, answerText } });
       if (optionId) {
         await tx.topicOption.update({
           where: { id: optionId },
@@ -893,7 +971,9 @@ export class TopicsService {
         voteId: createdVote.id,
         optionId: optionId?.toString() ?? null,
         spectrumValue,
+        answerText,
         newBalance: user?.pointsBalance ?? BigInt(0),
+        changed: true,
       };
     });
 
@@ -913,6 +993,7 @@ export class TopicsService {
       success: true,
       optionId: result.optionId,
       spectrumValue: result.spectrumValue,
+      answerText: result.answerText,
       rewardPoints: 0,
       newBalance: result.newBalance.toString(),
     };
@@ -1125,6 +1206,7 @@ export class TopicsService {
         id: o.id.toString(),
         label: o.label,
         voteCount: o.voteCount.toString(),
+        data: o.data ?? null,
       })),
     };
   }

@@ -71,6 +71,12 @@ enum TopicType {
   BINARY
   MULTIPLE
   SPECTRUM
+  SHORT_ANSWER
+  MATCHING
+  PUZZLE
+  SCRATCH
+  SPIN_WHEEL
+  LOTTERY
 }
 
 enum TopicStatus {
@@ -880,6 +886,7 @@ model TopicOption {
   topicId   BigInt   @map("topic_id")
   topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   label     String
+  data      Json?    @map("data")
   voteCount BigInt   @default(0) @map("vote_count")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -898,6 +905,7 @@ model Vote {
   optionId            BigInt?                  @map("option_id")
   option              TopicOption?             @relation(fields: [optionId], references: [id])
   spectrumValue       Int?                     @map("spectrum_value")
+  answerText          String?                  @map("answer_text")
   createdAt           DateTime                 @default(now()) @map("created_at")
   demographicSnapshot VoteDemographicSnapshot?
 

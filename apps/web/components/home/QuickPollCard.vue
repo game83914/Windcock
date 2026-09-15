@@ -9,7 +9,7 @@
       {{ poll.title }}
     </NuxtLink>
 
-    <div v-if="isOpen && !auth.isAuthed" class="mt-4">
+    <div v-if="isOpen && !auth.isAuthed && isOptionPick" class="mt-4">
       <div class="space-y-2">
         <button
           v-for="o in poll.options"
@@ -30,7 +30,7 @@
 
     <div v-else-if="isOpen && !auth.canVote" class="mt-4 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">此身份僅供查閱，不能投票。</div>
 
-    <div v-else class="mt-4 space-y-2">
+    <div v-else-if="isOptionPick" class="mt-4 space-y-2">
       <button
         v-for="o in poll.options"
         :key="o.id"
@@ -54,6 +54,11 @@
       </button>
     </div>
 
+    <button v-else type="button" class="mt-4 flex w-full items-center justify-between rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]" @click.stop="goTopic">
+      <span>{{ topicTypeLabel(poll.topicType) }} — 進去玩一票</span>
+      <span aria-hidden="true">►</span>
+    </button>
+
     <div class="mt-auto border-t border-[#f0e6d2] pt-3 text-xs text-[#77716a]">
       <span>{{ formatCompactNumber(poll.totalVotes) }} 人已投</span>
     </div>
@@ -62,7 +67,7 @@
 
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
-import { deadlineLabel, formatCompactNumber, optionPercentage } from '~/utils/topic';
+import { deadlineLabel, formatCompactNumber, optionPercentage, topicTypeLabel } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
 
@@ -78,6 +83,7 @@ const votingTargetId = ref<string | null>(null);
 const showLoginHint = ref(false);
 
 const isOpen = computed(() => poll.value.status === 'OPEN' && !!poll.value.voteEndAt && new Date(poll.value.voteEndAt).getTime() > Date.now());
+const isOptionPick = computed(() => poll.value.topicType === 'BINARY' || poll.value.topicType === 'MULTIPLE');
 const myVoteOptionId = computed(() => poll.value.options.find((option) => option.label === poll.value.myVote?.choice)?.id ?? null);
 
 watch(() => props.topic, (topic) => { poll.value = topic; });

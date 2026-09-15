@@ -117,19 +117,41 @@ export class CreateQuickTopicDto {
   @IsString()
   category?: string;
 
-  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE], default: TopicType.BINARY, description: '快問僅開放二元題與多選題（2 到 4 個選項）' })
-  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE])
-  topicType: 'BINARY' | 'MULTIPLE';
+  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY], description: '選項題會依選項數自動區分：2 個為 BINARY，其餘為 MULTIPLE；其餘題型依各題型規則' })
+  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY])
+  topicType: 'BINARY' | 'MULTIPLE' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
 
-  @ApiPropertyOptional({ description: '二元題固定 2 個，多選題 2 到 4 個' })
-  @ValidateIf((dto: CreateQuickTopicDto) => dto.topicType === TopicType.MULTIPLE)
+  @ApiPropertyOptional({ description: '選項題（2~10）、連連看（2~6）、拼圖題（2~4）、刮刮樂（1~9）、轉盤抽獎（2~8）、日式搖獎（2~10）；光譜題與簡答題不需選項' })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(2)
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(10)
   @IsString({ each: true })
   @MinLength(1, { each: true })
   @MaxLength(50, { each: true })
   options?: string[];
+
+  @ApiPropertyOptional({ description: '連連看的右側配對文字，需與 options 同長度、一一對應' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(50, { each: true })
+  matches?: string[];
+
+  @ApiPropertyOptional({ description: '轉盤抽獎各選項權重（正整數），需與 options 同長度' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  weights?: number[];
+
+  @ApiPropertyOptional({ description: '簡答題的作答提示' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  prompt?: string;
 
   @ApiProperty({ enum: QUICK_VOTE_DURATION_HOURS, default: 24, description: '快問以小時計，8 小時到 48 小時' })
   @IsInt()

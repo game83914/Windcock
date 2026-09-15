@@ -2,6 +2,17 @@ export interface TopicOption {
   id: string;
   label: string;
   voteCount: string;
+  data?: { match?: string; weight?: number } | null;
+}
+
+export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
+
+export interface TopicShortAnswer {
+  id: string;
+  nickname: string;
+  avatarUrl?: string | null;
+  answerText: string;
+  createdAt: string;
 }
 
 export type TopicContentBlockType = 'BACKGROUND' | 'CASE' | 'DATA' | 'SOURCE' | 'PERSPECTIVES';
@@ -23,7 +34,7 @@ export interface Topic {
   category: string;
   kind?: 'FORMAL' | 'QUICK';
   featuredOrder?: number | null;
-  topicType: 'BINARY' | 'MULTIPLE' | 'SPECTRUM';
+  topicType: QuickTopicType;
   status: string;
   moderationStatus: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
   moderationNote?: string | null;
@@ -45,6 +56,7 @@ export interface Topic {
   spectrumStddev?: string | null;
   hasVoted: boolean;
   myVote?: { choice: string; spectrumValue: number | null } | null;
+  responses?: TopicShortAnswer[];
   blocks: TopicContentBlock[];
   options: TopicOption[];
 }
