@@ -27,7 +27,7 @@
     </div>
 
     <Teleport to="body">
-      <Transition name="confirm">
+      <TransitionGroup name="confirm" tag="div" class="contents">
         <div
           v-for="confirm in confirms"
           :key="confirm.id"
@@ -55,7 +55,7 @@
             </div>
           </div>
         </div>
-      </Transition>
+      </TransitionGroup>
     </Teleport>
   </Teleport>
 </template>
