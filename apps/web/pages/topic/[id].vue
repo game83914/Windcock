@@ -9,9 +9,9 @@
   </div>
   <div v-else-if="topic" class="mx-auto max-w-6xl space-y-6">
     <div class="max-w-3xl">
-      <NuxtLink to="/" class="focus-ring text-sm font-bold text-[#6d6861] hover:text-[#d84a36]">&larr; 返回議題列表</NuxtLink>
+      <NuxtLink to="/" class="focus-ring text-sm font-bold text-[#6d6861] hover:text-[#d84a36]">&larr; 返回</NuxtLink>
       <div class="mt-4 flex flex-wrap items-center gap-2">
-        <span class="border border-[#171717] px-2 py-1 text-xs font-bold">{{ getCategoryMeta(topic.category).label }}</span>
+        <span v-if="topic.kind !== 'QUICK'" class="border border-[#171717] px-2 py-1 text-xs font-bold">{{ getCategoryMeta(topic.category).label }}</span>
         <span v-if="topic.kind === 'QUICK'" class="bg-[#b0761f] px-2 py-1 text-xs font-black text-white">快問</span>
         <span class="bg-[#171717] px-2 py-1 text-xs font-black text-white">議題小組發布</span>
         <span v-if="topic.proposedBy?.length" class="text-xs text-[#6d6861]">提案參與者：{{ topic.proposedBy.map((person) => person.label).join('、') }}</span>
@@ -45,13 +45,7 @@
       </header>
 
       <div class="p-5 sm:p-6">
-        <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-4">
-          <p class="text-sm font-bold text-[#2746b4]">登入後即可投票</p>
-          <div class="mt-3 flex gap-2">
-            <UiButton :to="registerUrl" variant="outline" size="sm">註冊</UiButton>
-            <UiButton :to="loginUrl" variant="data" size="sm">登入</UiButton>
-          </div>
-        </div>
+        <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-4 text-sm font-bold text-[#2746b4]">登入後即可投票</div>
 
         <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
         <div v-else-if="!showResults && isVotingOpen && auth.isAuthed && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">此身份僅供工作或資訊查閱，不能參與投票。</div>
@@ -203,7 +197,6 @@ const auth = useAuthStore();
 const { success: toastSuccess, error: toastError } = useToast();
 const topicId = computed(() => route.params.id as string);
 const loginUrl = computed(() => `/login?redirect=${encodeURIComponent(route.fullPath)}`);
-const registerUrl = computed(() => `/login?redirect=${encodeURIComponent(route.fullPath)}`);
 
 const topic = ref<Topic | null>(null);
 const loading = ref(true);

@@ -38,12 +38,6 @@
 
         <section class="surface-card p-5 sm:p-7">
           <p class="eyebrow-modern text-[#b0761f]">02 / 投票設定</p>
-          <div class="mt-6">
-            <span class="mb-2 block text-sm font-bold">分類</span>
-            <div class="flex flex-wrap gap-2">
-              <button v-for="item in categories" :key="item.key" type="button" class="focus-ring flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition" :class="category === item.key ? 'border-[#b0761f] bg-[#b0761f] text-white' : 'border-[#cfc8bc] bg-white hover:border-[#b0761f]'" @click="category = item.key"><span class="inline-block h-2 w-2 rounded-full" :style="{ backgroundColor: getCategoryMeta(item.key).color }" />{{ getCategoryMeta(item.key).label }}</button>
-            </div>
-          </div>
           <div class="mt-6 grid gap-3 sm:grid-cols-2">
             <button v-for="item in topicTypes" :key="item.value" type="button" class="focus-ring rounded-2xl border-2 p-4 text-left transition" :class="topicType === item.value ? 'border-[#b0761f] bg-[#f8ecd6]' : 'border-[#ded7cb] bg-white hover:border-[#b0761f]'" @click="setTopicType(item.value)">
               <strong class="block text-sm">{{ item.label }}</strong>
@@ -89,7 +83,7 @@
       <aside class="lg:sticky lg:top-28 lg:self-start">
         <p class="eyebrow-modern mb-3 text-[#77716a]">快問預覽</p>
         <div class="surface-quick p-6">
-          <div class="flex items-center justify-between text-xs"><span class="font-bold" :style="{ color: getCategoryMeta(category).color }">{{ category ? getCategoryMeta(category).label : '尚未選擇分類' }}</span><span class="rounded-full bg-[#b0761f] px-2.5 py-0.5 text-[10px] font-black text-white">快問</span></div>
+          <div class="flex items-center justify-end text-xs"><span class="rounded-full bg-[#b0761f] px-2.5 py-0.5 text-[10px] font-black text-white">快問</span></div>
           <h2 class="mt-6 text-2xl font-black leading-snug">{{ title || '你的快問會顯示在這裡' }}</h2>
           <ul class="mt-6 space-y-2 border-t border-[#f0e6d2] pt-4">
             <li v-for="option in visibleOptions" :key="option" class="flex items-center gap-3 text-sm"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#f0e6d2] text-[10px] font-black text-[#8f5d14]">{{ options.indexOf(option) + 1 }}</span><span class="font-medium">{{ option || '⋯' }}</span></li>
@@ -102,9 +96,8 @@
 </template>
 
 <script setup lang="ts">
-import type { Category, Topic } from '~/types/topic';
+import type { Topic } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
-import { applyCategoryRules, getCategoryMeta } from '~/utils/topic';
 import type { CapabilitySummary } from '~/stores/auth';
 
 definePageMeta({ middleware: 'auth' });
@@ -116,7 +109,6 @@ const api = useApi();
 const auth = useAuthStore();
 useSeoMeta({ title: '發起快問｜輿論測風向' });
 
-const categories = ref<Array<{ key: string }>>([]);
 const topicTypes: { value: QuickType; label: string; description: string }[] = [
   { value: 'BINARY', label: '二選一', description: '兩個明確選項，最快集票' },
   { value: 'MULTIPLE', label: '多選項', description: '2 到 4 個方向' },
@@ -129,7 +121,6 @@ const durationOptions = [
 ];
 
 const title = ref('');
-const category = ref('');
 const topicType = ref<QuickType>('BINARY');
 const options = ref(['選 A', '選 B']);
 const voteDurationHours = ref(24);
@@ -153,7 +144,6 @@ function setTopicType(type: QuickType) {
 function validateForm() {
   for (const key of Object.keys(fieldErrors)) delete fieldErrors[key];
   if (title.value.length < 5) fieldErrors.title = '快問標題至少需要 5 個字';
-  if (!category.value) formError.value = '請選擇一個分類。';
   options.value.forEach((option, index) => {
     if (!option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}`;
   });
@@ -175,7 +165,6 @@ async function submit() {
   try {
     savedTopic.value = await api.post<Topic>('/topics/quick', {
       title: title.value,
-      category: category.value,
       topicType: topicType.value,
       options: options.value,
       voteDurationHours: voteDurationHours.value,
@@ -189,14 +178,8 @@ async function submit() {
 
 onMounted(async () => {
   try {
-    const [summary, categoryItems] = await Promise.all([
-      api.get<CapabilitySummary>('/me/capabilities'),
-      api.get<Category[]>('/categories'),
-    ]);
+    const summary = await api.get<CapabilitySummary>('/me/capabilities');
     auth.setCapabilities(summary);
-    categories.value = categoryItems.filter((item) => item.isActive);
-    applyCategoryRules(categoryItems);
-    if (categories.value[0]) category.value = categories.value[0].key;
   } catch (error) {
     formError.value = errorMessage(error);
   } finally {

@@ -14,6 +14,7 @@ const KEY_META: Record<string, CategoryMeta> = {
   life: { key: 'life', label: '生活', eyebrow: '生活選擇', color: '#3f7a58', soft: '#e5f1e9' },
   technology: { key: 'technology', label: '科技', eyebrow: '科技與數位', color: '#7a5cbf', soft: '#efeafb' },
   entertainment: { key: 'entertainment', label: '娛樂', eyebrow: '娛樂與文化', color: '#b0761f', soft: '#f8f0e3' },
+  quick: { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#f8ecd6' },
 };
 
 const LABEL_TO_KEY: Record<string, string> = { 政治: 'politics', 社會: 'society', 生活: 'life', 科技: 'technology', 娛樂: 'entertainment' };

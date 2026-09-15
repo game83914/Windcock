@@ -214,7 +214,7 @@ const topics = computed(() => visibleTopics.value);
 const featuredTopics = computed<Topic[]>(() => featuredData.value ?? []);
 const totalPages = computed(() => Math.max(1, data.value.pagination.pages));
 const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#fff0d7' };
-const filterChips = computed(() => [quickCategoryChip, ...activeCategories.value]);
+const filterChips = computed(() => [quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
 const selectedCategory = computed(() => activeCategories.value.find((category) => category.key === activeCategory.value));
 const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : activeCategory.value === 'quick' ? '快問' : (selectedCategory.value?.label ?? '議題'));
 const hasActiveFilters = computed(() => activeCategory.value !== 'all' || Boolean(searchTerm.value));

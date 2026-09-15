@@ -138,7 +138,7 @@ const statusLabels: Record<string, string> = { OPEN: '開票中', CLOSED: '討�
 const statusLabel = (value: string) => statusLabels[value] || value;
 
 function syncCategories() {
-  categories.value = [...(categoryData.value ?? [])].sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
+  categories.value = [...(categoryData.value ?? [])].filter((item) => item.key !== 'quick').sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
 }
 
 const orderedItems = computed<Topic[]>(() => {

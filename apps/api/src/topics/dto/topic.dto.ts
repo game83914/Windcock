@@ -112,10 +112,10 @@ export class CreateQuickTopicDto {
   @Length(5, 100)
   title: string;
 
-  @ApiProperty({ example: 'life', description: '分類 key，可由 GET /categories 取得' })
+  @ApiPropertyOptional({ example: 'life', description: '已停用：快問不再設定生活分類，固定視為「快問」分類' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  category: string;
+  category?: string;
 
   @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE], default: TopicType.BINARY, description: '快問僅開放二元題與多選題（2 到 4 個選項）' })
   @IsEnum([TopicType.BINARY, TopicType.MULTIPLE])

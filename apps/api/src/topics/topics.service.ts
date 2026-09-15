@@ -300,7 +300,7 @@ export class TopicsService {
     if (new Set(optionLabels).size !== optionLabels.length) {
       throw new BadRequestException('選項不可重複');
     }
-    await this.categories.assertActiveCategory(dto.category);
+    await this.categories.assertActiveCategory(dto.category ?? 'quick');
     await this.checkQuickCreationRateLimit(userId);
 
     const duplicate = await this.prisma.topic.findFirst({
@@ -309,20 +309,22 @@ export class TopicsService {
     });
     if (duplicate) throw new ConflictException('已有相同標題的議題，請先參與既有討論');
 
+    const data: Prisma.TopicUncheckedCreateInput = {
+      title,
+      kind: TopicKind.QUICK,
+      category: dto.category ?? 'quick',
+      topicType: dto.topicType,
+      status: 'OPEN',
+      moderationStatus: 'APPROVED',
+      creatorId: userId,
+      voteDurationHours: dto.voteDurationHours,
+      minVotes: dto.minVotes ?? null,
+      voteEndAt: new Date(Date.now() + dto.voteDurationHours * 3_600_000),
+      options: { create: optionLabels.map((label) => ({ label })) },
+    };
+
     const topic = await this.prisma.topic.create({
-      data: {
-        title,
-        kind: TopicKind.QUICK,
-        category: dto.category,
-        topicType: dto.topicType,
-        status: 'OPEN',
-        moderationStatus: 'APPROVED',
-        creatorId: userId,
-        voteDurationHours: dto.voteDurationHours,
-        minVotes: dto.minVotes ?? null,
-        voteEndAt: new Date(Date.now() + dto.voteDurationHours * 3_600_000),
-        options: { create: optionLabels.map((label) => ({ label })) },
-      },
+      data,
       include: {
         options: { orderBy: { id: 'asc' } },
         contentBlocks: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },

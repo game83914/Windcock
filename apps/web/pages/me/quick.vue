@@ -14,7 +14,6 @@
     <div v-else-if="topics.length" class="space-y-4">
       <article v-for="topic in topics" :key="topic.id" class="border border-[#d7d1c6] bg-[#faf8f3] p-5 sm:p-6">
         <div class="flex flex-wrap items-center gap-2 text-xs">
-          <span class="font-bold" :style="{ color: getCategoryMeta(topic.category).color }">{{ getCategoryMeta(topic.category).label }}</span>
           <span class="bg-[#b0761f] px-2 py-1 font-bold text-white">快問</span>
           <span
             class="px-2 py-1 font-bold"
@@ -43,7 +42,7 @@
 
 <script setup lang="ts">
 import type { Topic } from '~/types/topic';
-import { deadlineLabel, formatCompactNumber, getCategoryMeta, leadingOptions } from '~/utils/topic';
+import { deadlineLabel, formatCompactNumber, leadingOptions } from '~/utils/topic';
 
 definePageMeta({ middleware: 'auth' });
 useSeoMeta({ title: '我的快問｜輿論測風向' });

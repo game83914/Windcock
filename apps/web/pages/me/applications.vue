@@ -165,7 +165,7 @@ watch(() => route.query.type, async (type) => {
 onMounted(async () => {
   await loadActive();
   try {
-    categories.value = (await api.get<Category[]>('/categories')).filter((item) => item.isActive);
+    categories.value = (await api.get<Category[]>('/categories')).filter((item) => item.isActive && item.key !== 'quick');
     applyCategoryRules(categories.value);
   } catch {
     categories.value = [];

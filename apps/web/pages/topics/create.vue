@@ -470,7 +470,7 @@ onMounted(async () => {
       api.get<Category[]>('/categories'),
     ]);
     auth.setCapabilities(summary);
-    categories.value = categoryItems.filter((item) => item.isActive);
+    categories.value = categoryItems.filter((item) => item.isActive && item.key !== 'quick');
     applyCategoryRules(categoryItems);
     if (!category.value && categories.value[0]) category.value = categories.value[0].key;
     if (summary.membershipTier !== 'SENIOR' && summary.partnerOrganizations.length) {
