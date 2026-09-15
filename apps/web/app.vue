@@ -52,7 +52,6 @@
     </main>
 
     <UiToastHost />
-    <UiBottomNav :authed="authed" :unread-count="unreadCount" />
   </div>
 </template>
 
