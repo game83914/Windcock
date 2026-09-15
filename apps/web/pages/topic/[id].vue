@@ -48,10 +48,6 @@
         <QuickVotePanel v-if="isQuick" :topic="topic" @refreshed="load" />
 
         <template v-else>
-          <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl bg-[#e7ecff] p-4">
-            <UiButton :to="loginUrl" variant="data" size="sm" block>{{ VOTE_LOGIN_LABEL }}</UiButton>
-          </div>
-
           <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
           <div v-else-if="!showResults && isVotingOpen && auth.isAuthed && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
 
@@ -183,7 +179,7 @@
 <script setup lang="ts">
 import type { Topic } from '~/types/topic';
 import { getCategoryMeta, optionPercentage } from '~/utils/topic';
-import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
+import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const route = useRoute();
 const router = useRouter();
@@ -295,6 +291,10 @@ async function load() {
     if (topicId.value !== expectedId) return;
     topic.value = fresh;
     totalVotes.value = fresh.totalVotes;
+    if (!auth.isAuthed && fresh.status === 'OPEN' && !!fresh.voteEndAt && new Date(fresh.voteEndAt).getTime() > Date.now() && !fresh.hasVoted) {
+      await navigateTo(loginUrl.value);
+      return;
+    }
   } catch (cause) {
     if (topicId.value !== expectedId) return;
     topic.value = null;

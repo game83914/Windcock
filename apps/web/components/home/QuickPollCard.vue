@@ -74,7 +74,7 @@
       <button
         type="button"
         class="focus-ring flex w-full items-center justify-between rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]"
-        @click.stop="expanded = !expanded"
+        @click.stop="auth.isAuthed ? (expanded = !expanded) : goLogin()"
       >
         <span>{{ expanded ? '收合' : `${topicTypeLabel(poll.topicType)} — 進去玩一票` }}</span>
         <span aria-hidden="true">{{ expanded ? '收合' : '►' }}</span>

@@ -1,9 +1,5 @@
 <template>
   <div>
-    <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl bg-[#e7ecff] p-4">
-      <UiButton :to="loginUrl" variant="data" size="sm" block>{{ VOTE_LOGIN_LABEL }}</UiButton>
-    </div>
-
     <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
     <div v-else-if="!showResults && isVotingOpen && auth.isAuthed && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
 
@@ -269,17 +265,15 @@
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
 import { isOptionPickType, optionPercentage } from '~/utils/topic';
-import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
+import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
 const emit = defineEmits<{ refreshed: [] }>();
 
-const route = useRoute();
 const api = useApi();
 const auth = useAuthStore();
 const { success: toastSuccess, error: toastError } = useToast();
 
-const loginUrl = computed(() => `/login?redirect=${encodeURIComponent(route.fullPath)}`);
 const isVotingOpen = computed(() => props.topic.status === 'OPEN' && !!props.topic.voteEndAt && new Date(props.topic.voteEndAt).getTime() > Date.now());
 const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabilitySummary?.participation));
 const showResults = computed(() => props.topic.hasVoted || !isVotingOpen.value || (auth.isAuthed && participationReady.value && !auth.canVote));
