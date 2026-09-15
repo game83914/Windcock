@@ -6,7 +6,7 @@
         <span v-if="topic.creator.type === 'MEMBER'" class="bg-[#ebe6dc] px-2 py-1 text-[11px] font-bold text-[#6d6861]">會員發起</span>
         <span v-if="topic.moderationStatus === 'PENDING_REVIEW'" class="bg-[#fff0d7] px-2 py-1 text-[11px] font-bold text-[#9a5b12]">待複核</span>
         <span v-else-if="topic.hasVoted" class="bg-[#e5f1e9] px-2 py-1 text-[11px] font-bold text-[#3f7a58]">已投票</span>
-        <span v-else class="text-xs text-[#77716a]">{{ deadlineLabel(topic.voteEndAt, deadlineNow) }}</span>
+        <span v-else class="text-xs font-bold text-[#77716a]">{{ deadlineLabel(topic.voteEndAt, deadlineNow) }}</span>
       </div>
     </div>
 
