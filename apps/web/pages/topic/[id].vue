@@ -40,12 +40,12 @@
 
     <section v-show="activeSection === 'vote'" class="max-w-3xl overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] shadow-[0_8px_28px_rgba(23,23,23,0.08)]">
       <header class="border-b border-[#ded7cb] px-5 py-4 sm:px-6">
-        <p class="eyebrow-modern text-[#d84a36]">{{ showResults ? '投票結果' : '你的選擇' }}</p>
-        <h2 class="mt-1 text-xl font-black">{{ showResults ? '目前風向' : '請選擇你的立場' }}</h2>
+        <p class="eyebrow-modern text-[#d84a36]">{{ isInteractionLocked ? '議題選項' : showResults ? '投票結果' : '你的選擇' }}</p>
+        <h2 class="mt-1 text-xl font-black">{{ isInteractionLocked ? '內容預覽' : showResults ? '目前風向' : '請選擇你的立場' }}</h2>
       </header>
 
       <div class="p-5 sm:p-6">
-        <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-4">
+        <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-4">
           <p class="text-sm font-bold text-[#2746b4]">登入後即可投票</p>
           <div class="mt-3 flex gap-2">
             <UiButton :to="registerUrl" variant="outline" size="sm">註冊</UiButton>
@@ -53,17 +53,18 @@
           </div>
         </div>
 
-        <div v-else-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
-        <div v-else-if="!showResults && isVotingOpen && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">此身份僅供工作或資訊查閱，不能參與投票。</div>
+        <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
+        <div v-else-if="!showResults && isVotingOpen && auth.isAuthed && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">此身份僅供工作或資訊查閱，不能參與投票。</div>
 
         <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'SPECTRUM'">
           <div class="flex items-end justify-between">
-            <span class="text-sm font-bold text-[#6d6861]">目前選擇</span>
-            <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ spectrumValue }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
+            <span class="text-sm font-bold text-[#6d6861]">目前風向</span>
+            <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ isInteractionLocked ? lockedSpectrum : spectrumValue }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
           </div>
-          <input v-model.number="spectrumValue" type="range" min="0" max="100" class="focus-ring mt-5 w-full accent-[#3157d5]" />
+          <input v-if="!isInteractionLocked" v-model.number="spectrumValue" type="range" min="0" max="100" class="focus-ring mt-5 w-full accent-[#3157d5]" />
+          <div v-else class="mt-5 h-2 rounded-full bg-[#e3decf]"><div class="h-full rounded-full bg-[#3157d5]" :style="{ width: `${lockedSpectrum}%` }" /></div>
           <div class="mt-2 flex justify-between text-xs font-bold text-[#77716a]"><span>0</span><span>50</span><span>100</span></div>
-          <UiButton variant="data" block class="mt-6" :disabled="voting || confirmingSpectrum" @click="confirmingSpectrum = true">
+          <UiButton v-if="!isInteractionLocked" variant="data" block class="mt-6" :disabled="voting || confirmingSpectrum" @click="confirmingSpectrum = true">
             確認送出 {{ spectrumValue }} 分
           </UiButton>
         </template>
@@ -75,8 +76,8 @@
               :key="o.id"
               type="button"
               class="focus-ring flex min-h-12 w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left font-bold transition"
-              :class="selectedOptionId === o.id ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb] bg-white hover:border-[#171717]'"
-              :disabled="voting"
+              :class="[selectedOptionId === o.id ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb] bg-white', isInteractionLocked ? 'cursor-not-allowed opacity-60 hover:border-[#ded7cb]' : 'hover:border-[#171717]']"
+              :disabled="voting || isInteractionLocked"
               @click="onOptionTap(o.id)"
             >
               <span>{{ o.label }}</span>
@@ -227,6 +228,11 @@ const confirmingOptionId = ref<string | null>(null);
 const confirmingSpectrum = ref(false);
 const myVoteOptionId = computed(() => topic.value?.options.find((option) => option.label === topic.value?.myVote?.choice)?.id ?? null);
 const isQuick = computed(() => topic.value?.kind === 'QUICK');
+const isInteractionLocked = computed(() => !auth.isAuthed);
+const lockedSpectrum = computed(() => {
+  const median = topic.value?.spectrumMedian;
+  return typeof median === 'number' ? Math.round(median) : 50;
+});
 const sections = computed<Array<{ value: TopicSection; label: string; count: number | null }>>(() => {
   if (isQuick.value) return [{ value: 'vote', label: '即時結果', count: null }];
   return [
