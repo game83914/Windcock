@@ -67,12 +67,12 @@
             <label class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-2.5 pr-1 sm:max-w-44">
               <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3Z" /></svg>
               <select v-model="activeCategory" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none" aria-label="議題分類" @change="selectCategory(activeCategory)">
-                <option value="all">全部（{{ allTopicCount }}）</option>
+                <option value="all">全部</option>
                 <option
                   v-for="category in filterChips"
                   :key="category.key"
                   :value="category.key"
-                >{{ category.key === 'quick' ? '快問' : `${category.label}（${categoryCounts[category.key] ?? 0}）` }}</option>
+                >{{ category.key === 'quick' ? '快問' : category.label }}</option>
               </select>
             </label>
             <label class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-2.5 pr-1 sm:max-w-44">
@@ -213,8 +213,6 @@ watch(() => data.value, (list) => {
 }, { immediate: true });
 const topics = computed(() => visibleTopics.value);
 const featuredTopics = computed<Topic[]>(() => featuredData.value ?? []);
-const categoryCounts = computed(() => data.value.categoryCounts ?? {});
-const allTopicCount = computed(() => Object.values(categoryCounts.value).reduce((sum, count) => sum + count, 0));
 const totalPages = computed(() => Math.max(1, data.value.pagination.pages));
 const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#fff0d7' };
 const filterChips = computed(() => [quickCategoryChip, ...activeCategories.value]);
