@@ -11,7 +11,7 @@
 
         <div class="hidden flex-1 items-center justify-center gap-6 lg:flex">
           <NuxtLink to="/gifs" class="focus-ring text-sm font-black text-[#8f4f78] hover:text-[#d84a36]">GIF 市集</NuxtLink>
-          <NuxtLink v-if="!authed || auth.canAuthorTopics || auth.canSubmitTopicApplication" :to="authed ? '/topics/create' : '/login?redirect=/topics/create'" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#d84a36] hover:text-[#171717]">{{ auth.canAuthorTopics ? '建立議題' : '提出議題' }}</NuxtLink>
+          <NuxtLink v-if="authed && (auth.canAuthorTopics || auth.canSubmitTopicApplication)" to="/topics/create" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#d84a36] hover:text-[#171717]">{{ auth.canAuthorTopics ? '建立議題' : '提出議題' }}</NuxtLink>
           <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#b0761f] hover:text-[#171717]">發起快問</NuxtLink>
         </div>
 
@@ -42,7 +42,6 @@
             </details>
           </template>
           <template v-else>
-            <NuxtLink to="/login?redirect=/topics/create" class="focus-ring hidden text-xs font-bold text-[#d84a36] sm:block lg:hidden">發起議題</NuxtLink>
             <NuxtLink to="/login" class="focus-ring rounded-xl bg-[#d84a36] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#171717]">門號登入</NuxtLink>
           </template>
         </div>
