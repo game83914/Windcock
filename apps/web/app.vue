@@ -12,7 +12,7 @@
         <div v-if="showCreateButton" ref="createAreaEl" class="relative shrink-0">
           <button
             type="button"
-            class="focus-ring grid size-9 place-items-center rounded-xl bg-[#171717] text-white transition hover:bg-[#d84a36]"
+            class="focus-ring grid size-9 place-items-center rounded-xl bg-[#d84a36] text-white transition hover:bg-[#171717]"
             aria-haspopup="menu"
             :aria-expanded="createMenuOpen"
             @click="createMenuOpen = !createMenuOpen"
