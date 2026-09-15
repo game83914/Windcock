@@ -70,6 +70,7 @@ enum TopicKind {
 enum TopicType {
   BINARY
   MULTIPLE
+  IMAGE_MULTIPLE
   SPECTRUM
   SHORT_ANSWER
   MATCHING

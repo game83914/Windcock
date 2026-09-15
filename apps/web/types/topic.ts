@@ -5,7 +5,7 @@ export interface TopicOption {
   data?: { match?: string; weight?: number; imageUrl?: string } | null;
 }
 
-export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
+export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
 
 export interface TopicShortAnswer {
   id: string;

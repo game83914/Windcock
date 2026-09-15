@@ -18,7 +18,7 @@
           class="focus-ring flex w-full items-center justify-between rounded-lg border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]"
           @click.stop="goLogin"
         >
-          <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-5 w-5 shrink-0 rounded border border-[#ded7cb] object-cover" />{{ o.label }}</span>
+          <span class="flex items-center gap-2">{{ o.label }}</span>
           <span aria-hidden="true">+</span>
         </button>
       </div>
@@ -38,7 +38,7 @@
         @click.stop="onTap(o)"
       >
         <span class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold" :class="myVoteOptionId === o.id ? 'text-[#8f5d14]' : 'text-[#171717]'">
-          <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-5 w-5 shrink-0 rounded border border-[#ded7cb] object-cover" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+          <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
           <span class="flex items-center gap-2 text-xs tabular-nums">
             <span v-if="voting && votingTargetId === o.id" class="size-3.5 animate-spin rounded-full border-2 border-[#b0761f] border-t-transparent" aria-hidden="true" />
             <template v-else>
@@ -62,12 +62,68 @@
         @click.stop="goTopic"
       >
         <span class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold" :class="myVoteOptionId === o.id ? 'text-[#8f5d14]' : 'text-[#171717]'">
-          <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-5 w-5 shrink-0 rounded border border-[#ded7cb] object-cover" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+          <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
           <span class="shrink-0 text-xs font-black tabular-nums text-[#77716a]">{{ optionPercentage(o, poll) }}%</span>
         </span>
         <span class="block h-1 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
       </button>
       <button v-if="optionsCollapsed" type="button" class="focus-ring w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
+    </div>
+
+    <div v-else-if="isImagePick && isOpen && !auth.isAuthed" class="mt-4">
+      <div class="grid grid-cols-2 gap-3">
+        <button
+          v-for="o in poll.options"
+          :key="o.id"
+          type="button"
+          class="focus-ring group relative aspect-square overflow-hidden rounded-lg border-2 border-[#e0c9a0] bg-white transition hover:border-[#b0761f]"
+          @click.stop="goLogin"
+        >
+          <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
+          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-black text-white">{{ o.label }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div v-else-if="isImagePick && isOpen && auth.isAuthed && !auth.canVote" class="mt-4 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
+
+    <div v-else-if="isImagePick && isOpen" class="mt-4">
+      <div class="grid grid-cols-2 gap-3">
+        <button
+          v-for="o in poll.options"
+          :key="o.id"
+          type="button"
+          class="focus-ring group relative aspect-square overflow-hidden rounded-lg border-2 text-left transition disabled:cursor-not-allowed"
+          :class="myVoteOptionId === o.id ? 'border-[#b0761f] ring-2 ring-[#b0761f]' : 'border-[#e0c9a0] hover:border-[#b0761f]'"
+          :disabled="voting"
+          @click.stop="onTap(o)"
+        >
+          <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
+          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-black text-white">{{ o.label }}</span>
+          <span v-if="voting && votingTargetId === o.id" class="absolute inset-0 grid place-items-center bg-black/30"><span class="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" /></span>
+          <span v-else-if="myVoteOptionId === o.id" class="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-[#b0761f] text-xs text-white" aria-hidden="true">✓</span>
+          <span v-if="poll.hasVoted" class="absolute inset-x-0 bottom-0 h-1 bg-white/20"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
+        </button>
+      </div>
+    </div>
+
+    <div v-else-if="isImagePick" class="mt-4">
+      <div class="grid grid-cols-2 gap-3">
+        <button
+          v-for="o in poll.options"
+          :key="o.id"
+          type="button"
+          class="focus-ring group relative aspect-square overflow-hidden rounded-lg border border-[#e0c9a0] bg-white text-left"
+          :class="myVoteOptionId === o.id ? 'ring-2 ring-[#b0761f]' : ''"
+          @click.stop="goTopic"
+        >
+          <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
+          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1.5 pt-5 text-[10px] font-black text-white">
+            <span class="flex items-center justify-between gap-1"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}<span class="shrink-0 tabular-nums">{{ optionPercentage(o, poll) }}%</span></span>
+          </span>
+          <span class="absolute inset-x-0 bottom-0 h-1 bg-white/20"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
+        </button>
+      </div>
     </div>
 
     <div v-else class="mt-4">
@@ -92,7 +148,7 @@
 
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
-import { deadlineLabel, formatCompactNumber, isOptionPickType, optionPercentage, topicTypeLabel } from '~/utils/topic';
+import { deadlineLabel, formatCompactNumber, isImageOptionType, isOptionPickType, optionPercentage, topicTypeLabel } from '~/utils/topic';
 import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
@@ -111,6 +167,7 @@ const showAllOptions = ref(false);
 
 const isOpen = computed(() => poll.value.status === 'OPEN' && !!poll.value.voteEndAt && new Date(poll.value.voteEndAt).getTime() > Date.now());
 const isOptionPick = computed(() => isOptionPickType(poll.value.topicType) && poll.value.topicType !== 'SHORT_ANSWER');
+const isImagePick = computed(() => isImageOptionType(poll.value.topicType));
 const myVoteOptionId = computed(() => poll.value.options.find((option) => option.label === poll.value.myVote?.choice)?.id ?? null);
 const optionsCollapsed = computed(() => !showAllOptions.value && poll.value.options.length > OPTION_COLLAPSE_LIMIT);
 const visibleOptions = computed(() => optionsCollapsed.value ? poll.value.options.slice(0, OPTION_COLLAPSE_LIMIT) : poll.value.options);

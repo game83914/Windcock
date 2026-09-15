@@ -64,6 +64,31 @@
             </UiButton>
           </template>
 
+          <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'IMAGE_MULTIPLE'">
+            <div class="grid grid-cols-2 gap-3">
+              <button
+                v-for="o in topic.options"
+                :key="o.id"
+                type="button"
+                class="focus-ring group relative aspect-square overflow-hidden rounded-2xl border-2 bg-white transition"
+                :class="selectedOptionId === o.id ? 'border-[#3157d5] ring-2 ring-[#3157d5]' : 'border-[#ded7cb] hover:border-[#171717]'"
+                :disabled="voting || isInteractionLocked"
+                @click="onOptionTap(o.id)"
+              >
+                <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" @click.stop="openLightbox(o.data?.imageUrl ?? '')" />
+                <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">{{ o.label }}</span>
+                <span v-if="selectedOptionId === o.id" class="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-[#3157d5] text-sm text-white" aria-hidden="true">✓</span>
+              </button>
+            </div>
+            <div v-if="confirmingOptionId" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedOption?.label }}」？送出後無法修改。</p>
+              <div class="flex shrink-0 gap-2">
+                <UiButton variant="outline" size="sm" :disabled="voting" @click="resetVoteIntents">重選</UiButton>
+                <UiButton variant="data" size="sm" :disabled="voting" @click="submitVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
+              </div>
+            </div>
+          </template>
+
           <template v-else-if="!showResults && isVotingOpen">
             <div class="space-y-2.5">
               <button
@@ -76,7 +101,6 @@
                 @click="onOptionTap(o.id)"
               >
                 <span class="flex items-center gap-3">
-                  <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-16 w-16 shrink-0 rounded-xl border border-[#ded7cb] object-cover" @click.stop="openLightbox(o.data.imageUrl)" />
                   <span>{{ o.label }}</span>
                 </span>
                 <span class="flex items-center gap-2">
@@ -124,10 +148,27 @@
               <div class="relative mt-5 h-3 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5]" :style="{ width: `${Number(topic.spectrumMedian || 0)}%` }" /></div>
               <p v-if="topic.myVote" class="mt-4 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
             </template>
+            <template v-else-if="topic.topicType === 'IMAGE_MULTIPLE'">
+              <div class="grid grid-cols-2 gap-3">
+                <div v-for="o in topic.options" :key="o.id" class="relative overflow-hidden rounded-2xl border border-[#ded7cb]">
+                  <span class="relative block aspect-square">
+                    <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" @click.stop="openLightbox(o.data?.imageUrl ?? '')" />
+                    <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">
+                      <span class="flex items-center justify-between gap-2">
+                        <span>{{ o.label }}</span>
+                        <span class="shrink-0 tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span>
+                      </span>
+                    </span>
+                    <span class="absolute inset-x-0 bottom-0 h-1.5 bg-white/20"><span class="block h-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
+                  </span>
+                </div>
+              </div>
+              <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+            </template>
             <template v-else>
               <div class="space-y-5">
                 <div v-for="o in visibleOptions" :key="o.id">
-                  <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="flex items-center gap-2 font-bold"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-10 w-10 shrink-0 rounded-lg border border-[#ded7cb] object-cover cursor-pointer transition hover:opacity-80" @click.stop="openLightbox(o.data.imageUrl)" />{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
+                  <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="flex items-center gap-2 font-bold">{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
                   <div class="h-2 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></div>
                 </div>
               </div>

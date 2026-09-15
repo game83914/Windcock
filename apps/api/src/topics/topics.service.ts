@@ -315,7 +315,7 @@ export class TopicsService {
     optionLabels.forEach((label) => assertClean(label, '選項'));
     this.assertOptionImagesLength(dto);
 
-    const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
+    const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.IMAGE_MULTIPLE, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
     const noOptionTypes: TopicType[] = [TopicType.SPECTRUM, TopicType.SHORT_ANSWER];
     if (optionTypes.includes(dto.topicType) && !optionLabels.length) {
       throw new BadRequestException('此題型必須設定選項');
@@ -329,6 +329,9 @@ export class TopicsService {
         break;
       case TopicType.MULTIPLE:
         if (optionLabels.length < 2 || optionLabels.length > 10) throw new BadRequestException('選項題必須設定 2 到 10 個選項');
+        break;
+      case TopicType.IMAGE_MULTIPLE:
+        if (optionLabels.length < 2 || optionLabels.length > 10) throw new BadRequestException('圖片選項題必須設定 2 到 10 個選項');
         break;
       case TopicType.MATCHING:
         if (optionLabels.length < 2 || optionLabels.length > 6) throw new BadRequestException('連連看必須設定 2 到 6 組配對');
@@ -1125,6 +1128,9 @@ export class TopicsService {
     if (dto.topicType === 'MULTIPLE' && (options.length < 2 || options.length > 6)) {
       throw new BadRequestException('多選題必須設定 2 到 6 個選項');
     }
+    if (dto.topicType === 'IMAGE_MULTIPLE' && (options.length < 2 || options.length > 6)) {
+      throw new BadRequestException('圖片選項題必須設定 2 到 6 個選項');
+    }
     if (new Set(options).size !== options.length) {
       throw new BadRequestException('選項不可重複');
     }
@@ -1171,16 +1177,21 @@ export class TopicsService {
     return this.serialize(topic, false);
   }
 
-  private assertOptionImagesLength(dto: { options?: string[]; optionImages?: (string | null)[] }) {
-    if (!dto.optionImages) return;
-    const count = (dto.options || []).length;
-    if (dto.optionImages.length !== count) {
-      throw new BadRequestException('選項圖片數量需與選項一一對應');
-    }
-    for (const imageUrl of dto.optionImages) {
-      if (imageUrl !== null && typeof imageUrl === 'string' && !imageUrl.startsWith('/api/v1/option-images/')) {
-        throw new BadRequestException('選項圖片路徑無效');
+  private assertOptionImagesLength(dto: { topicType: TopicType; options?: string[]; optionImages?: (string | null)[] }) {
+    if (dto.topicType === TopicType.IMAGE_MULTIPLE) {
+      const count = (dto.options || []).length;
+      if (!dto.optionImages || dto.optionImages.length !== count) {
+        throw new BadRequestException('圖片選項題必須為每個選項提供圖片');
       }
+      for (const imageUrl of dto.optionImages) {
+        if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('/api/v1/option-images/')) {
+          throw new BadRequestException('圖片選項題的每個選項都必須是指定格式的圖片路徑');
+        }
+      }
+      return;
+    }
+    if (dto.optionImages?.some(Boolean)) {
+      throw new BadRequestException('此題型不支援選項圖片');
     }
   }
 
@@ -1188,7 +1199,8 @@ export class TopicsService {
     return dto.optionImages?.[index] && dto.optionImages[index] !== null ? dto.optionImages[index]! : null;
   }
 
-  private optionImageData(dto: { optionImages?: (string | null)[] }, index: number) {
+  private optionImageData(dto: { topicType: TopicType; optionImages?: (string | null)[] }, index: number) {
+    if (dto.topicType !== TopicType.IMAGE_MULTIPLE) return undefined;
     const imageUrl = this.optionImageAt(dto, index);
     return imageUrl ? { imageUrl } : undefined;
   }

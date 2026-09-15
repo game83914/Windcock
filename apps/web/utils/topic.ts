@@ -77,6 +77,7 @@ export function optionPercentage(option: TopicOption, topic: Topic) {
 export const TOPIC_TYPE_LABEL: Record<string, string> = {
   BINARY: '二選一',
   MULTIPLE: '多選項',
+  IMAGE_MULTIPLE: '圖片選項題',
   SPECTRUM: '光譜題',
   SHORT_ANSWER: '簡答題',
   MATCHING: '連連看',
@@ -88,6 +89,10 @@ export const TOPIC_TYPE_LABEL: Record<string, string> = {
 
 export function isOptionPickType(topicType?: string) {
   return !!topicType && ['BINARY', 'MULTIPLE'].includes(topicType);
+}
+
+export function isImageOptionType(topicType?: string) {
+  return topicType === 'IMAGE_MULTIPLE';
 }
 
 export function topicTypeLabel(topicType?: string) {

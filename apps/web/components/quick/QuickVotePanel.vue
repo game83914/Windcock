@@ -159,13 +159,31 @@
           @click="submitQuickVote(o.id)"
         >
           <span class="flex items-center gap-3">
-            <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-16 w-16 shrink-0 rounded-xl border border-[#ded7cb] object-cover" @click.stop="openLightbox(o.data.imageUrl)" />
             <span>{{ o.label }}</span>
           </span>
           <span aria-hidden="true">{{ myVoteOptionId === o.id ? '✓' : '○' }}</span>
         </button>
       </div>
       <button v-if="optionsCollapsed" type="button" class="focus-ring mt-3 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${topic.options.length}）` }}</button>
+    </template>
+
+    <template v-else-if="!showResults && isVotingOpen && isImageOption">
+      <div class="grid grid-cols-2 gap-3">
+        <button
+          v-for="o in topic.options"
+          :key="o.id"
+          type="button"
+          class="focus-ring group relative aspect-square overflow-hidden rounded-2xl border-2 bg-white transition"
+          :class="myVoteOptionId === o.id ? 'border-[#b0761f] ring-2 ring-[#b0761f]' : 'border-[#e0c9a0] hover:border-[#b0761f]'"
+          :disabled="voting || isInteractionLocked"
+          @click="submitQuickVote(o.id)"
+        >
+          <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" @click.stop="openLightbox(o.data?.imageUrl ?? '')" />
+          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">{{ o.label }}</span>
+          <span v-if="voting && votingTargetId === o.id" class="absolute inset-0 grid place-items-center bg-black/30"><span class="size-6 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" /></span>
+          <span v-else-if="myVoteOptionId === o.id" class="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-[#b0761f] text-sm text-white" aria-hidden="true">✓</span>
+        </button>
+      </div>
     </template>
 
     <template v-else-if="isVotingOpen && showResults && topic.topicType === 'SPECTRUM'">
@@ -219,13 +237,38 @@
           @click="changeQuickVote(o.id)"
         >
           <span class="flex items-center justify-between px-4 py-3 text-sm font-bold">
-            <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-10 w-10 shrink-0 rounded-lg border border-[#ded7cb] object-cover cursor-pointer transition hover:opacity-80" @click.stop="openLightbox(o.data.imageUrl)" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+            <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
             <span class="flex items-center gap-2 tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span>
           </span>
           <span class="block h-1.5 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
         </button>
       </div>
       <button v-if="optionsCollapsed" type="button" class="focus-ring mt-3 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${topic.options.length}）` }}</button>
+    </template>
+
+    <template v-else-if="isVotingOpen && showResults && isImageOption">
+      <div class="grid grid-cols-2 gap-3">
+        <button
+          v-for="o in topic.options"
+          :key="o.id"
+          type="button"
+          class="focus-ring relative overflow-hidden rounded-2xl border-2 text-left transition"
+          :class="myVoteOptionId === o.id ? 'border-[#b0761f]' : 'border-[#ded7cb] hover:border-[#b0761f]'"
+          :disabled="voting"
+          @click="changeQuickVote(o.id)"
+        >
+          <span class="relative block aspect-square">
+            <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" @click.stop="openLightbox(o.data?.imageUrl ?? '')" />
+            <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">
+              <span class="flex items-center justify-between gap-2">
+                <span class="flex items-center gap-1"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+                <span class="shrink-0 tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span>
+              </span>
+            </span>
+            <span class="absolute inset-x-0 bottom-0 h-1.5 bg-white/20"><span class="block h-full bg-[#b0761f] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
+          </span>
+        </button>
+      </div>
     </template>
 
     <template v-else>
@@ -249,6 +292,23 @@
         <div class="relative mt-5 h-3 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5]" :style="{ width: `${Number(topic.spectrumMedian || 0)}%` }" /></div>
         <p v-if="topic.myVote" class="mt-4 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
       </template>
+      <template v-else-if="isImageOption">
+        <div class="grid grid-cols-2 gap-3">
+          <div v-for="o in topic.options" :key="o.id" class="relative overflow-hidden rounded-2xl border border-[#ded7cb]">
+            <span class="relative block aspect-square">
+              <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" @click.stop="openLightbox(o.data?.imageUrl ?? '')" />
+              <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">
+                <span class="flex items-center justify-between gap-2">
+                  <span>{{ o.label }}</span>
+                  <span class="shrink-0 tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span>
+                </span>
+              </span>
+              <span class="absolute inset-x-0 bottom-0 h-1.5 bg-white/20"><span class="block h-full bg-[#3157d5]" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
+            </span>
+          </div>
+        </div>
+        <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+      </template>
       <template v-else>
         <div class="space-y-5">
           <div v-for="o in visibleOptions" :key="o.id">
@@ -265,7 +325,7 @@
 
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
-import { isOptionPickType, optionPercentage } from '~/utils/topic';
+import { isImageOptionType, isOptionPickType, optionPercentage } from '~/utils/topic';
 import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
@@ -282,9 +342,11 @@ const isVotingOpen = computed(() => props.topic.status === 'OPEN' && !!props.top
 const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabilitySummary?.participation));
 const showResults = computed(() => props.topic.hasVoted || !isVotingOpen.value || (auth.isAuthed && participationReady.value && !auth.canVote));
 const isOptionPick = computed(() => isOptionPickType(props.topic.topicType));
+const isImageOption = computed(() => isImageOptionType(props.topic.topicType));
 const isInteractionLocked = computed(() => !auth.isAuthed);
 
 const voting = ref(false);
+const votingTargetId = ref<string | null>(null);
 const spectrumValue = ref(50);
 const shortAnswerText = ref('');
 const myVoteOptionId = computed(() => props.topic.options.find((option) => option.label === props.topic.myVote?.choice)?.id ?? null);
@@ -381,12 +443,15 @@ function wheelLabel(index: number) {
 async function submitQuickVote(optionId: string) {
   if (voting.value || !auth.isAuthed || optionId === myVoteOptionId.value) return;
   voting.value = true;
+  votingTargetId.value = optionId;
   try {
     const res = await api.post<{ newBalance: string; rewardPoints: number }>(`/topics/${props.topic.id}/vote`, { optionId });
     auth.updatePoints(res.newBalance);
+    votingTargetId.value = null;
     toastSuccess('已投票，快問結果即時更新');
     emit('refreshed');
   } catch (e) {
+    votingTargetId.value = null;
     toastError(errorMessage(e));
   } finally {
     voting.value = false;
@@ -396,11 +461,14 @@ async function submitQuickVote(optionId: string) {
 async function changeQuickVote(optionId: string) {
   if (voting.value || optionId === myVoteOptionId.value) return;
   voting.value = true;
+  votingTargetId.value = optionId;
   try {
     const res = await api.patch<{ newBalance: string; rewardPoints: number }>(`/topics/${props.topic.id}/vote`, { optionId });
     auth.updatePoints(res.newBalance);
+    votingTargetId.value = null;
     emit('refreshed');
   } catch (e) {
+    votingTargetId.value = null;
     toastError(errorMessage(e));
   } finally {
     voting.value = false;

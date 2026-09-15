@@ -352,7 +352,7 @@ export class StancesService {
 
   private campOptions(topic: { topicType: TopicType; options: Array<{ id: bigint; label: string }> }) {
     if (topic.topicType === 'BINARY') return topic.options.slice(0, 2);
-    if (topic.topicType === 'MULTIPLE') return topic.options;
+    if (topic.topicType === 'MULTIPLE' || topic.topicType === 'IMAGE_MULTIPLE') return topic.options;
     return null;
   }
 

@@ -60,7 +60,7 @@
               <button v-for="item in categories" :key="item.key" type="button" class="focus-ring flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition" :class="category === item.key ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-white hover:border-[#171717]'" @click="category = item.key"><span class="inline-block h-2 w-2 rounded-full" :style="{ backgroundColor: getCategoryMeta(item.key).color }" />{{ getCategoryMeta(item.key).label }}</button>
             </div>
           </div>
-          <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <div class="mt-6 grid gap-3 sm:grid-cols-4">
             <button v-for="item in topicTypes" :key="item.value" type="button" class="focus-ring rounded-2xl border-2 p-4 text-left transition" :class="topicType === item.value ? 'border-[#d84a36] bg-[#fbe9e5]' : 'border-[#ded7cb] bg-white hover:border-[#d84a36]'" @click="topicType = item.value">
               <strong class="block text-sm">{{ item.label }}</strong>
               <span class="mt-1 block text-xs leading-5 text-[#77716a]">{{ item.description }}</span>
@@ -68,15 +68,18 @@
           </div>
           <div v-if="topicType !== 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-5">
             <div class="flex items-center justify-between">
-              <span class="text-sm font-bold">投票選項</span>
-              <button v-if="topicType === 'MULTIPLE' && options.length < 6" type="button" class="focus-ring rounded-full text-xs font-bold text-[#d84a36] hover:underline" @click="addOption">＋ 新增選項</button>
+              <span class="text-sm font-bold">{{ topicType === 'IMAGE_MULTIPLE' ? '圖片選項' : '投票選項' }}</span>
+              <button v-if="topicType !== 'BINARY' && options.length < 6" type="button" class="focus-ring rounded-full text-xs font-bold text-[#d84a36] hover:underline" @click="addOption">＋ 新增{{ topicType === 'IMAGE_MULTIPLE' ? '圖片' : '選項' }}</button>
             </div>
             <div class="mt-3 space-y-3">
-              <div v-for="(_, index) in options" :key="index" class="flex items-center gap-3">
-                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f8e3de] text-xs font-black text-[#a63222]">{{ index + 1 }}</span>
-                <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="`選項 ${index + 1}`" class="field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
-                <TopicsOptionImageInput v-model="optionImages[index]" @preview="lightboxSrc = $event" />
-                <button v-if="topicType === 'MULTIPLE' && options.length > 2" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="removeOption(index)">&times;</button>
+              <div v-for="(_, index) in options" :key="index">
+                <div class="flex items-center gap-3">
+                  <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f8e3de] text-xs font-black text-[#a63222]">{{ index + 1 }}</span>
+                  <TopicsOptionImageInput v-if="topicType === 'IMAGE_MULTIPLE'" v-model="optionImages[index]" @preview="lightboxSrc = $event" />
+                  <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="topicType === 'IMAGE_MULTIPLE' ? `圖片 ${index + 1} 的說明` : `選項 ${index + 1}`" class="flex-1 field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
+                  <button v-if="topicType !== 'BINARY' && options.length > 2" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="removeOption(index)">&times;</button>
+                </div>
+                <p v-if="fieldErrors[`option-${index}`]" class="mt-2 pl-11 text-xs font-bold text-[#a63222]">{{ fieldErrors[`option-${index}`] }}</p>
               </div>
             </div>
           </div>
@@ -229,7 +232,7 @@ import type { CapabilitySummary } from '~/stores/auth';
 
 definePageMeta({ middleware: 'auth' });
 
-type TopicType = 'BINARY' | 'MULTIPLE' | 'SPECTRUM';
+type TopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'SPECTRUM';
 interface DraftBlock {
   key: number;
   type: TopicContentBlockType;
@@ -268,6 +271,7 @@ const durations = [3, 7, 14, 30];
 const topicTypes: { value: TopicType; label: string; description: string }[] = [
   { value: 'BINARY', label: '二元題', description: '兩個明確選項' },
   { value: 'MULTIPLE', label: '多選題', description: '2 到 6 個方向' },
+  { value: 'IMAGE_MULTIPLE', label: '圖片選項題', description: '以圖片為選項，2 到 6 張' },
   { value: 'SPECTRUM', label: '光譜題', description: '以 0 到 100 表態' },
 ];
 const blockGroups: BlockGroup[] = [
@@ -321,7 +325,10 @@ watch(topicType, (type, previous) => {
   } else if (type === 'BINARY') {
     options.value = ['支持', '反對'];
     optionImages.value = [null, null];
-  } else if (previous !== 'MULTIPLE') {
+  } else if (type === 'IMAGE_MULTIPLE') {
+    options.value = ['圖片一', '圖片二', '圖片三'];
+    optionImages.value = [null, null, null];
+  } else if (previous === 'SPECTRUM') {
     options.value = ['選項一', '選項二', '其他'];
     optionImages.value = [null, null, null];
   }
@@ -401,9 +408,11 @@ function validateForm() {
   if (description.value && description.value.length < 20) fieldErrors.description = '若填寫說明，至少需要 20 個字；也可以留空';
   if (topicType.value !== 'SPECTRUM') {
     options.value.forEach((option, index) => {
-      if (!option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}`;
+      if (!option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}${topicType.value === 'IMAGE_MULTIPLE' ? '的說明' : ''}`;
+      if (topicType.value === 'IMAGE_MULTIPLE' && !optionImages.value[index]) fieldErrors[`option-${index}`] = `請為選項 ${index + 1} 上傳圖片`;
     });
     if (new Set(options.value.map((item) => item.trim())).size !== options.value.length) formError.value = '投票選項不可重複。';
+    if (topicType.value === 'IMAGE_MULTIPLE' && options.value.length < 2) formError.value = '圖片選項題至少需要 2 個選項。';
   }
   blocks.value.forEach((item, index) => {
     if (item.title.length < 3) fieldErrors[`block-${index}-title`] = '模組標題至少需要 3 個字';
@@ -428,7 +437,7 @@ function payload() {
     category: category.value,
     topicType: topicType.value,
     options: topicType.value === 'SPECTRUM' ? undefined : options.value,
-    optionImages: topicType.value === 'SPECTRUM' ? undefined : optionImages.value.map((image) => image || null),
+    optionImages: topicType.value === 'IMAGE_MULTIPLE' ? optionImages.value : undefined,
     voteDurationDays: voteDurationDays.value,
     blocks: blocks.value.map(({ key, expanded, ...item }) => ({
       ...item,

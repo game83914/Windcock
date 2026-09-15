@@ -57,7 +57,7 @@
                 <input v-model.trim="rows[index].label" :data-field="`option-${index}`" maxlength="50" :placeholder="rowPlaceholder" class="field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
                 <input v-if="builderType === 'MATCHING'" v-model.trim="rows[index].match" :data-field="`match-${index}`" maxlength="50" placeholder="右側配對" class="field-input" :class="{ 'field-input-error': fieldErrors[`match-${index}`] }" />
                 <input v-if="builderType === 'SPIN_WHEEL'" v-model.trim="rows[index].weight" :data-field="`weight-${index}`" maxlength="4" inputmode="numeric" placeholder="權重" class="field-input w-20" :class="{ 'field-input-error': fieldErrors[`weight-${index}`] }" />
-                <TopicsOptionImageInput v-if="builderType === 'OPTION'" v-model="rows[index].image" @preview="lightboxSrc = $event" />
+                <TopicsOptionImageInput v-if="builderType === 'IMAGE_OPTION'" v-model="rows[index].image" @preview="lightboxSrc = $event" />
                 <button v-if="rows.length > minRows" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除項目" @click="rows.splice(index, 1)">&times;</button>
               </div>
             </div>
@@ -131,6 +131,7 @@
             </div>
             <div v-for="(row, index) in filledRows" :key="index" class="flex items-center gap-3 text-sm">
               <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#f0e6d2] text-[10px] font-black text-[#8f5d14]">{{ index + 1 }}</span>
+              <img v-if="builderType === 'IMAGE_OPTION' && row.image" :src="row.image" alt="" class="h-8 w-8 shrink-0 rounded-lg border border-[#e0c9a0] object-cover" />
               <span class="font-medium">{{ row.label || '⋯' }}</span>
               <span v-if="builderType === 'SPIN_WHEEL' && row.weight" class="ml-auto rounded-full bg-[#f8ecd6] px-2 py-0.5 text-[10px] font-black text-[#8f5d14]">x{{ row.weight }}</span>
             </div>
@@ -151,7 +152,7 @@ import type { CapabilitySummary } from '~/stores/auth';
 
 definePageMeta({ middleware: 'auth' });
 
-type BuilderType = 'OPTION' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
+type BuilderType = 'OPTION' | 'IMAGE_OPTION' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
 interface BuilderRow { label: string; match: string; weight: string; image: string | null }
 
 const route = useRoute();
@@ -161,6 +162,7 @@ useSeoMeta({ title: '發起快問｜輿論測風向' });
 
 const BUILDER_RULES: Record<BuilderType, { label: string; description: string; min: number; max: number; needs: 'LIST' | 'MATCH' | 'WEIGHT' | 'NONE' }> = {
   OPTION: { label: '選項題', description: '二選一或 2~10 個選項，一鍵看分佈', min: 2, max: 10, needs: 'LIST' },
+  IMAGE_OPTION: { label: '圖片選項題', description: '上傳圖片為選項，點圖即投', min: 2, max: 10, needs: 'LIST' },
   SPECTRUM: { label: '光譜題', description: '0~100 滑桿測立場，即時看風向', min: 0, max: 0, needs: 'NONE' },
   SHORT_ANSWER: { label: '簡答題', description: '收集文字回應，公開顯示解讀民意', min: 0, max: 0, needs: 'NONE' },
   MATCHING: { label: '連連看', description: '左右配對，配對完成即選定', min: 2, max: 6, needs: 'MATCH' },
@@ -169,7 +171,7 @@ const BUILDER_RULES: Record<BuilderType, { label: string; description: string; m
   SPIN_WHEEL: { label: '轉盤抽獎', description: '轉動轉盤，指到的即你的選擇', min: 2, max: 8, needs: 'WEIGHT' },
   LOTTERY: { label: '日式搖獎', description: '搖箱抽球，抽中的即你的選擇', min: 2, max: 10, needs: 'LIST' },
 };
-const DEFAULT_COUNT: Record<BuilderType, number> = { OPTION: 2, SPECTRUM: 0, SHORT_ANSWER: 0, MATCHING: 3, PUZZLE: 3, SCRATCH: 4, SPIN_WHEEL: 4, LOTTERY: 5 };
+const DEFAULT_COUNT: Record<BuilderType, number> = { OPTION: 2, IMAGE_OPTION: 3, SPECTRUM: 0, SHORT_ANSWER: 0, MATCHING: 3, PUZZLE: 3, SCRATCH: 4, SPIN_WHEEL: 4, LOTTERY: 5 };
 const builderTypes = Object.entries(BUILDER_RULES).map(([value, rule]) => ({ value: value as BuilderType, label: rule.label, description: rule.description }));
 const durationOptions = [
   { value: 6, label: '6 小時' },
@@ -200,6 +202,7 @@ const maxRows = computed(() => currentBuilder.value.max);
 const rowLimitLabel = computed(() => `${minRows.value}~${maxRows.value}`);
 const rowHeading = computed(() => ({
   OPTION: '選項',
+  IMAGE_OPTION: '圖片選項',
   SPECTRUM: '光譜軸向',
   SHORT_ANSWER: '作答提示',
   MATCHING: '配對內容',
@@ -208,7 +211,7 @@ const rowHeading = computed(() => ({
   SPIN_WHEEL: '轉盤選項',
   LOTTERY: '搖獎球選項',
 }[builderType.value] ?? '項目'));
-const rowPlaceholder = computed(() => builderType.value === 'MATCHING' ? '左側項目' : builderType.value === 'PUZZLE' ? '拼圖提示（如「支持」）' : '選項內容');
+const rowPlaceholder = computed(() => builderType.value === 'IMAGE_OPTION' ? '圖片說明（必填、不可重複）' : builderType.value === 'MATCHING' ? '左側項目' : builderType.value === 'PUZZLE' ? '拼圖提示（如「支持」）' : '選項內容');
 const filledLabels = computed(() => rows.value.map((row) => row.label.trim()).filter(Boolean));
 const filledRows = computed(() => rows.value.filter((row) => row.label.trim()));
 const totalVotesLabel = '投完即見';
@@ -225,6 +228,7 @@ function setBuilderType(type: BuilderType) {
 
 function backendTopicType(): QuickTopicType {
   if (builderType.value === 'OPTION') return filledLabels.value.length === 2 ? 'BINARY' : 'MULTIPLE';
+  if (builderType.value === 'IMAGE_OPTION') return 'IMAGE_MULTIPLE';
   return builderType.value;
 }
 
@@ -244,6 +248,10 @@ function validateForm() {
       }
       if (builderType.value === 'MATCHING' && !row.match.trim()) {
         fieldErrors[`match-${index}`] = '請填寫右側配對';
+        valid = false;
+      }
+      if (builderType.value === 'IMAGE_OPTION' && !row.image) {
+        fieldErrors[`option-${index}`] = '請為此選項上傳圖片';
         valid = false;
       }
     });
@@ -301,9 +309,8 @@ async function submit() {
       voteDurationHours: voteDurationHours.value,
     };
     if (usesRows.value) payload.options = rows.value.map((row) => row.label.trim());
-    if (builderType.value === 'OPTION') {
-      const images = rows.value.map((row) => row.image || null);
-      payload.optionImages = images;
+    if (builderType.value === 'IMAGE_OPTION') {
+      payload.optionImages = rows.value.map((row) => row.image || null);
     }
     if (builderType.value === 'MATCHING') payload.matches = rows.value.map((row) => row.match.trim());
     if (builderType.value === 'SPIN_WHEEL') {
