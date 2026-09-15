@@ -1,4 +1,5 @@
 <template>
+  <UiImageLightbox v-model:src="lightboxSrc" />
   <div v-if="loading" class="mx-auto max-w-3xl">
     <div class="h-64 animate-pulse bg-[#e5e0d6]" />
   </div>
@@ -75,7 +76,7 @@
                 @click="onOptionTap(o.id)"
               >
                 <span class="flex items-center gap-3">
-                  <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-9 w-9 shrink-0 rounded-lg border border-[#ded7cb] object-cover" />
+                  <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-16 w-16 shrink-0 rounded-xl border border-[#ded7cb] object-cover" @click.stop="openLightbox(o.data.imageUrl)" />
                   <span>{{ o.label }}</span>
                 </span>
                 <span class="flex items-center gap-2">
@@ -126,7 +127,7 @@
             <template v-else>
               <div class="space-y-5">
                 <div v-for="o in visibleOptions" :key="o.id">
-                  <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="flex items-center gap-2 font-bold"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-6 w-6 shrink-0 rounded-md border border-[#ded7cb] object-cover" />{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
+                  <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="flex items-center gap-2 font-bold"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-10 w-10 shrink-0 rounded-lg border border-[#ded7cb] object-cover cursor-pointer transition hover:opacity-80" @click.stop="openLightbox(o.data.imageUrl)" />{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
                   <div class="h-2 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></div>
                 </div>
               </div>
@@ -214,6 +215,9 @@ const confirmingOptionId = ref<string | null>(null);
 const confirmingSpectrum = ref(false);
 const isQuick = computed(() => topic.value?.kind === 'QUICK');
 const isInteractionLocked = computed(() => !auth.isAuthed);
+
+const lightboxSrc = ref<string | null>(null);
+function openLightbox(src: string) { lightboxSrc.value = src; }
 
 const showAllOptions = ref(false);
 const optionsCollapsed = computed(() => !showAllOptions.value && (topic.value?.options.length ?? 0) > OPTION_COLLAPSE_LIMIT);

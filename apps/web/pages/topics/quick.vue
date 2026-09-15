@@ -1,5 +1,6 @@
 <template>
   <div class="mx-auto max-w-6xl pb-12">
+    <UiImageLightbox v-model:src="lightboxSrc" />
     <div class="mb-8 border-b border-[#ded7cb] pb-6">
       <p class="eyebrow-modern text-[#b0761f]">UGC 微投票 · 立即開票</p>
       <h1 class="mt-1 text-3xl font-black tracking-[-0.04em] sm:text-4xl">發起今天快問</h1>
@@ -56,7 +57,7 @@
                 <input v-model.trim="rows[index].label" :data-field="`option-${index}`" maxlength="50" :placeholder="rowPlaceholder" class="field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
                 <input v-if="builderType === 'MATCHING'" v-model.trim="rows[index].match" :data-field="`match-${index}`" maxlength="50" placeholder="右側配對" class="field-input" :class="{ 'field-input-error': fieldErrors[`match-${index}`] }" />
                 <input v-if="builderType === 'SPIN_WHEEL'" v-model.trim="rows[index].weight" :data-field="`weight-${index}`" maxlength="4" inputmode="numeric" placeholder="權重" class="field-input w-20" :class="{ 'field-input-error': fieldErrors[`weight-${index}`] }" />
-                <OptionImageInput v-if="builderType === 'OPTION'" v-model="rows[index].image" />
+                <TopicsOptionImageInput v-if="builderType === 'OPTION'" v-model="rows[index].image" @preview="lightboxSrc = $event" />
                 <button v-if="rows.length > minRows" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除項目" @click="rows.splice(index, 1)">&times;</button>
               </div>
             </div>
@@ -188,6 +189,7 @@ const submitting = ref(false);
 const formError = ref('');
 const fieldErrors = reactive<Record<string, string>>({});
 const savedTopic = ref<Topic | null>(null);
+const lightboxSrc = ref<string | null>(null);
 const eligibility = computed(() => auth.capabilitySummary?.seniorEligibility);
 const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const durationLabel = computed(() => durationOptions.find((item) => item.value === voteDurationHours.value)?.label ?? `${voteDurationHours.value} 小時`);

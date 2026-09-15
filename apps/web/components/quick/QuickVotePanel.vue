@@ -1,5 +1,6 @@
 <template>
   <div>
+    <UiImageLightbox v-model:src="lightboxSrc" />
     <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
     <div v-else-if="!showResults && isVotingOpen && auth.isAuthed && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
 
@@ -158,7 +159,7 @@
           @click="submitQuickVote(o.id)"
         >
           <span class="flex items-center gap-3">
-            <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-9 w-9 shrink-0 rounded-lg border border-[#ded7cb] object-cover" />
+            <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-16 w-16 shrink-0 rounded-xl border border-[#ded7cb] object-cover" @click.stop="openLightbox(o.data.imageUrl)" />
             <span>{{ o.label }}</span>
           </span>
           <span aria-hidden="true">{{ myVoteOptionId === o.id ? '✓' : '○' }}</span>
@@ -218,7 +219,7 @@
           @click="changeQuickVote(o.id)"
         >
           <span class="flex items-center justify-between px-4 py-3 text-sm font-bold">
-            <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-6 w-6 shrink-0 rounded-md border border-[#ded7cb] object-cover" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+            <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-10 w-10 shrink-0 rounded-lg border border-[#ded7cb] object-cover cursor-pointer transition hover:opacity-80" @click.stop="openLightbox(o.data.imageUrl)" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
             <span class="flex items-center gap-2 tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span>
           </span>
           <span class="block h-1.5 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
@@ -273,6 +274,9 @@ const emit = defineEmits<{ refreshed: [] }>();
 const api = useApi();
 const auth = useAuthStore();
 const { success: toastSuccess, error: toastError } = useToast();
+
+const lightboxSrc = ref<string | null>(null);
+function openLightbox(src: string) { lightboxSrc.value = src; }
 
 const isVotingOpen = computed(() => props.topic.status === 'OPEN' && !!props.topic.voteEndAt && new Date(props.topic.voteEndAt).getTime() > Date.now());
 const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabilitySummary?.participation));
