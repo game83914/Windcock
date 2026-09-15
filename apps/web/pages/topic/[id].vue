@@ -55,7 +55,7 @@
             <span class="text-sm font-bold text-[#6d6861]">目前選擇</span>
             <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ spectrumValue }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
           </div>
-          <input v-model.number="spectrumValue" type="range" min="0" max="100" class="focus-ring mt-5 w-full accent-[#3157d5]" :class="{ 'cursor-not-allowed opacity-60': isInteractionLocked }" :disabled="isInteractionLocked" />
+          <input v-model.number="spectrumValue" type="range" min="0" max="100" class="spec-range focus-ring mt-5 w-full accent-[#3157d5]" :class="{ 'cursor-not-allowed opacity-60': isInteractionLocked }" :disabled="isInteractionLocked" />
           <div class="mt-2 flex justify-between text-xs font-bold text-[#77716a]"><span>0</span><span>50</span><span>100</span></div>
           <UiButton v-if="!isInteractionLocked" variant="data" block class="mt-6" :disabled="voting || confirmingSpectrum" @click="confirmingSpectrum = true">
             確認送出 {{ spectrumValue }} 分
@@ -75,21 +75,29 @@
           <p class="text-sm leading-6 text-[#6d6861]">先點左側項目，再點右側對應的配對。配對正確即完成投票。</p>
           <div class="mt-4 grid grid-cols-2 gap-3">
             <div class="space-y-2">
-              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring flex min-h-12 w-full items-center rounded-xl border-2 bg-white px-3 py-2.5 text-left text-sm font-bold transition" :class="matchingLeftId === o.id ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb]'" :disabled="voting || isInteractionLocked" @click="onMatchingLeft(o.id)">{{ o.label }}</button>
+              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring relative flex min-h-12 w-full items-center rounded-xl border-2 bg-white px-3 py-2.5 text-left text-sm font-bold transition" :class="[matchedPair?.includes(o.id) ? 'match-success border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : '', matchingLeftId === o.id ? 'matching-picked border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb]']" :disabled="voting || matchingPending || isInteractionLocked" @click="onMatchingLeft(o.id)">
+                <span class="min-w-0">{{ o.label }}</span>
+                <span v-if="matchingLeftId === o.id" class="ml-2 text-[#3157d5]" aria-hidden="true">●</span>
+              </button>
             </div>
             <div class="space-y-2">
-              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring flex min-h-12 w-full items-center rounded-xl border-2 border-dashed border-[#cfc8bc] bg-white px-3 py-2.5 text-left text-sm font-bold text-[#8b857d] transition enabled:hover:border-[#171717]" :disabled="voting || isInteractionLocked || !matchingLeftId" @click="onMatchingRight(o.id)">{{ o.data?.match }}</button>
+              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring flex min-h-12 w-full items-center rounded-xl border-2 border-dashed bg-white px-3 py-2.5 text-left text-sm font-bold transition" :class="[matchedPair?.includes(o.id) ? 'match-success border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : '', matchingWrong === o.id ? 'match-wrong border-[#d84a36] bg-[#fbe9e5] text-[#a63222]' : '', matchingLeftId ? 'matching-ready border-[#3157d5] text-[#3157d5]' : 'border-[#cfc8bc] text-[#8b857d]']" :disabled="voting || matchingPending || isInteractionLocked || !matchingLeftId" @click="onMatchingRight(o.id)">{{ o.data?.match }}</button>
             </div>
           </div>
+          <p v-if="matchingPending" class="mt-3 text-center text-xs font-bold text-[#3f7a58]">配對成功！送出中…</p>
         </template>
 
         <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'PUZZLE'">
           <p class="text-sm leading-6 text-[#6d6861]">把下方打亂的字塊依正確順序點回原詞，拼完即完成投票。</p>
           <div class="mt-4 space-y-4">
             <div v-for="o in topic.options" :key="o.id">
-              <p class="mb-2 text-xs font-bold text-[#77716a]">進度 {{ puzzleProgress[o.id] ?? 0 }} / {{ o.label.length }} · 目標「{{ o.label }}」</p>
-              <div class="flex flex-wrap gap-2">
-                <button v-for="(letter, index) in (puzzleShuffles[o.id] ?? o.label.split(''))" :key="index" type="button" class="focus-ring grid h-11 w-11 place-items-center rounded-xl border-2 text-lg font-black transition" :class="(puzzleProgress[o.id] ?? 0) > 0 ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb] bg-white'" :disabled="voting || isInteractionLocked" @click="onPuzzleTile(o.id, letter)">{{ letter }}</button>
+              <p class="mb-2 flex items-center justify-between text-xs font-bold text-[#77716a]">
+                <span>進度 {{ Math.min(puzzleProgress[o.id] ?? 0, o.label.length) }} / {{ o.label.length }} · {{ o.label }}</span>
+                <span class="ml-2 tracking-[0.18em]"><span class="text-[#3f7a58]">{{ '•'.repeat(Math.min(puzzleProgress[o.id] ?? 0, o.label.length)) }}</span><span class="text-[#d7d1c6]">{{ '•'.repeat(Math.max(o.label.length - (puzzleProgress[o.id] ?? 0), 0)) }}</span></span>
+              </p>
+              <div class="relative flex flex-wrap gap-2" :class="{ 'puzzle-row-shake': puzzleWrongRow === o.id }">
+                <button v-for="(letter, index) in (puzzleShuffles[o.id] ?? o.label.split(''))" :key="index" type="button" class="focus-ring grid h-11 w-11 place-items-center rounded-xl border-2 text-lg font-black transition" :class="[puzzleDoneId === o.id ? 'tile-assemble border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : '', puzzleJustIndex?.optionId === o.id && puzzleJustIndex?.index === index ? 'tile-pop border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : (puzzleProgress[o.id] ?? 0) > 0 ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb] bg-white']" :style="puzzleDoneId === o.id ? { animationDelay: `${index * 55}ms` } : undefined" :disabled="voting || isInteractionLocked || puzzleDoneId === o.id" @click="onPuzzleTile(o.id, index, letter)">{{ letter }}</button>
+                <UiConfetti v-if="puzzleDoneId === o.id" :burst-key="`puzzle-${o.id}`" :count="10" />
               </div>
             </div>
           </div>
@@ -98,27 +106,44 @@
         <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'SCRATCH'">
           <p class="text-sm leading-6 text-[#6d6861]">按住卡片刮開偽裝貼紙，刮到底即投下那一票。</p>
           <div class="mt-4 grid grid-cols-3 gap-3" @mouseup="scratchStop" @mouseleave="scratchStop" @touchend="scratchStop">
-            <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring relative aspect-square select-none overflow-hidden rounded-2xl border-2 border-[#ded7cb] bg-white text-xs font-black transition" :class="voting || isInteractionLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer touch-none'" :disabled="voting || isInteractionLocked" @mousedown="scratchStart(o.id)" @touchstart.prevent="scratchStart(o.id)">
-              <span class="grid h-full w-full place-items-center px-1 text-center leading-tight">{{ o.label }}</span>
-              <span class="absolute inset-0 grid place-items-center rounded-xl bg-gradient-to-br from-[#9a6a12] to-[#c9a15e] text-xl font-black text-white" :style="{ opacity: 1 - (scratchProgress[o.id] ?? 0) }">？（{{ (scratchProgress[o.id] ?? 0) > 0 ? '刮' : '' }}）</span>
+            <button v-for="(o, index) in topic.options" :key="o.id" type="button" class="focus-ring relative aspect-square select-none overflow-hidden rounded-2xl border-2 bg-white text-xs font-black transition" :class="[voting || isInteractionLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer touch-none', (scratchProgress[o.id] ?? 0) > 0 && (scratchProgress[o.id] ?? 0) < 1 ? 'scratch-wiggle' : '', scratchDoneId === o.id ? 'scratch-win border-[#3f7a58]' : 'border-[#ded7cb]']" :disabled="voting || isInteractionLocked" @mousedown="scratchStart(o.id)" @touchstart.prevent="scratchStart(o.id)">
+              <span class="grid h-full w-full place-items-center px-1 text-center leading-tight" :class="scratchDoneId === o.id ? 'text-[#3f7a58]' : ''">{{ o.label }}</span>
+              <span v-if="scratchDoneId === o.id" class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-2xl text-[#3f7a58]" aria-hidden="true">✓</span>
+              <span class="scratch-pattern absolute inset-0 grid place-items-center rounded-xl bg-gradient-to-br from-[#9a6a12] to-[#c9a15e] text-xl font-black text-white" :style="{ opacity: 1 - (scratchProgress[o.id] ?? 0) }">
+                <span class="scratch-shine pointer-events-none absolute inset-0" />
+                <span class="grid h-full w-full place-items-center">{{ (scratchProgress[o.id] ?? 0) > 0 ? '刮' : '？' }}</span>
+                <span class="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-black/20 text-[10px] font-bold">{{ index + 1 }}</span>
+              </span>
+              <UiConfetti v-if="scratchDoneId === o.id" :burst-key="`scratch-${o.id}`" :count="10" />
             </button>
           </div>
         </template>
 
         <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'SPIN_WHEEL'">
           <div class="relative mx-auto w-full max-w-72">
-            <span class="absolute left-1/2 top-0 z-10 -translate-x-1/2 translate-y-[-6px] text-2xl leading-none text-[#d84a36]" aria-hidden="true">▼</span>
-            <svg viewBox="0 0 200 200" class="block w-full drop-shadow-sm" :class="{ 'cursor-wait': wheelSpinning }" :style="wheelSpinning ? { transform: `rotate(${wheelDeg}deg)`, transition: 'transform 2.8s cubic-bezier(0.2, 0.7, 0.2, 1)' } : { transform: `rotate(${wheelDeg}deg)` }" role="img" aria-label="轉盤">
-              <g v-for="(o, index) in topic.options" :key="o.id">
-                <path :d="wheelArc(index)" :fill="wheelColors[index % wheelColors.length]" stroke="#fffaf0" stroke-width="1.5" />
-                <text :x="wheelLabel(index).x" :y="wheelLabel(index).y" :transform="`rotate(${wheelLabel(index).rotate} ${wheelLabel(index).x} ${wheelLabel(index).y})`" text-anchor="middle" font-size="12" font-weight="700" fill="#fffaf0">{{ o.label }}</text>
-              </g>
-              <circle cx="100" cy="100" r="20" fill="#fffaf0" stroke="#ded7cb" stroke-width="2" />
-            </svg>
-            <div v-if="gameSelectedId" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <span class="wheel-pointer absolute left-1/2 top-0 z-10 -ml-[10px]" aria-hidden="true" />
+            <div class="relative">
+              <svg viewBox="0 0 200 200" class="block w-full drop-shadow-sm" :class="{ 'cursor-wait': wheelSpinning }" :style="wheelSpinning ? { transform: `rotate(${wheelDeg}deg)`, transition: 'transform 2.8s cubic-bezier(0.2, 0.7, 0.2, 1)' } : { transform: `rotate(${wheelDeg}deg)` }" role="img" aria-label="轉盤">
+                <defs>
+                  <radialGradient id="wheel-hub-grad" cx="50%" cy="42%" r="70%">
+                    <stop offset="0%" stop-color="#fffdf8" />
+                    <stop offset="100%" stop-color="#ebd9b8" />
+                  </radialGradient>
+                </defs>
+                <g v-for="(o, index) in topic.options" :key="o.id">
+                  <path :d="wheelArc(index)" :fill="wheelColors[index % wheelColors.length]" stroke="#fffaf0" stroke-width="1.5" :class="{ 'wheel-hit': wheelHitIndex === index }" />
+                  <text :x="wheelLabel(index).x" :y="wheelLabel(index).y" :transform="`rotate(${wheelLabel(index).rotate} ${wheelLabel(index).x} ${wheelLabel(index).y})`" text-anchor="middle" font-size="12" font-weight="700" fill="#fffaf0">{{ o.label }}</text>
+                </g>
+                <circle cx="100" cy="100" r="21" fill="url(#wheel-hub-grad)" stroke="#ded7cb" stroke-width="2" class="wheel-hub" :class="{ 'hub-pulse': !wheelSpinning }" />
+                <text x="100" y="105" text-anchor="middle" font-size="13" font-weight="900" fill="#8f5d14">GO</text>
+              </svg>
+              <span v-if="wheelSpinning" class="wheel-sheen pointer-events-none absolute inset-0 rounded-full" aria-hidden="true" />
+              <UiConfetti v-if="gameSelectedId" :burst-key="`wheel-${wheelConfettiKey}`" :count="14" />
+            </div>
+            <div v-if="gameSelectedId" class="game-chip-in mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
               <p class="text-sm font-bold text-[#2746b4]">轉到了「{{ selectedGameLabel }}」，確定要投這一票嗎？送出後仍可在結果區更改票。</p>
               <div class="flex shrink-0 gap-2">
-                <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null">再轉一次</UiButton>
+                <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null; wheelHitIndex = null">再轉一次</UiButton>
                 <UiButton variant="data" size="sm" :disabled="voting" @click="submitGameVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
               </div>
             </div>
@@ -129,20 +154,34 @@
         </template>
 
         <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'LOTTERY'">
-          <div class="rounded-2xl border border-[#e0c9a0] bg-[#fffaf0] p-5">
-            <div class="relative mx-auto flex h-40 max-w-sm flex-wrap items-center justify-center gap-2" :class="{ 'lottery-shake': lotteryState === 'shaking' }">
-              <span v-for="(o, index) in topic.options" :key="o.id" class="grid size-14 place-items-center rounded-full border border-[#e0c9a0] bg-white text-sm font-black text-[#8f5d14] shadow-md" :class="{ 'bg-[#b0761f] !text-white !border-[#b0761f]': lotteryResultId === o.id }">{{ index + 1 }}</span>
+          <div class="rounded-2xl border border-[#e0c9a0] bg-gradient-to-b from-[#fffaf0] to-[#fdf3e0] p-5">
+            <div class="relative mx-auto max-w-sm overflow-hidden rounded-xl">
+              <div class="lottery-shell relative">
+                <div class="lottery-lid relative flex items-center justify-between px-4 py-2">
+                  <span class="lottery-lid-knob" aria-hidden="true" />
+                  <span class="text-[10px] font-black tracking-[0.18em] text-[#8f5d14]">{{ lotteryState === 'result' ? '抽籤完成' : '搖獎箱' }}</span>
+                  <span class="lottery-lid-knob" aria-hidden="true" />
+                </div>
+                <div class="relative mx-auto flex h-40 flex-wrap items-center justify-center gap-2 px-3" :class="{ 'lottery-shake': lotteryState === 'shaking' }">
+                  <span v-for="(o, index) in topic.options" :key="o.id" class="lottery-ball grid size-14 place-items-center rounded-full border text-sm font-black shadow-sm" :class="lotteryResultId === o.id ? 'lottery-ball-hit' : 'border-[#e0c9a0] bg-white text-[#8f5d14]'">{{ index + 1 }}</span>
+                  <span v-if="lotteryState === 'drawing'" class="lottery-light-beam pointer-events-none absolute left-1/2 top-10 z-10 -translate-x-1/2" aria-hidden="true" />
+                </div>
+              </div>
+              <div v-if="lotteryState === 'drawing'" class="lottery-draw-wrap pointer-events-none absolute inset-x-0 top-6 z-20 flex justify-center">
+                <span class="lottery-draw-ball grid size-14 place-items-center rounded-full border border-[#b0761f] bg-white text-sm font-black text-[#8f5d14] shadow-lg">{{ lotteryDrawNumber }}<span class="absolute -bottom-5 text-[9px] font-bold text-[#b0761f]">出球中</span></span>
+              </div>
+              <UiConfetti v-if="lotteryState === 'result'" :burst-key="`lottery-${lotteryConfettiKey}`" :count="14" />
             </div>
-            <p class="mt-3 text-center text-xs font-bold text-[#8f5d14]">{{ lotteryState === 'shaking' ? '搖獎中…' : lotteryState === 'result' ? '抽中了！搖中哪顆即投哪票' : '每顆球代表一個選項，搖中即送出' }}</p>
-            <div v-if="gameSelectedId" class="mt-4 flex flex-col items-center gap-2">
+            <p class="mt-3 text-center text-xs font-bold text-[#8f5d14]">{{ lotteryStatusLabel }}</p>
+            <div v-if="gameSelectedId" class="game-chip-in mt-4 flex flex-col items-center gap-2">
               <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedGameLabel }}」？送出後仍可在結果區更改票。</p>
               <div class="flex gap-2">
-                <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null">再搖一次</UiButton>
+                <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null; lotteryResultId = null; lotteryState = 'idle'">再搖一次</UiButton>
                 <UiButton variant="data" size="sm" :disabled="voting" @click="submitGameVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
               </div>
             </div>
             <div v-else class="mt-3 text-center">
-              <UiButton variant="data" :disabled="lotteryState === 'shaking' || voting || isInteractionLocked" @click="shakeLottery">{{ voting ? '送出中…' : '搖一搖' }}</UiButton>
+              <UiButton variant="data" :disabled="lotteryState === 'shaking' || lotteryState === 'drawing' || voting || isInteractionLocked" @click="shakeLottery">{{ voting ? '送出中…' : '搖一搖' }}</UiButton>
             </div>
           </div>
         </template>
@@ -196,7 +235,7 @@
               <span class="text-sm font-bold text-[#6d6861]">你的選擇</span>
               <strong class="text-2xl font-black tabular-nums text-[#b0761f]">{{ spectrumValue }}<small class="ml-1 text-xs text-[#77716a]">/ 100</small></strong>
             </div>
-            <input v-model.number="spectrumValue" type="range" min="0" max="100" class="focus-ring mt-3 w-full accent-[#b0761f]" :disabled="voting" />
+            <input v-model.number="spectrumValue" type="range" min="0" max="100" class="spec-range focus-ring mt-3 w-full accent-[#b0761f]" :disabled="voting" />
             <div class="mt-1 flex justify-between text-xs font-bold text-[#77716a]"><span>0</span><span>50</span><span>100</span></div>
             <UiButton variant="quick" block class="mt-4" :disabled="voting || spectrumUnchanged" @click="changeSpectrumVote">{{ voting ? '更新中…' : '更新我的分數' }}</UiButton>
           </div>
@@ -362,9 +401,30 @@ const wheelDeg = ref(0);
 const wheelSpinning = ref(false);
 const puzzleProgress = reactive<Record<string, number>>({});
 const puzzleShuffles = shallowReactive<Record<string, string[]>>({});
-const lotteryState = ref<'idle' | 'shaking' | 'result'>('idle');
+const lotteryState = ref<'idle' | 'shaking' | 'drawing' | 'result'>('idle');
 const lotteryResultId = ref<string | null>(null);
+const lotteryDrawId = ref<string | null>(null);
+const lotteryDrawNumber = computed(() => {
+  const index = topic.value?.options.findIndex((option) => option.id === lotteryDrawId.value) ?? -1;
+  return index >= 0 ? index + 1 : '';
+});
+const lotteryStatusLabel = computed(() => {
+  if (lotteryState.value === 'shaking') return '搖獎中…';
+  if (lotteryState.value === 'drawing') return '開獎…';
+  if (lotteryState.value === 'result') return '抽中了！搖中哪顆即投哪票';
+  return '每顆球代表一個選項，搖中即送出';
+});
 const selectedGameLabel = computed(() => topic.value?.options.find((option) => option.id === gameSelectedId.value)?.label ?? '');
+const wheelHitIndex = ref<number | null>(null);
+const wheelConfettiKey = ref('');
+const lotteryConfettiKey = ref('');
+const matchingPending = ref(false);
+const matchedPair = ref<[string, string] | null>(null);
+const matchingWrong = ref<string | null>(null);
+const scratchDoneId = ref<string | null>(null);
+const puzzleJustIndex = ref<{ optionId: string; index: number } | null>(null);
+const puzzleWrongRow = ref<string | null>(null);
+const puzzleDoneId = ref<string | null>(null);
 const mySpectrumValue = computed(() => {
   const value = topic.value?.myVote?.spectrumValue;
   return value != null ? Number(value) : null;
@@ -552,8 +612,9 @@ function scratchStart(optionId: string) {
     scratchProgress[optionId] = Math.min(1, (scratchProgress[optionId] ?? 0) + 0.06);
     if (scratchProgress[optionId] >= 1) {
       scratchStop();
+      scratchDoneId.value = optionId;
       const option = topic.value?.options.find((item) => item.id === optionId);
-      if (option) void submitQuickVote(option);
+      if (option) window.setTimeout(() => void submitQuickVote(option), 380);
     }
   }, 70);
 }
@@ -571,30 +632,51 @@ function onMatchingLeft(optionId: string) {
 }
 
 function onMatchingRight(optionId: string) {
-  if (voting.value || isInteractionLocked.value) return;
+  if (voting.value || matchingPending.value || isInteractionLocked.value) return;
   const leftId = matchingLeftId.value;
   if (!leftId || leftId === optionId) return;
   const left = topic.value?.options.find((option) => option.id === leftId);
   const right = topic.value?.options.find((option) => option.id === optionId);
   matchingLeftId.value = null;
   if (left && right && left.label === right.data?.match) {
-    void submitQuickVote(right);
+    matchingPending.value = true;
+    matchedPair.value = [leftId, optionId];
+    window.setTimeout(() => {
+      matchingPending.value = false;
+      matchedPair.value = null;
+      void submitQuickVote(right);
+    }, 340);
   } else {
+    matchingWrong.value = optionId;
     toastError('配對錯誤，請再試一次');
+    window.setTimeout(() => {
+      matchingWrong.value = null;
+    }, 720);
   }
 }
 
-function onPuzzleTile(optionId: string, letter: string) {
-  if (voting.value || isInteractionLocked.value) return;
+function onPuzzleTile(optionId: string, index: number, letter: string) {
+  if (voting.value || isInteractionLocked.value || puzzleDoneId.value === optionId) return;
   const option = topic.value?.options.find((item) => item.id === optionId);
   if (!option) return;
   const progress = puzzleProgress[optionId] ?? 0;
   if (letter === option.label[progress]) {
     puzzleProgress[optionId] = progress + 1;
-    if (puzzleProgress[optionId] >= option.label.length) void submitQuickVote(option);
+    puzzleJustIndex.value = { optionId, index };
+    window.setTimeout(() => {
+      if (puzzleJustIndex.value?.optionId === optionId && puzzleJustIndex.value?.index === index) puzzleJustIndex.value = null;
+    }, 320);
+    if (puzzleProgress[optionId] >= option.label.length) {
+      puzzleDoneId.value = optionId;
+      window.setTimeout(() => void submitQuickVote(option), 380);
+    }
   } else {
     puzzleProgress[optionId] = 0;
+    puzzleWrongRow.value = optionId;
     toastError('順序不對，拼圖已打亂重來');
+    window.setTimeout(() => {
+      puzzleWrongRow.value = null;
+    }, 760);
   }
 }
 
@@ -620,30 +702,44 @@ function spinWheel() {
   const current = ((wheelDeg.value % 360) + 360) % 360;
   const delta = ((desired - current + 360) % 360) + 1080;
   wheelSpinning.value = true;
+  wheelHitIndex.value = null;
   wheelDeg.value += delta;
   window.setTimeout(() => {
     wheelSpinning.value = false;
+    wheelHitIndex.value = idx;
+    wheelConfettiKey.value = `${options[idx].id}-${Date.now()}`;
     gameSelectedId.value = options[idx].id;
   }, 2800);
 }
 
 function shakeLottery() {
   const options = topic.value?.options ?? [];
-  if (!options.length || lotteryState.value === 'shaking' || voting.value || isInteractionLocked.value) return;
+  if (!options.length || lotteryState.value === 'shaking' || lotteryState.value === 'drawing' || voting.value || isInteractionLocked.value) return;
+  lotteryResultId.value = null;
+  lotteryDrawId.value = null;
   lotteryState.value = 'shaking';
   const idx = Math.floor(Math.random() * options.length);
   window.setTimeout(() => {
-    lotteryState.value = 'result';
-    lotteryResultId.value = options[idx].id;
-    gameSelectedId.value = options[idx].id;
-  }, 1300);
+    lotteryDrawId.value = options[idx].id;
+    lotteryState.value = 'drawing';
+    window.setTimeout(() => {
+      lotteryState.value = 'result';
+      lotteryResultId.value = options[idx].id;
+      lotteryConfettiKey.value = `${options[idx].id}-${Date.now()}`;
+      gameSelectedId.value = options[idx].id;
+    }, 520);
+  }, 1080);
 }
 
 async function submitGameVote() {
   const option = topic.value?.options.find((item) => item.id === gameSelectedId.value);
   if (!option || voting.value) return;
   gameSelectedId.value = null;
+  wheelHitIndex.value = null;
   lotteryResultId.value = null;
+  lotteryState.value = 'idle';
+  scratchDoneId.value = null;
+  puzzleDoneId.value = null;
   for (const key of Object.keys(puzzleProgress)) delete puzzleProgress[key];
   await submitQuickVote(option);
 }
@@ -749,7 +845,7 @@ onUnmounted(() => {
 
 <style scoped>
 .lottery-shake {
-  animation: lottery-shake 0.45s ease-in-out infinite;
+  animation: lottery-shake 0.4s ease-in-out infinite;
 }
 @keyframes lottery-shake {
   0%,
@@ -764,6 +860,340 @@ onUnmounted(() => {
   }
   75% {
     transform: translate(-2px, -3px) rotate(1deg);
+  }
+}
+
+/* 轉盤 */
+.wheel-pointer {
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 16px solid #d84a36;
+  filter: drop-shadow(0 2px 3px rgba(23, 23, 23, 0.35));
+  animation: pointer-bob 1.8s ease-in-out infinite;
+  transform-origin: 50% 0;
+}
+@keyframes pointer-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}
+.wheel-hub {
+  transition: filter 0.25s ease;
+}
+.hub-pulse {
+  animation: hub-pulse 2.4s ease-in-out infinite;
+}
+@keyframes hub-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(176, 118, 31, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(176, 118, 31, 0.55));
+  }
+}
+.wheel-sheen {
+  background: conic-gradient(from 0deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 12%, rgba(255, 255, 255, 0) 88%, rgba(255, 255, 255, 0.4));
+  animation: wheel-sheen 1.1s linear infinite;
+}
+@keyframes wheel-sheen {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.wheel-hit {
+  animation: wheel-hit-flash 0.7s ease 2;
+}
+@keyframes wheel-hit-flash {
+  0%,
+  100% {
+    stroke: #fffaf0;
+    stroke-width: 1.5;
+    filter: none;
+  }
+  45% {
+    stroke: #ffffff;
+    stroke-width: 3.5;
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.95));
+  }
+}
+.game-chip-in {
+  animation: chip-in 0.32s cubic-bezier(0.22, 0.9, 0.35, 1.2) both;
+}
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 搖獎箱 */
+.lottery-lid {
+  background: linear-gradient(180deg, #c9a15e, #a8792f);
+  border-radius: 10px 10px 0 0;
+}
+.lottery-lid-knob {
+  display: block;
+  height: 8px;
+  width: 26px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.lottery-shell {
+  background: linear-gradient(180deg, #fffdf8, #f3e7cf);
+  border: 1px solid #e0c9a0;
+  border-radius: 0 0 14px 14px;
+  box-shadow: inset 0 -6px 14px -8px rgba(143, 93, 20, 0.35);
+}
+.lottery-ball {
+  transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease;
+}
+.lottery-ball-hit {
+  border-color: #b0761f;
+  background: #b0761f;
+  color: #ffffff;
+  transform: scale(1.08);
+  animation: ball-hit 0.5s ease 2;
+}
+@keyframes ball-hit {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(176, 118, 31, 0);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(176, 118, 31, 0.75);
+  }
+}
+.lottery-light-beam {
+  width: 2px;
+  height: 84px;
+  background: linear-gradient(180deg, rgba(255, 241, 201, 0), rgba(255, 220, 140, 0.85), rgba(255, 241, 201, 0));
+  animation: beam-waver 0.5s ease-in-out infinite alternate;
+}
+@keyframes beam-waver {
+  from {
+    opacity: 0.55;
+    transform: translateX(-50%) scaleY(1);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scaleY(1.08);
+  }
+}
+.lottery-draw-ball {
+  animation: draw-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  position: relative;
+}
+@keyframes draw-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-34px) scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-24px) scale(1);
+  }
+}
+
+/* 刮刮樂 */
+.scratch-pattern {
+  background-image:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0, rgba(255, 255, 255, 0.5) 1.5px, transparent 1.5px, transparent 7px);
+}
+.scratch-shine {
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.45) 45%, transparent 60%);
+  background-size: 200% 100%;
+  animation: scratch-shine 2.4s ease-in-out infinite;
+}
+@keyframes scratch-shine {
+  0%,
+  60% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -60% 0;
+  }
+}
+.scratch-wiggle {
+  animation: scratch-wiggle 0.22s ease-in-out infinite;
+}
+@keyframes scratch-wiggle {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(0.5px, 1px) rotate(0.6deg);
+  }
+}
+.scratch-win {
+  animation: scratch-win 0.45s ease-out;
+}
+@keyframes scratch-win {
+  0% {
+    box-shadow: 0 0 0 rgba(63, 122, 88, 0);
+    transform: scale(1);
+  }
+  45% {
+    box-shadow: 0 0 0 10px rgba(63, 122, 88, 0.18);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(63, 122, 88, 0);
+    transform: scale(1);
+  }
+}
+
+/* 拼圖 */
+.tile-pop {
+  animation: tile-pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+@keyframes tile-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.tile-assemble {
+  animation: tile-assemble 0.45s ease-out both;
+}
+@keyframes tile-assemble {
+  from {
+    transform: scale(1.25) rotate(4deg);
+    box-shadow: 0 0 0 6px rgba(63, 122, 88, 0.25);
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 0 0 0 0 rgba(63, 122, 88, 0);
+  }
+}
+.puzzle-row-shake {
+  animation: puzzle-row-shake 0.4s ease-in-out;
+}
+@keyframes puzzle-row-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+/* 連連看 */
+.matching-picked,
+.matching-ready {
+  animation: matching-glow 1.5s ease-in-out infinite;
+}
+@keyframes matching-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(49, 87, 213, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(49, 87, 213, 0);
+  }
+}
+.match-success {
+  animation: match-success 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+@keyframes match-success {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.match-wrong {
+  animation: match-wrong 0.4s ease-in-out;
+}
+@keyframes match-wrong {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* 光譜滑桿 */
+.spec-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #3f7a58, #b0761f 55%, #3157d5);
+}
+.spec-range::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #3f7a58, #b0761f 55%, #3157d5);
+}
+.spec-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 3px solid #b0761f;
+  box-shadow: 0 1px 4px rgba(23, 23, 23, 0.25);
+  transition: transform 0.15s ease;
+}
+.spec-range::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-pointer,
+  .hub-pulse,
+  .wheel-sheen,
+  .wheel-hit,
+  .lottery-shake,
+  .lottery-ball-hit,
+  .lottery-light-beam,
+  .lottery-draw-ball,
+  .game-chip-in,
+  .scratch-shine,
+  .scratch-wiggle,
+  .scratch-win,
+  .tile-pop,
+  .tile-assemble,
+  .puzzle-row-shake,
+  .matching-picked,
+  .matching-ready,
+  .match-success,
+  .match-wrong {
+    animation: none;
   }
 }
 </style>
