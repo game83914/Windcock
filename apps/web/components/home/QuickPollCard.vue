@@ -9,10 +9,10 @@
       {{ poll.title }}
     </NuxtLink>
 
-    <div v-if="isOpen && !auth.isAuthed && isOptionPick" class="mt-4">
+    <div v-if="isOptionPick && isOpen && !auth.isAuthed" class="mt-4">
       <div class="space-y-2">
         <button
-          v-for="o in poll.options"
+          v-for="o in visibleOptions"
           :key="o.id"
           type="button"
           class="focus-ring flex w-full items-center justify-between rounded-lg border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]"
@@ -22,22 +22,23 @@
           <span aria-hidden="true">+</span>
         </button>
       </div>
+      <button v-if="optionsCollapsed" type="button" class="focus-ring mt-2 w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
       <div v-if="showLoginHint" class="mt-3 rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-3" @click.stop>
-        <p class="text-xs font-bold text-[#2746b4]">登入後即可一鍵投票，還能獲得點數。</p>
-        <UiButton :to="`/login?redirect=${encodeURIComponent('/')}`" variant="data" size="sm" class="mt-2" @click.stop>門號登入投票</UiButton>
+        <p class="text-xs font-bold text-[#2746b4]">{{ VOTE_GUEST_NOTICE }}</p>
+        <UiButton :to="`/login?redirect=${encodeURIComponent('/')}`" variant="data" size="sm" class="mt-2" @click.stop>{{ VOTE_LOGIN_LABEL }}</UiButton>
       </div>
     </div>
 
-    <div v-else-if="isOpen && !auth.canVote" class="mt-4 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">此身份僅供查閱，不能投票。</div>
+    <div v-else-if="isOptionPick && isOpen && auth.isAuthed && !auth.canVote" class="mt-4 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
 
-    <div v-else-if="isOptionPick" class="mt-4 space-y-2">
+    <div v-else-if="isOptionPick && isOpen" class="mt-4 space-y-2">
       <button
-        v-for="o in poll.options"
+        v-for="o in visibleOptions"
         :key="o.id"
         type="button"
         class="focus-ring block w-full overflow-hidden rounded-lg border text-left transition disabled:cursor-not-allowed"
-        :class="isOpen && myVoteOptionId === o.id ? 'border-[#b0761f] bg-[#fff8ec]' : 'border-[#e0c9a0] bg-white hover:border-[#b0761f]'"
-        :disabled="voting || !isOpen"
+        :class="myVoteOptionId === o.id ? 'border-[#b0761f] bg-[#fff8ec]' : 'border-[#e0c9a0] bg-white hover:border-[#b0761f]'"
+        :disabled="voting"
         @click.stop="onTap(o)"
       >
         <span class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold" :class="myVoteOptionId === o.id ? 'text-[#8f5d14]' : 'text-[#171717]'">
@@ -52,12 +53,40 @@
         </span>
         <span v-if="poll.hasVoted" class="block h-1 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
       </button>
+      <button v-if="optionsCollapsed" type="button" class="focus-ring w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
     </div>
 
-    <button v-else type="button" class="mt-4 flex w-full items-center justify-between rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]" @click.stop="goTopic">
-      <span>{{ topicTypeLabel(poll.topicType) }} — 進去玩一票</span>
-      <span aria-hidden="true">►</span>
-    </button>
+    <div v-else-if="isOptionPick" class="mt-4 space-y-2">
+      <button
+        v-for="o in visibleOptions"
+        :key="o.id"
+        type="button"
+        class="focus-ring block w-full overflow-hidden rounded-lg border border-[#e0c9a0] text-left"
+        :class="myVoteOptionId === o.id ? 'bg-[#fff8ec]' : 'bg-white'"
+        @click.stop="goTopic"
+      >
+        <span class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold" :class="myVoteOptionId === o.id ? 'text-[#8f5d14]' : 'text-[#171717]'">
+          <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+          <span class="shrink-0 text-xs font-black tabular-nums text-[#77716a]">{{ optionPercentage(o, poll) }}%</span>
+        </span>
+        <span class="block h-1 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
+      </button>
+      <button v-if="optionsCollapsed" type="button" class="focus-ring w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
+    </div>
+
+    <div v-else class="mt-4">
+      <button
+        type="button"
+        class="focus-ring flex w-full items-center justify-between rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]"
+        @click.stop="expanded = !expanded"
+      >
+        <span>{{ expanded ? '收合' : `${topicTypeLabel(poll.topicType)} — 進去玩一票` }}</span>
+        <span aria-hidden="true">{{ expanded ? '收合' : '►' }}</span>
+      </button>
+      <div v-if="expanded" class="mt-3 rounded-xl border border-[#e0c9a0] bg-[#fffaf0] p-4" @click.stop>
+        <QuickVotePanel :topic="poll" @refreshed="onRefreshed" />
+      </div>
+    </div>
 
     <div class="mt-auto border-t border-[#f0e6d2] pt-3 text-xs text-[#77716a]">
       <span>{{ formatCompactNumber(poll.totalVotes) }} 人已投</span>
@@ -67,7 +96,8 @@
 
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
-import { deadlineLabel, formatCompactNumber, optionPercentage, topicTypeLabel } from '~/utils/topic';
+import { deadlineLabel, formatCompactNumber, isOptionPickType, optionPercentage, topicTypeLabel } from '~/utils/topic';
+import { OPTION_COLLAPSE_LIMIT, VOTE_GUEST_NOTICE, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
 
@@ -81,15 +111,23 @@ const poll = ref<Topic>(props.topic);
 const voting = ref(false);
 const votingTargetId = ref<string | null>(null);
 const showLoginHint = ref(false);
+const expanded = ref(false);
+const showAllOptions = ref(false);
 
 const isOpen = computed(() => poll.value.status === 'OPEN' && !!poll.value.voteEndAt && new Date(poll.value.voteEndAt).getTime() > Date.now());
-const isOptionPick = computed(() => poll.value.topicType === 'BINARY' || poll.value.topicType === 'MULTIPLE');
+const isOptionPick = computed(() => isOptionPickType(poll.value.topicType) && poll.value.topicType !== 'SHORT_ANSWER');
 const myVoteOptionId = computed(() => poll.value.options.find((option) => option.label === poll.value.myVote?.choice)?.id ?? null);
+const optionsCollapsed = computed(() => !showAllOptions.value && poll.value.options.length > OPTION_COLLAPSE_LIMIT);
+const visibleOptions = computed(() => optionsCollapsed.value ? poll.value.options.slice(0, OPTION_COLLAPSE_LIMIT) : poll.value.options);
+
+function toggleOptions() {
+  showAllOptions.value = !showAllOptions.value;
+}
 
 watch(() => props.topic, (topic) => { poll.value = topic; });
 
 function goTopic() {
-  if (voting.value) return;
+  if (voting.value || expanded.value) return;
   router.push(`/topic/${poll.value.id}`);
 }
 
@@ -97,6 +135,14 @@ async function onTap(option: TopicOption) {
   if (voting.value || !isOpen.value || option.id === myVoteOptionId.value) return;
   if (poll.value.hasVoted) await changeVote(option);
   else await submitVote(option);
+}
+
+async function refreshPoll() {
+  poll.value = await api.get<Topic>(`/topics/${poll.value.id}`);
+}
+
+async function onRefreshed() {
+  await refreshPoll();
 }
 
 async function submitVote(option: TopicOption) {
@@ -107,7 +153,7 @@ async function submitVote(option: TopicOption) {
     auth.updatePoints(res.newBalance);
     votingTargetId.value = null;
     toastSuccess('已投票，快問結果即時更新');
-    poll.value = await api.get<Topic>(`/topics/${poll.value.id}`);
+    await refreshPoll();
   } catch (e) {
     votingTargetId.value = null;
     toastError(errorMessage(e));
@@ -124,7 +170,7 @@ async function changeVote(option: TopicOption) {
     auth.updatePoints(res.newBalance);
     votingTargetId.value = null;
     toastSuccess(`已更改為「${option.label}」`);
-    poll.value = await api.get<Topic>(`/topics/${poll.value.id}`);
+    await refreshPoll();
   } catch (e) {
     votingTargetId.value = null;
     toastError(errorMessage(e));
