@@ -62,10 +62,11 @@
             <h2 class="text-2xl font-black tracking-[-0.035em] sm:text-3xl">{{ sectionHeading }}</h2>
             <span class="text-xs font-bold tabular-nums text-[#77716a]">{{ status === 'pending' ? '載入中' : `${data.pagination.total} 筆` }}</span>
           </div>
-          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
-            <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white px-3 py-1.5 sm:w-40">
-              <span class="text-xs font-bold text-[#77716a]">分類</span>
-              <select v-model="activeCategory" class="min-w-0 flex-1 bg-transparent py-1 text-sm font-bold outline-none" aria-label="議題分類" @change="selectCategory(activeCategory)">
+          <div class="min-w-0">
+          <div class="flex items-center gap-2.5 sm:gap-3">
+            <label class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-2.5 pr-1 sm:max-w-44">
+              <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3Z" /></svg>
+              <select v-model="activeCategory" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none" aria-label="議題分類" @change="selectCategory(activeCategory)">
                 <option value="all">全部（{{ allTopicCount }}）</option>
                 <option
                   v-for="category in filterChips"
@@ -74,26 +75,37 @@
                 >{{ category.key === 'quick' ? '快問' : `${category.label}（${categoryCounts[category.key] ?? 0}）` }}</option>
               </select>
             </label>
-            <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white px-3 py-1.5 sm:w-44">
-              <span class="text-xs font-bold text-[#77716a]">排序</span>
-              <select v-model="sort" class="min-w-0 flex-1 bg-transparent py-1 text-sm font-bold outline-none" @change="selectSort">
+            <label class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-2.5 pr-1 sm:max-w-44">
+              <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
+              <select v-model="sort" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none" @change="selectSort">
                 <option value="ACTIVITY">更新時間</option>
                 <option value="POPULAR">熱門</option>
                 <option value="NEWEST">建立時間</option>
               </select>
             </label>
-            <label class="block sm:w-72">
-              <span class="sr-only">搜尋議題</span>
-              <input
-                v-model="searchInput"
-                type="search"
-                maxlength="100"
-                placeholder="搜尋議題標題或描述"
-                aria-label="搜尋議題"
-                class="focus-ring w-full min-w-0 border border-[#d3cbc0] bg-white px-3.5 py-2.5 text-sm rounded-xl"
-              />
-            </label>
+            <button
+              type="button"
+              class="focus-ring grid size-9 shrink-0 place-items-center rounded-2xl border transition"
+              :class="showSearch || searchActive ? 'border-[#d84a36] bg-[#fbe9e5] text-[#d84a36]' : 'border-[#d3cbc0] bg-white text-[#5f5a53] hover:border-[#b9b0a3]'"
+              :aria-expanded="showSearch"
+              :aria-label="showSearch ? '收起搜尋' : '展開搜尋'"
+              @click="toggleSearch"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+            </button>
           </div>
+          <Transition name="search-drop">
+            <div v-if="showSearch" class="mt-2.5">
+              <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-3 pr-2">
+                <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                <input ref="searchInputEl" v-model="searchInput" type="search" maxlength="100" placeholder="搜尋議題標題或描述" aria-label="搜尋議題" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none" />
+                <button v-if="searchInput" type="button" class="focus-ring grid size-6 shrink-0 place-items-center rounded-full text-[#77716a] hover:bg-[#ebe6dc] hover:text-[#171717]" aria-label="清除搜尋" @click="clearSearch">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </label>
+            </div>
+          </Transition>
+        </div>
         </div>
         <p class="sr-only" aria-live="polite">{{ resultsAnnouncement }}</p>
         <div v-if="error" role="alert" class="border border-[#9c3b3b] bg-[#f6e7e7] px-5 py-8 text-center text-sm text-[#7c2f2f]">
@@ -157,6 +169,9 @@ const searchInput = ref(initialSearch);
 const searchTerm = ref(initialSearch);
 const topicPage = ref(initialPage);
 const sort = ref<'POPULAR' | 'NEWEST' | 'ACTIVITY'>(initialSort);
+const showSearch = ref(Boolean(initialSearch));
+const searchInputEl = ref<HTMLInputElement | null>(null);
+const searchActive = computed(() => Boolean(searchTerm.value));
 
 const { active: activeCategories, refresh: refreshCategories } = useCategories();
 const kindForFetch = computed<'FORMAL' | 'QUICK' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : 'FORMAL');
@@ -240,6 +255,12 @@ watch(searchInput, (value) => {
 watch(status, (nextStatus) => {
   if (nextStatus === 'success') hasLoaded.value = true;
 });
+watch(searchTerm, (value) => {
+  if (value) showSearch.value = true;
+});
+watch(showSearch, (open) => {
+  if (open) nextTick(() => searchInputEl.value?.focus());
+});
 watch(() => data.value.pagination.pages, (pages) => {
   if (pages === 0 && topicPage.value !== 1) topicPage.value = 1;
   else if (pages > 0 && topicPage.value > pages) topicPage.value = pages;
@@ -318,6 +339,17 @@ function selectSort() {
   topicPage.value = 1;
 }
 
+function toggleSearch() {
+  showSearch.value = !showSearch.value;
+}
+
+function clearSearch() {
+  searchInput.value = '';
+  searchTerm.value = '';
+  topicPage.value = 1;
+  showSearch.value = false;
+}
+
 async function loadMore() {
   if (loadingMore.value) return;
   const pages = data.value.pagination.pages;
@@ -381,6 +413,17 @@ function commentSnippet(content: string) {
 
 @keyframes ticker-scroll {
   to { transform: translateX(-50%); }
+}
+
+.search-drop-enter-active,
+.search-drop-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.search-drop-enter-from,
+.search-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 @media (prefers-reduced-motion: reduce) {
