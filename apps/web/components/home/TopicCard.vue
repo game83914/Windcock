@@ -35,9 +35,8 @@
       </div>
     </div>
 
-    <div class="mt-auto flex items-center justify-between border-t border-[#ded8cd] pt-5 text-xs text-[#77716a]" :class="topic.topicType === 'SPECTRUM' ? 'mt-8' : 'mt-7'">
+    <div class="mt-auto border-t border-[#ded8cd] pt-5 text-xs text-[#77716a]" :class="topic.topicType === 'SPECTRUM' ? 'mt-8' : 'mt-7'">
       <span><strong class="text-[#171717]">{{ formatCompactNumber(topic.totalVotes) }}</strong> 人參與</span>
-      <span class="font-bold text-[#171717] group-hover:text-[#d84a36]">查看風向 &rarr;</span>
     </div>
   </NuxtLink>
 </template>

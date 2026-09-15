@@ -54,9 +54,8 @@
       </button>
     </div>
 
-    <div class="mt-auto flex items-center justify-between gap-2 border-t border-[#f0e6d2] pt-3 text-xs text-[#77716a]">
+    <div class="mt-auto border-t border-[#f0e6d2] pt-3 text-xs text-[#77716a]">
       <span>{{ formatCompactNumber(poll.totalVotes) }} 人已投</span>
-      <NuxtLink :to="`/topic/${poll.id}`" class="focus-ring font-bold text-[#b0761f] hover:underline" @click.stop>詳細結果 ↗</NuxtLink>
     </div>
   </article>
 </template>
