@@ -348,7 +348,7 @@ function commentSnippet(content: string) {
 
 <style scoped>
 .ticker-track {
-  animation: ticker-scroll 48s linear infinite;
+  animation: ticker-scroll 96s linear infinite;
 }
 
 .ticker:hover .ticker-track,
