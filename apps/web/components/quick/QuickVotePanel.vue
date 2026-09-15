@@ -204,9 +204,6 @@
     </template>
 
     <template v-else-if="isVotingOpen && showResults && isOptionPick">
-      <p class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
-        <span aria-hidden="true">✓</span> 已投票 — 快問結果即時更新，點選其他選項即可更改票。
-      </p>
       <div class="space-y-2.5">
         <button
           v-for="o in visibleOptions"
