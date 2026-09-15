@@ -9,7 +9,7 @@
   </div>
   <div v-else-if="topic" class="mx-auto max-w-6xl space-y-6">
     <div class="max-w-3xl">
-      <NuxtLink to="/" class="focus-ring text-sm font-bold text-[#6d6861] hover:text-[#d84a36]">&larr; 返回</NuxtLink>
+      <button type="button" class="focus-ring text-sm font-bold text-[#6d6861] hover:text-[#d84a36]" @click="goBack">&larr; 返回</button>
       <div class="mt-4 flex flex-wrap items-center gap-2">
         <span v-if="topic.kind !== 'QUICK'" class="border border-[#171717] px-2 py-1 text-xs font-bold">{{ getCategoryMeta(topic.category).label }}</span>
         <span v-if="topic.kind === 'QUICK'" class="bg-[#b0761f] px-2 py-1 text-xs font-black text-white">快問</span>
@@ -262,6 +262,14 @@ function blockLabel(type: Topic['blocks'][number]['type']) {
     SOURCE: '來源連結',
     PERSPECTIVES: '多方觀點',
   }[type];
+}
+
+function goBack() {
+  if (!import.meta.client || router.options.history.state?.back) {
+    router.back();
+    return;
+  }
+  void navigateTo('/');
 }
 
 function applyUpdate(data: any) {
