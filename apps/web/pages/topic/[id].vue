@@ -119,7 +119,7 @@
           </div>
         </template>
 
-        <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'SPIN_WHEEL'">
+        <template v-else-if="isVotingOpen && topic.topicType === 'SPIN_WHEEL' && (!showResults || showGameAgain)">
           <div class="relative mx-auto w-full max-w-72">
             <span class="wheel-pointer absolute left-1/2 top-0 z-10 -ml-[10px]" aria-hidden="true" />
             <div class="relative">
@@ -138,22 +138,16 @@
                 <text x="100" y="105" text-anchor="middle" font-size="13" font-weight="900" fill="#8f5d14">GO</text>
               </svg>
               <span v-if="wheelSpinning" class="wheel-sheen pointer-events-none absolute inset-0 rounded-full" aria-hidden="true" />
-              <UiConfetti v-if="gameSelectedId" :burst-key="`wheel-${wheelConfettiKey}`" :count="14" />
+              <UiConfetti v-if="wheelHitIndex !== null" :burst-key="`wheel-${wheelConfettiKey}`" :count="14" />
             </div>
-            <div v-if="gameSelectedId" class="game-chip-in mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <p class="text-sm font-bold text-[#2746b4]">轉到了「{{ selectedGameLabel }}」，確定要投這一票嗎？送出後仍可在結果區更改票。</p>
-              <div class="flex shrink-0 gap-2">
-                <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null; wheelHitIndex = null">再轉一次</UiButton>
-                <UiButton variant="data" size="sm" :disabled="voting" @click="submitGameVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
-              </div>
-            </div>
-            <div v-else class="mt-4 text-center">
+            <div class="mt-4 flex flex-col items-center gap-1.5 text-center">
               <UiButton variant="data" :disabled="wheelSpinning || voting || isInteractionLocked" @click="spinWheel">{{ wheelSpinning ? '轉動中…' : '轉一次！' }}</UiButton>
+              <button v-if="showGameAgain" type="button" class="focus-ring text-xs font-bold text-[#77716a] hover:underline" @click="showGameAgain = false">返回結果</button>
             </div>
           </div>
         </template>
 
-        <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'LOTTERY'">
+        <template v-else-if="isVotingOpen && topic.topicType === 'LOTTERY' && (!showResults || showGameAgain)">
           <div class="rounded-2xl border border-[#e0c9a0] bg-gradient-to-b from-[#fffaf0] to-[#fdf3e0] p-5">
             <div class="relative mx-auto max-w-sm overflow-hidden rounded-xl">
               <div class="lottery-shell relative">
@@ -173,15 +167,9 @@
               <UiConfetti v-if="lotteryState === 'result'" :burst-key="`lottery-${lotteryConfettiKey}`" :count="14" />
             </div>
             <p class="mt-3 text-center text-xs font-bold text-[#8f5d14]">{{ lotteryStatusLabel }}</p>
-            <div v-if="gameSelectedId" class="game-chip-in mt-4 flex flex-col items-center gap-2">
-              <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedGameLabel }}」？送出後仍可在結果區更改票。</p>
-              <div class="flex gap-2">
-                <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null; lotteryResultId = null; lotteryState = 'idle'">再搖一次</UiButton>
-                <UiButton variant="data" size="sm" :disabled="voting" @click="submitGameVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
-              </div>
-            </div>
-            <div v-else class="mt-3 text-center">
+            <div class="mt-3 flex flex-col items-center gap-1.5 text-center">
               <UiButton variant="data" :disabled="lotteryState === 'shaking' || lotteryState === 'drawing' || voting || isInteractionLocked" @click="shakeLottery">{{ voting ? '送出中…' : '搖一搖' }}</UiButton>
+              <button v-if="showGameAgain" type="button" class="focus-ring text-xs font-bold text-[#77716a] hover:underline" @click="showGameAgain = false; lotteryState = 'idle'; lotteryResultId = null">返回結果</button>
             </div>
           </div>
         </template>
@@ -256,10 +244,14 @@
           </div>
         </template>
 
-        <template v-else-if="isQuick && isVotingOpen && showResults">
+        <template v-else-if="isQuick && isVotingOpen && showResults && !showGameAgain">
           <p class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
             <span aria-hidden="true">✓</span> 已投票 — 快問結果即時更新，點選其他選項即可更改票。
           </p>
+          <button v-if="topic.topicType === 'SPIN_WHEEL' || topic.topicType === 'LOTTERY'" type="button" class="focus-ring mb-4 flex w-full items-center justify-between rounded-xl border border-[#3157d5] bg-[#e7ecff] px-4 py-3 text-left text-sm font-bold text-[#2746b4] transition hover:border-[#171717]" @click="showGameAgain = true">
+            <span>再來一次，交給運氣決定下一票</span>
+            <span aria-hidden="true">↻</span>
+          </button>
           <div class="space-y-2.5">
             <button
               v-for="o in topic.options"
@@ -394,7 +386,6 @@ const isQuick = computed(() => topic.value?.kind === 'QUICK');
 const isInteractionLocked = computed(() => !auth.isAuthed);
 const shortAnswerText = ref('');
 const matchingLeftId = ref<string | null>(null);
-const gameSelectedId = ref<string | null>(null);
 const scratchProgress = reactive<Record<string, number>>({});
 let scratchTimer: ReturnType<typeof setInterval> | null = null;
 const wheelDeg = ref(0);
@@ -414,8 +405,8 @@ const lotteryStatusLabel = computed(() => {
   if (lotteryState.value === 'result') return '抽中了！搖中哪顆即投哪票';
   return '每顆球代表一個選項，搖中即送出';
 });
-const selectedGameLabel = computed(() => topic.value?.options.find((option) => option.id === gameSelectedId.value)?.label ?? '');
 const wheelHitIndex = ref<number | null>(null);
+const showGameAgain = ref(false);
 const wheelConfettiKey = ref('');
 const lotteryConfettiKey = ref('');
 const matchingPending = ref(false);
@@ -706,9 +697,14 @@ function spinWheel() {
   wheelDeg.value += delta;
   window.setTimeout(() => {
     wheelSpinning.value = false;
+    const option = options[idx];
     wheelHitIndex.value = idx;
-    wheelConfettiKey.value = `${options[idx].id}-${Date.now()}`;
-    gameSelectedId.value = options[idx].id;
+    wheelConfettiKey.value = `${option.id}-${Date.now()}`;
+    window.setTimeout(async () => {
+      wheelHitIndex.value = null;
+      showGameAgain.value = false;
+      await submitLanded(option);
+    }, 620);
   }, 2800);
 }
 
@@ -720,28 +716,28 @@ function shakeLottery() {
   lotteryState.value = 'shaking';
   const idx = Math.floor(Math.random() * options.length);
   window.setTimeout(() => {
-    lotteryDrawId.value = options[idx].id;
+    const option = options[idx];
+    lotteryDrawId.value = option.id;
     lotteryState.value = 'drawing';
     window.setTimeout(() => {
       lotteryState.value = 'result';
-      lotteryResultId.value = options[idx].id;
-      lotteryConfettiKey.value = `${options[idx].id}-${Date.now()}`;
-      gameSelectedId.value = options[idx].id;
+      lotteryResultId.value = option.id;
+      lotteryConfettiKey.value = `${option.id}-${Date.now()}`;
+      window.setTimeout(async () => {
+        lotteryResultId.value = null;
+        lotteryState.value = 'idle';
+        showGameAgain.value = false;
+        await submitLanded(option);
+      }, 620);
     }, 520);
   }, 1080);
 }
 
-async function submitGameVote() {
-  const option = topic.value?.options.find((item) => item.id === gameSelectedId.value);
-  if (!option || voting.value) return;
-  gameSelectedId.value = null;
-  wheelHitIndex.value = null;
-  lotteryResultId.value = null;
-  lotteryState.value = 'idle';
-  scratchDoneId.value = null;
-  puzzleDoneId.value = null;
-  for (const key of Object.keys(puzzleProgress)) delete puzzleProgress[key];
-  await submitQuickVote(option);
+async function submitLanded(option: TopicOption) {
+  if (voting.value) return;
+  if (option.id === myVoteOptionId.value) return;
+  if (topic.value?.hasVoted) await changeQuickVote(option);
+  else await submitQuickVote(option);
 }
 
 async function submitVote() {
@@ -817,6 +813,7 @@ onMounted(async () => {
 watch(topicId, async (nextId, previousId) => {
   leaveTopic(previousId);
   selectedStance.value = null;
+  showGameAgain.value = false;
   resetVoteIntents();
   activeSection.value = validSections.includes(route.query.section as TopicSection) ? route.query.section as TopicSection : 'vote';
   await load();
