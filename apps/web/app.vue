@@ -40,7 +40,7 @@
             </details>
           </template>
           <template v-else>
-            <NuxtLink to="/login" class="focus-ring rounded-xl bg-[#d84a36] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#171717]">門號登入</NuxtLink>
+            <NuxtLink to="/login" class="focus-ring rounded-xl bg-[#d84a36] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#171717]">註冊/登入</NuxtLink>
           </template>
         </div>
       </nav>
