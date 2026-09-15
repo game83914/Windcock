@@ -116,7 +116,7 @@
               <circle cx="100" cy="100" r="20" fill="#fffaf0" stroke="#ded7cb" stroke-width="2" />
             </svg>
             <div v-if="gameSelectedId" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <p class="text-sm font-bold text-[#2746b4]">轉到了「{{ selectedGameLabel }}」，確定送出？送出後無法修改。</p>
+              <p class="text-sm font-bold text-[#2746b4]">轉到了「{{ selectedGameLabel }}」，確定要投這一票嗎？送出後仍可在結果區更改票。</p>
               <div class="flex shrink-0 gap-2">
                 <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null">再轉一次</UiButton>
                 <UiButton variant="data" size="sm" :disabled="voting" @click="submitGameVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
@@ -135,7 +135,7 @@
             </div>
             <p class="mt-3 text-center text-xs font-bold text-[#8f5d14]">{{ lotteryState === 'shaking' ? '搖獎中…' : lotteryState === 'result' ? '抽中了！搖中哪顆即投哪票' : '每顆球代表一個選項，搖中即送出' }}</p>
             <div v-if="gameSelectedId" class="mt-4 flex flex-col items-center gap-2">
-              <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedGameLabel }}」？</p>
+              <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedGameLabel }}」？送出後仍可在結果區更改票。</p>
               <div class="flex gap-2">
                 <UiButton variant="outline" size="sm" :disabled="voting" @click="gameSelectedId = null">再搖一次</UiButton>
                 <UiButton variant="data" size="sm" :disabled="voting" @click="submitGameVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
@@ -179,6 +179,26 @@
               <UiButton variant="outline" size="sm" :disabled="voting" @click="confirmingSpectrum = false">重選</UiButton>
               <UiButton variant="data" size="sm" :disabled="voting" @click="submitVote">{{ voting ? '送出中…' : '確定送出' }}</UiButton>
             </div>
+          </div>
+        </template>
+
+        <template v-else-if="isQuick && isVotingOpen && showResults && topic.topicType === 'SPECTRUM'">
+          <p class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
+            <span aria-hidden="true">✓</span> 已投票 — 快問結果即時更新，可調整滑桿更改票。
+          </p>
+          <div class="flex items-end justify-between">
+            <span class="text-sm font-bold text-[#6d6861]">社群中位數</span>
+            <strong class="text-4xl font-black tabular-nums text-[#b0761f]">{{ Math.round(Number(topic.spectrumMedian || 0)) }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
+          </div>
+          <div class="relative mt-5 h-2 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#b0761f]" :style="{ width: `${Number(topic.spectrumMedian || 0)}%` }" /></div>
+          <div class="mt-6 rounded-xl border border-[#e0c9a0] bg-[#fffaf0] p-4">
+            <div class="flex items-end justify-between">
+              <span class="text-sm font-bold text-[#6d6861]">你的選擇</span>
+              <strong class="text-2xl font-black tabular-nums text-[#b0761f]">{{ spectrumValue }}<small class="ml-1 text-xs text-[#77716a]">/ 100</small></strong>
+            </div>
+            <input v-model.number="spectrumValue" type="range" min="0" max="100" class="focus-ring mt-3 w-full accent-[#b0761f]" :disabled="voting" />
+            <div class="mt-1 flex justify-between text-xs font-bold text-[#77716a]"><span>0</span><span>50</span><span>100</span></div>
+            <UiButton variant="quick" block class="mt-4" :disabled="voting || spectrumUnchanged" @click="changeSpectrumVote">{{ voting ? '更新中…' : '更新我的分數' }}</UiButton>
           </div>
         </template>
 
@@ -345,6 +365,11 @@ const puzzleShuffles = shallowReactive<Record<string, string[]>>({});
 const lotteryState = ref<'idle' | 'shaking' | 'result'>('idle');
 const lotteryResultId = ref<string | null>(null);
 const selectedGameLabel = computed(() => topic.value?.options.find((option) => option.id === gameSelectedId.value)?.label ?? '');
+const mySpectrumValue = computed(() => {
+  const value = topic.value?.myVote?.spectrumValue;
+  return value != null ? Number(value) : null;
+});
+const spectrumUnchanged = computed(() => mySpectrumValue.value !== null && spectrumValue.value === mySpectrumValue.value);
 const wheelColors = ['#b0761f', '#3157d5', '#3f7a58', '#9a6a12', '#7c3aed', '#c2410c', '#0e7490', '#be185d'];
 const sections = computed<Array<{ value: TopicSection; label: string; count: number | null }>>(() => {
   if (isQuick.value) return [{ value: 'vote', label: '即時結果', count: null }];
@@ -440,6 +465,7 @@ function applyUpdate(data: any) {
       topic.value = fresh;
       totalVotes.value = fresh.totalVotes;
       preparePuzzle(fresh);
+      if (fresh.topicType === 'SPECTRUM' && fresh.myVote?.spectrumValue != null) spectrumValue.value = Number(fresh.myVote.spectrumValue);
     } catch {
       // The next successful realtime tick or manual navigation will refresh the data.
     }
@@ -495,6 +521,22 @@ async function submitShortAnswer() {
     const res = await api.post<{ newBalance: string; rewardPoints: number }>(`/topics/${topicId.value}/vote`, { answerText: text });
     auth.updatePoints(res.newBalance);
     toastSuccess(res.rewardPoints > 0 ? `已送出回答，獲得 ${res.rewardPoints} 點` : '已送出回答');
+    await load();
+  } catch (e) {
+    toastError(errorMessage(e));
+    await load();
+  } finally {
+    voting.value = false;
+  }
+}
+
+async function changeSpectrumVote() {
+  if (voting.value || mySpectrumValue.value === null) return;
+  voting.value = true;
+  try {
+    const res = await api.patch<{ newBalance: string; rewardPoints: number }>(`/topics/${topicId.value}/vote`, { spectrumValue: spectrumValue.value });
+    auth.updatePoints(res.newBalance);
+    toastSuccess(`已更改為 ${spectrumValue.value} 分`);
     await load();
   } catch (e) {
     toastError(errorMessage(e));
