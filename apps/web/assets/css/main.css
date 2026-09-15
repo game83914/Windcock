@@ -108,3 +108,12 @@ body {
     scroll-behavior: auto;
   }
 }
+
+/* 行動裝置輸入框維持 16px，避免 iOS Safari 聚焦自動放大頁面 */
+@media (max-width: 767px) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

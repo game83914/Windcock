@@ -22,6 +22,37 @@
       </div>
     </section>
 
+    <div v-if="showCreateButton" ref="createAreaEl" class="relative mb-7">
+      <button
+        type="button"
+        class="focus-ring flex items-center gap-2 rounded-2xl border border-[#ded7cb] bg-white px-4 py-3 text-sm font-black transition hover:border-[#171717]"
+        aria-haspopup="menu"
+        :aria-expanded="createMenuOpen"
+        @click="createMenuOpen = !createMenuOpen"
+      >
+        <span class="grid size-7 place-items-center rounded-xl bg-[#d84a36] text-lg font-black leading-none text-white" aria-hidden="true">＋</span>
+        建立內容
+      </button>
+      <Transition name="create-drop">
+        <div v-if="createMenuOpen" role="menu" aria-label="選擇要建立的內容類型" class="absolute left-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] p-1.5 shadow-[0_12px_36px_rgba(23,23,23,0.16)]">
+          <NuxtLink
+            v-if="canCreateTopic"
+            role="menuitem"
+            to="/topics/create"
+            class="focus-ring block px-3 py-2.5 text-sm font-black text-[#d84a36] hover:bg-[#fbe9e5]"
+            @click="createMenuOpen = false"
+          >建立議題</NuxtLink>
+          <NuxtLink
+            v-if="canCreateQuick"
+            role="menuitem"
+            to="/topics/quick"
+            class="focus-ring block px-3 py-2.5 text-sm font-black text-[#b0761f] hover:bg-[#fff0d7]"
+            @click="createMenuOpen = false"
+          >發起快問</NuxtLink>
+        </div>
+      </Transition>
+    </div>
+
     <div v-if="isInitialLoading" class="space-y-8" aria-live="polite">
       <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         <div v-for="item in 3" :key="item" class="h-72 animate-pulse rounded-2xl bg-[#e5e0d6] motion-reduce:animate-none" />
@@ -136,6 +167,12 @@ useSeoMeta({
 const api = useApi();
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
+const createAreaEl = ref<HTMLElement | null>(null);
+const createMenuOpen = ref(false);
+const canCreateTopic = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.canSubmitTopicApplication));
+const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
+const showCreateButton = computed(() => canCreateTopic.value || canCreateQuick.value);
 const initialCategory = queryText(route.query.category) || 'all';
 const initialPage = 1;
 const initialSort = (['POPULAR', 'NEWEST', 'ACTIVITY'] as const).includes(queryText(route.query.sort) as 'POPULAR' | 'NEWEST' | 'ACTIVITY')
@@ -251,6 +288,8 @@ onMounted(() => {
     observedSentinel = loadMoreSentinel.value;
     intersectionObserver.observe(observedSentinel);
   }
+  window.addEventListener('pointerdown', onOutsidePointerDown);
+  window.addEventListener('keydown', onEscape, true);
 });
 watch(loadMoreSentinel, (el) => {
   if (!import.meta.client || !intersectionObserver) return;
@@ -263,8 +302,21 @@ onUnmounted(() => {
   intersectionObserver?.disconnect();
   intersectionObserver = null;
   observedSentinel = null;
+  window.removeEventListener('pointerdown', onOutsidePointerDown);
+  window.removeEventListener('keydown', onEscape, true);
   if (deadlineTimer) clearInterval(deadlineTimer);
 });
+
+function onOutsidePointerDown(event: PointerEvent) {
+  if (!createMenuOpen.value) return;
+  const el = createAreaEl.value;
+  if (el && !(event.target as Node).isConnected) return;
+  if (el && !el.contains(event.target as Node)) createMenuOpen.value = false;
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape' && createMenuOpen.value) createMenuOpen.value = false;
+}
 
 function emptyTopicList(limit: number): TopicListResponse {
   return { items: [], categoryCounts: {}, pagination: { page: 1, limit, total: 0, pages: 0 } };
@@ -340,6 +392,17 @@ function commentSnippet(content: string) {
 
 @keyframes ticker-scroll {
   to { transform: translateX(-50%); }
+}
+
+.create-drop-enter-active,
+.create-drop-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.create-drop-enter-from,
+.create-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 @media (prefers-reduced-motion: reduce) {

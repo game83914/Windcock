@@ -13,15 +13,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
         </NuxtLink>
 
-        <div class="hidden flex-1 items-center justify-center gap-6 lg:flex">
-          <NuxtLink v-if="authed && (auth.canAuthorTopics || auth.canSubmitTopicApplication)" to="/topics/create" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#d84a36] hover:text-[#171717]">{{ auth.canAuthorTopics ? '建立議題' : '提出議題' }}</NuxtLink>
-          <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#b0761f] hover:text-[#171717]">發起快問</NuxtLink>
-        </div>
+        <div class="flex flex-1 items-center justify-center gap-6 lg:flex"></div>
 
         <div class="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
           <template v-if="authed">
-            <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring rounded-lg bg-[#b0761f] px-3 py-2 text-xs font-bold text-white lg:hidden">快問</NuxtLink>
-            <NuxtLink v-if="auth.canAuthorTopics || auth.canSubmitTopicApplication" to="/topics/create" class="focus-ring rounded-lg bg-[#d84a36] px-3 py-2 text-xs font-bold text-white lg:hidden">{{ auth.canAuthorTopics ? '建立' : '提案' }}</NuxtLink>
             <details class="group relative">
               <summary class="focus-ring flex cursor-pointer list-none items-center gap-2 rounded-xl border border-[#ded7cb] bg-white px-2 py-1.5 hover:border-[#b9b0a3] [&::-webkit-details-marker]:hidden">
                 <UserAvatar :nickname="auth.nickname" :avatar-url="auth.avatarUrl" size="sm" />
@@ -61,7 +56,6 @@
 <script setup lang="ts">
 const auth = useAuthStore();
 const authed = computed(() => auth.isAuthed);
-const canCreateQuick = computed(() => authed.value && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const api = useApi();
 const unreadCount = ref(0);
 
