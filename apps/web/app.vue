@@ -51,7 +51,7 @@
               <summary class="focus-ring grid size-9 cursor-pointer list-none place-items-center rounded-xl border border-[#ded7cb] bg-white text-[#171717] transition hover:border-[#b0761f] hover:text-[#b0761f] [&::-webkit-details-marker]:hidden" aria-label="會員功能表" title="會員中心">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               </summary>
-              <div class="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] p-1.5 shadow-[0_12px_36px_rgba(23,23,23,0.16)]">
+              <div class="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] p-1.5 shadow-[0_12px_36px_rgba(23,23,23,0.16)]" @click="closeMemberMenu">
                 <NuxtLink to="/me" class="focus-ring block px-3 py-2 text-sm font-black hover:bg-[#ebe6dc]">會員中心</NuxtLink>
                 <NuxtLink to="/me/notifications" class="focus-ring flex items-center justify-between px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">通知<span v-if="unreadCount" class="inline-grid min-w-4 place-items-center rounded-full bg-[#d84a36] px-1 text-[9px] text-white">{{ unreadCount > 9 ? '9+' : unreadCount }}</span></NuxtLink>
                 <NuxtLink to="/me/votes" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">投票紀錄</NuxtLink>
@@ -144,6 +144,10 @@ watch(authed, () => { loadUnreadCount(); loadCapabilities(); });
 async function logout() {
   auth.clear();
   await navigateTo('/');
+}
+
+function closeMemberMenu() {
+  if (memberMenuEl.value) memberMenuEl.value.open = false;
 }
 
 function onOutsidePointerDown(event: PointerEvent) {
