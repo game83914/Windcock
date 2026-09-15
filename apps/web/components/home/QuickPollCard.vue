@@ -1,7 +1,7 @@
 <template>
   <article class="flex h-full flex-col rounded-2xl border border-[#e0c9a0] bg-white p-4 shadow-[0_6px_20px_rgba(23,23,23,0.06)] transition hover:-translate-y-0.5 hover:border-[#b0761f] hover:shadow-[0_12px_28px_rgba(23,23,23,0.10)]">
     <div class="flex items-center justify-between gap-2">
-      <span class="inline-flex items-center gap-1 rounded-full bg-[#fff0d7] px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-[#8f5d14]"><span aria-hidden="true">⚡</span> 快問</span>
+      <span class="inline-flex items-center gap-1 rounded-full bg-[#fff0d7] px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-[#8f5d14]">快問</span>
       <span class="text-xs font-bold text-[#77716a]">{{ deadlineLabel(poll.voteEndAt, deadlineNow) }}</span>
     </div>
 

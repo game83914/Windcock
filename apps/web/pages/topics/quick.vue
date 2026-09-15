@@ -89,7 +89,7 @@
       <aside class="lg:sticky lg:top-28 lg:self-start">
         <p class="eyebrow-modern mb-3 text-[#77716a]">快問預覽</p>
         <div class="surface-quick p-6">
-          <div class="flex items-center justify-between text-xs"><span class="font-bold" :style="{ color: getCategoryMeta(category).color }">{{ category ? getCategoryMeta(category).label : '尚未選擇分類' }}</span><span class="rounded-full bg-[#b0761f] px-2.5 py-0.5 text-[10px] font-black text-white">⚡ 快問</span></div>
+          <div class="flex items-center justify-between text-xs"><span class="font-bold" :style="{ color: getCategoryMeta(category).color }">{{ category ? getCategoryMeta(category).label : '尚未選擇分類' }}</span><span class="rounded-full bg-[#b0761f] px-2.5 py-0.5 text-[10px] font-black text-white">快問</span></div>
           <h2 class="mt-6 text-2xl font-black leading-snug">{{ title || '你的快問會顯示在這裡' }}</h2>
           <ul class="mt-6 space-y-2 border-t border-[#f0e6d2] pt-4">
             <li v-for="option in visibleOptions" :key="option" class="flex items-center gap-3 text-sm"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#f0e6d2] text-[10px] font-black text-[#8f5d14]">{{ options.indexOf(option) + 1 }}</span><span class="font-medium">{{ option || '⋯' }}</span></li>

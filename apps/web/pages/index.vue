@@ -72,7 +72,7 @@
                   v-for="category in filterChips"
                   :key="category.key"
                   :value="category.key"
-                >{{ category.key === 'quick' ? '⚡ 快問' : `${category.label}（${categoryCounts[category.key] ?? 0}）` }}</option>
+                >{{ category.key === 'quick' ? '快問' : `${category.label}（${categoryCounts[category.key] ?? 0}）` }}</option>
               </select>
             </label>
             <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white px-3 py-1.5 sm:w-44">
