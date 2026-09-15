@@ -91,6 +91,11 @@ export class CreateTopicDto {
   @MaxLength(50, { each: true })
   options?: string[];
 
+  @ApiPropertyOptional({ description: '與 options 對齊的選項圖片相對路徑（如 /api/v1/option-images/xxxx），無圖片的選項請填 null' })
+  @IsOptional()
+  @IsArray()
+  optionImages?: (string | null)[];
+
   @ApiPropertyOptional({ type: [CreateTopicContentBlockDto], description: '按需加入的背景、案例、數據、來源或多方觀點，最多 8 筆' })
   @IsOptional()
   @IsArray()
@@ -129,6 +134,11 @@ export class CreateQuickTopicDto {
   @MinLength(1, { each: true })
   @MaxLength(50, { each: true })
   options?: string[];
+
+  @ApiPropertyOptional({ description: '與 options 對齊的選項圖片相對路徑（如 /api/v1/option-images/xxxx），無圖片的選項請填 null' })
+  @IsOptional()
+  @IsArray()
+  optionImages?: (string | null)[];
 
   @ApiPropertyOptional({ description: '連連看的右側配對文字，需與 options 同長度、一一對應' })
   @IsOptional()

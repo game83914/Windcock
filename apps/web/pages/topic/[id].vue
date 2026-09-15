@@ -74,7 +74,10 @@
                 :disabled="voting || isInteractionLocked"
                 @click="onOptionTap(o.id)"
               >
-                <span>{{ o.label }}</span>
+                <span class="flex items-center gap-3">
+                  <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-9 w-9 shrink-0 rounded-lg border border-[#ded7cb] object-cover" />
+                  <span>{{ o.label }}</span>
+                </span>
                 <span class="flex items-center gap-2">
                   <span v-if="voting && votingTargetId === o.id" class="size-4 animate-spin rounded-full border-2 border-[#3157d5] border-t-transparent" aria-hidden="true" />
                   <span v-else aria-hidden="true">{{ selectedOptionId === o.id ? '✓' : '○' }}</span>
@@ -123,7 +126,7 @@
             <template v-else>
               <div class="space-y-5">
                 <div v-for="o in visibleOptions" :key="o.id">
-                  <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="font-bold">{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
+                  <div class="mb-2 flex items-center justify-between gap-4 text-sm"><span class="flex items-center gap-2 font-bold"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-6 w-6 shrink-0 rounded-md border border-[#ded7cb] object-cover" />{{ o.label }}</span><span class="shrink-0 font-black tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></div>
                   <div class="h-2 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></div>
                 </div>
               </div>

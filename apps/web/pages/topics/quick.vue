@@ -56,10 +56,11 @@
                 <input v-model.trim="rows[index].label" :data-field="`option-${index}`" maxlength="50" :placeholder="rowPlaceholder" class="field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
                 <input v-if="builderType === 'MATCHING'" v-model.trim="rows[index].match" :data-field="`match-${index}`" maxlength="50" placeholder="右側配對" class="field-input" :class="{ 'field-input-error': fieldErrors[`match-${index}`] }" />
                 <input v-if="builderType === 'SPIN_WHEEL'" v-model.trim="rows[index].weight" :data-field="`weight-${index}`" maxlength="4" inputmode="numeric" placeholder="權重" class="field-input w-20" :class="{ 'field-input-error': fieldErrors[`weight-${index}`] }" />
+                <OptionImageInput v-if="builderType === 'OPTION'" v-model="rows[index].image" />
                 <button v-if="rows.length > minRows" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除項目" @click="rows.splice(index, 1)">&times;</button>
               </div>
             </div>
-            <button v-if="rows.length < maxRows" type="button" class="focus-ring mt-3 rounded-full text-xs font-bold text-[#b0761f] hover:underline" @click="rows.push({ label: '', match: '', weight: '' })">＋ 新增{{ builderType === 'MATCHING' ? '配對' : '項目' }}</button>
+            <button v-if="rows.length < maxRows" type="button" class="focus-ring mt-3 rounded-full text-xs font-bold text-[#b0761f] hover:underline" @click="rows.push({ label: '', match: '', weight: '', image: null })">＋ 新增{{ builderType === 'MATCHING' ? '配對' : '項目' }}</button>
             <p v-if="builderType === 'SPIN_WHEEL'" class="mt-2 text-xs leading-5 text-[#77716a]">權重為選填的轉盤機率（正整數）：數字愈大愈容易被轉到；留空則每格機率相同。</p>
           </div>
 
@@ -150,7 +151,7 @@ import type { CapabilitySummary } from '~/stores/auth';
 definePageMeta({ middleware: 'auth' });
 
 type BuilderType = 'OPTION' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
-interface BuilderRow { label: string; match: string; weight: string }
+interface BuilderRow { label: string; match: string; weight: string; image: string | null }
 
 const route = useRoute();
 const api = useApi();
@@ -211,7 +212,7 @@ const filledRows = computed(() => rows.value.filter((row) => row.label.trim()));
 const totalVotesLabel = '投完即見';
 
 function seedRows(type: BuilderType): BuilderRow[] {
-  return Array.from({ length: DEFAULT_COUNT[type] }, () => ({ label: '', match: '', weight: '' }));
+  return Array.from({ length: DEFAULT_COUNT[type] }, () => ({ label: '', match: '', weight: '', image: null }));
 }
 
 function setBuilderType(type: BuilderType) {
@@ -298,6 +299,10 @@ async function submit() {
       voteDurationHours: voteDurationHours.value,
     };
     if (usesRows.value) payload.options = rows.value.map((row) => row.label.trim());
+    if (builderType.value === 'OPTION') {
+      const images = rows.value.map((row) => row.image || null);
+      payload.optionImages = images;
+    }
     if (builderType.value === 'MATCHING') payload.matches = rows.value.map((row) => row.match.trim());
     if (builderType.value === 'SPIN_WHEEL') {
       const weights = rows.value.map((row) => Number(row.weight.trim()));

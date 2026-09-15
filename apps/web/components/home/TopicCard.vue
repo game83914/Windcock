@@ -26,7 +26,7 @@
     <div v-else class="mt-8 space-y-3">
       <div v-for="option in options" :key="option.id">
         <div class="mb-1 flex justify-between text-xs">
-          <span class="truncate pr-3 font-medium">{{ option.label }}</span>
+          <span class="flex min-w-0 items-center gap-1.5 truncate pr-3 font-medium"><img v-if="option.data?.imageUrl" :src="option.data.imageUrl" alt="選項圖片" class="h-4 w-4 shrink-0 rounded border border-[#ded7cb] object-cover" /><span class="truncate">{{ option.label }}</span></span>
           <span class="font-bold tabular-nums">{{ optionPercentage(option, topic) }}%</span>
         </div>
         <div class="h-1.5 bg-[#dfdad0]">

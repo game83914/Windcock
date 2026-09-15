@@ -157,7 +157,10 @@
           :disabled="voting || isInteractionLocked"
           @click="submitQuickVote(o.id)"
         >
-          <span>{{ o.label }}</span>
+          <span class="flex items-center gap-3">
+            <img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-9 w-9 shrink-0 rounded-lg border border-[#ded7cb] object-cover" />
+            <span>{{ o.label }}</span>
+          </span>
           <span aria-hidden="true">{{ myVoteOptionId === o.id ? '✓' : '○' }}</span>
         </button>
       </div>
@@ -215,7 +218,7 @@
           @click="changeQuickVote(o.id)"
         >
           <span class="flex items-center justify-between px-4 py-3 text-sm font-bold">
-            <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+            <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-6 w-6 shrink-0 rounded-md border border-[#ded7cb] object-cover" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
             <span class="flex items-center gap-2 tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span>
           </span>
           <span class="block h-1.5 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>

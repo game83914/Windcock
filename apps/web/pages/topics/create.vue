@@ -68,13 +68,14 @@
           <div v-if="topicType !== 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-5">
             <div class="flex items-center justify-between">
               <span class="text-sm font-bold">投票選項</span>
-              <button v-if="topicType === 'MULTIPLE' && options.length < 6" type="button" class="focus-ring rounded-full text-xs font-bold text-[#d84a36] hover:underline" @click="options.push('')">＋ 新增選項</button>
+              <button v-if="topicType === 'MULTIPLE' && options.length < 6" type="button" class="focus-ring rounded-full text-xs font-bold text-[#d84a36] hover:underline" @click="addOption">＋ 新增選項</button>
             </div>
             <div class="mt-3 space-y-3">
               <div v-for="(_, index) in options" :key="index" class="flex items-center gap-3">
                 <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f8e3de] text-xs font-black text-[#a63222]">{{ index + 1 }}</span>
                 <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="`選項 ${index + 1}`" class="field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
-                <button v-if="topicType === 'MULTIPLE' && options.length > 2" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="options.splice(index, 1)">&times;</button>
+                <OptionImageInput v-model="optionImages[index]" />
+                <button v-if="topicType === 'MULTIPLE' && options.length > 2" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="removeOption(index)">&times;</button>
               </div>
             </div>
           </div>
@@ -292,6 +293,7 @@ const description = ref('');
 const category = ref('');
 const topicType = ref<TopicType>('BINARY');
 const options = ref(['支持', '反對']);
+const optionImages = ref<(string | null)[]>([null, null]);
 const blocks = ref<DraftBlock[]>([]);
 const voteDurationDays = ref(7);
 const agreed = ref(false);
@@ -311,10 +313,27 @@ const importMode = computed(() => Boolean(appliedImport.value && !editingId.valu
 let nextBlockKey = 1;
 
 watch(topicType, (type, previous) => {
-  if (type === 'SPECTRUM') options.value = [];
-  else if (type === 'BINARY') options.value = ['支持', '反對'];
-  else if (previous !== 'MULTIPLE') options.value = ['選項一', '選項二', '其他'];
+  if (type === 'SPECTRUM') {
+    options.value = [];
+    optionImages.value = [];
+  } else if (type === 'BINARY') {
+    options.value = ['支持', '反對'];
+    optionImages.value = [null, null];
+  } else if (previous !== 'MULTIPLE') {
+    options.value = ['選項一', '選項二', '其他'];
+    optionImages.value = [null, null, null];
+  }
 });
+
+function removeOption(index: number) {
+  options.value.splice(index, 1);
+  optionImages.value.splice(index, 1);
+}
+
+function addOption() {
+  options.value.push('');
+  optionImages.value.push(null);
+}
 
 function blockMeta(type: TopicContentBlockType) {
   return blockDefinitions.find((item) => item.type === type)!;
@@ -340,6 +359,7 @@ async function onApplyImport(payload: TopicImportPayload) {
   topicType.value = payload.topicType;
   await nextTick();
   options.value = [...(payload.options ?? [])];
+  optionImages.value = (payload.options ?? []).map(() => null);
   voteDurationDays.value = payload.voteDurationDays;
   blocks.value = (payload.blocks ?? []).map((item) => ({
     key: nextBlockKey++,
@@ -365,6 +385,7 @@ async function applyAiTopicDraft(form: TopicAuthoringForm | StanceAuthoringForm)
   topicType.value = form.topicType;
   await nextTick();
   options.value = [...form.options];
+  optionImages.value = form.options.map(() => null);
   voteDurationDays.value = form.voteDurationDays;
   blocks.value = form.blocks.map((item) => ({
     key: nextBlockKey++, type: item.type, title: item.title, content: item.content,
@@ -405,6 +426,7 @@ function payload() {
     category: category.value,
     topicType: topicType.value,
     options: topicType.value === 'SPECTRUM' ? undefined : options.value,
+    optionImages: topicType.value === 'SPECTRUM' ? undefined : optionImages.value.map((image) => image || null),
     voteDurationDays: voteDurationDays.value,
     blocks: blocks.value.map(({ key, expanded, ...item }) => ({
       ...item,
@@ -492,6 +514,7 @@ onMounted(async () => {
     topicType.value = topic.topicType as TopicType;
     await nextTick();
     options.value = topic.options.map((item) => item.label);
+    optionImages.value = topic.options.map((item) => item.data?.imageUrl ?? null);
     voteDurationDays.value = topic.voteDurationDays;
     blocks.value = topic.blocks.map((item) => ({
       key: nextBlockKey++,

@@ -2,7 +2,7 @@ export interface TopicOption {
   id: string;
   label: string;
   voteCount: string;
-  data?: { match?: string; weight?: number } | null;
+  data?: { match?: string; weight?: number; imageUrl?: string } | null;
 }
 
 export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';

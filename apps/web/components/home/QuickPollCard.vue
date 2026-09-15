@@ -18,7 +18,7 @@
           class="focus-ring flex w-full items-center justify-between rounded-lg border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]"
           @click.stop="goLogin"
         >
-          <span>{{ o.label }}</span>
+          <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-5 w-5 shrink-0 rounded border border-[#ded7cb] object-cover" />{{ o.label }}</span>
           <span aria-hidden="true">+</span>
         </button>
       </div>
@@ -38,7 +38,7 @@
         @click.stop="onTap(o)"
       >
         <span class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold" :class="myVoteOptionId === o.id ? 'text-[#8f5d14]' : 'text-[#171717]'">
-          <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+          <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-5 w-5 shrink-0 rounded border border-[#ded7cb] object-cover" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
           <span class="flex items-center gap-2 text-xs tabular-nums">
             <span v-if="voting && votingTargetId === o.id" class="size-3.5 animate-spin rounded-full border-2 border-[#b0761f] border-t-transparent" aria-hidden="true" />
             <template v-else>
@@ -62,7 +62,7 @@
         @click.stop="goTopic"
       >
         <span class="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-bold" :class="myVoteOptionId === o.id ? 'text-[#8f5d14]' : 'text-[#171717]'">
-          <span class="flex items-center gap-2"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
+          <span class="flex items-center gap-2"><img v-if="o.data?.imageUrl" :src="o.data.imageUrl" alt="選項圖片" class="h-5 w-5 shrink-0 rounded border border-[#ded7cb] object-cover" /><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}</span>
           <span class="shrink-0 text-xs font-black tabular-nums text-[#77716a]">{{ optionPercentage(o, poll) }}%</span>
         </span>
         <span class="block h-1 bg-[#f0e6d2]"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>

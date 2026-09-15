@@ -254,6 +254,7 @@ export class TopicsService {
     const title = dto.title.trim();
     const description = dto.description?.trim() || null;
     this.validateTopicInput(dto);
+    this.assertOptionImagesLength(dto);
     await this.categories.assertActiveCategory(dto.category);
 
     const duplicate = await this.prisma.topic.findFirst({
@@ -280,7 +281,7 @@ export class TopicsService {
         options:
           dto.topicType === TopicType.SPECTRUM
             ? undefined
-            : { create: (dto.options || []).map((label) => ({ label: label.trim() })) },
+            : { create: (dto.options || []).map((label, index) => ({ label: label.trim(), data: this.optionImageData(dto, index) })) },
         contentBlocks: dto.blocks?.length
           ? {
               create: dto.blocks.map((item, index) => ({
@@ -312,6 +313,7 @@ export class TopicsService {
     const weights = (dto.weights || []).filter((weight) => Number.isFinite(weight) && weight > 0);
     assertClean(title, '標題');
     optionLabels.forEach((label) => assertClean(label, '選項'));
+    this.assertOptionImagesLength(dto);
 
     const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
     const noOptionTypes: TopicType[] = [TopicType.SPECTRUM, TopicType.SHORT_ANSWER];
@@ -363,9 +365,12 @@ export class TopicsService {
     if (duplicate) throw new ConflictException('已有相同標題的議題，請先參與既有討論');
 
     const optionCreates = optionLabels.map((label, index) => {
+      const sourceIndex = (dto.options || []).findIndex((item) => item.trim() === label);
       const optionData: Record<string, string | number> = {};
       if (matchLabels.length === optionLabels.length) optionData.match = matchLabels[index];
       if (weights.length === optionLabels.length) optionData.weight = weights[index];
+      const imageUrl = this.optionImageAt(dto, sourceIndex);
+      if (imageUrl) optionData.imageUrl = imageUrl;
       return { label, ...(Object.keys(optionData).length ? { data: optionData } : {}) };
     });
 
@@ -479,6 +484,7 @@ export class TopicsService {
     }
 
     this.validateTopicInput(dto);
+    this.assertOptionImagesLength(dto);
     await this.categories.assertActiveCategory(dto.category);
     const title = dto.title.trim();
     const duplicate = await this.prisma.topic.findFirst({
@@ -505,7 +511,7 @@ export class TopicsService {
           options:
             dto.topicType === TopicType.SPECTRUM
               ? undefined
-              : { create: (dto.options || []).map((label) => ({ label: label.trim() })) },
+              : { create: (dto.options || []).map((label, index) => ({ label: label.trim(), data: this.optionImageData(dto, index) })) },
           contentBlocks: dto.blocks?.length
             ? {
                 create: dto.blocks.map((item, index) => ({
@@ -603,6 +609,7 @@ export class TopicsService {
     if (options.publish) await this.policy.assert(userId, Capability.TOPIC_PUBLISH, scope);
 
     this.validateTopicInput(dto);
+    this.assertOptionImagesLength(dto);
     await this.categories.assertActiveCategory(dto.category);
     const title = dto.title.trim();
     const duplicate = await this.prisma.topic.findFirst({
@@ -633,7 +640,7 @@ export class TopicsService {
           voteEndAt: options.publish ? new Date(Date.now() + dto.voteDurationDays * 86_400_000) : null,
           options: dto.topicType === TopicType.SPECTRUM
             ? undefined
-            : { create: (dto.options || []).map((label) => ({ label: label.trim() })) },
+            : { create: (dto.options || []).map((label, index) => ({ label: label.trim(), data: this.optionImageData(dto, index) })) },
           contentBlocks: dto.blocks?.length ? {
             create: dto.blocks.map((item, index) => ({
               type: item.type,
@@ -679,6 +686,7 @@ export class TopicsService {
     this.assertStanceTreeDepth(dto.stances ?? [], 0, maxDepth);
 
     this.validateTopicInput(dto);
+    this.assertOptionImagesLength(dto);
     await this.categories.assertActiveCategory(dto.category);
     const title = dto.title.trim();
     const duplicate = await this.prisma.topic.findFirst({
@@ -701,7 +709,7 @@ export class TopicsService {
           voteEndAt: dto.publish ? new Date(Date.now() + dto.voteDurationDays * 86_400_000) : null,
           options: dto.topicType === TopicType.SPECTRUM
             ? undefined
-            : { create: (dto.options || []).map((label) => ({ label: label.trim() })) },
+            : { create: (dto.options || []).map((label, index) => ({ label: label.trim(), data: this.optionImageData(dto, index) })) },
           contentBlocks: dto.blocks?.length ? {
             create: dto.blocks.map((item, index) => ({
               type: item.type,
@@ -1161,6 +1169,28 @@ export class TopicsService {
       return reviewed;
     });
     return this.serialize(topic, false);
+  }
+
+  private assertOptionImagesLength(dto: { options?: string[]; optionImages?: (string | null)[] }) {
+    if (!dto.optionImages) return;
+    const count = (dto.options || []).length;
+    if (dto.optionImages.length !== count) {
+      throw new BadRequestException('選項圖片數量需與選項一一對應');
+    }
+    for (const imageUrl of dto.optionImages) {
+      if (imageUrl !== null && typeof imageUrl === 'string' && !imageUrl.startsWith('/api/v1/option-images/')) {
+        throw new BadRequestException('選項圖片路徑無效');
+      }
+    }
+  }
+
+  private optionImageAt(dto: { optionImages?: (string | null)[] }, index: number): string | null {
+    return dto.optionImages?.[index] && dto.optionImages[index] !== null ? dto.optionImages[index]! : null;
+  }
+
+  private optionImageData(dto: { optionImages?: (string | null)[] }, index: number) {
+    const imageUrl = this.optionImageAt(dto, index);
+    return imageUrl ? { imageUrl } : undefined;
   }
 
   private serialize(topic: any, hasVoted: boolean, isFollowing = false) {
