@@ -44,8 +44,7 @@
     <section v-if="featuredTopics.length">
       <div class="mb-4 flex items-center justify-between gap-3">
         <div>
-          <p class="eyebrow-modern text-[#d84a36]">編輯嚴選</p>
-          <h2 class="mt-1 text-xl font-black sm:text-2xl">置頂議題</h2>
+          <h2 class="text-xl font-black text-[#d84a36] sm:text-2xl">焦點議題</h2>
         </div>
       </div>
       <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
