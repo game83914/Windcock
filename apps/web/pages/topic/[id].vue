@@ -48,9 +48,8 @@
         <QuickVotePanel v-if="isQuick" :topic="topic" @refreshed="load" />
 
         <template v-else>
-          <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-4 text-sm font-bold text-[#2746b4]">
-            <p>{{ VOTE_GUEST_NOTICE }}</p>
-            <UiButton :to="loginUrl" variant="data" size="sm" class="mt-3">{{ VOTE_LOGIN_LABEL }}</UiButton>
+          <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl bg-[#e7ecff] p-4">
+            <UiButton :to="loginUrl" variant="data" size="sm" block>{{ VOTE_LOGIN_LABEL }}</UiButton>
           </div>
 
           <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
@@ -184,7 +183,7 @@
 <script setup lang="ts">
 import type { Topic } from '~/types/topic';
 import { getCategoryMeta, optionPercentage } from '~/utils/topic';
-import { OPTION_COLLAPSE_LIMIT, VOTE_GUEST_NOTICE, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
+import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
 
 const route = useRoute();
 const router = useRouter();

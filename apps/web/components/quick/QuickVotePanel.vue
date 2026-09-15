@@ -1,8 +1,7 @@
 <template>
   <div>
-    <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-4 text-sm font-bold text-[#2746b4]">
-      <p>{{ VOTE_GUEST_NOTICE }}</p>
-      <UiButton :to="loginUrl" variant="data" size="sm" class="mt-3">{{ VOTE_LOGIN_LABEL }}</UiButton>
+    <div v-if="!showResults && isVotingOpen && !auth.isAuthed" class="mb-4 rounded-xl bg-[#e7ecff] p-4">
+      <UiButton :to="loginUrl" variant="data" size="sm" block>{{ VOTE_LOGIN_LABEL }}</UiButton>
     </div>
 
     <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
@@ -270,7 +269,7 @@
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
 import { isOptionPickType, optionPercentage } from '~/utils/topic';
-import { OPTION_COLLAPSE_LIMIT, VOTE_GUEST_NOTICE, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
+import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
 const emit = defineEmits<{ refreshed: [] }>();
@@ -400,10 +399,8 @@ async function changeQuickVote(optionId: string) {
   if (voting.value || optionId === myVoteOptionId.value) return;
   voting.value = true;
   try {
-    const option = props.topic.options.find((item) => item.id === optionId);
     const res = await api.patch<{ newBalance: string; rewardPoints: number }>(`/topics/${props.topic.id}/vote`, { optionId });
     auth.updatePoints(res.newBalance);
-    toastSuccess(option ? `已更改為「${option.label}」` : '已更改票');
     emit('refreshed');
   } catch (e) {
     toastError(errorMessage(e));
@@ -457,7 +454,6 @@ async function changeSpectrumVote() {
   try {
     const res = await api.patch<{ newBalance: string; rewardPoints: number }>(`/topics/${props.topic.id}/vote`, { spectrumValue: spectrumValue.value });
     auth.updatePoints(res.newBalance);
-    toastSuccess(`已更改為 ${spectrumValue.value} 分`);
     emit('refreshed');
   } catch (e) {
     toastError(errorMessage(e));

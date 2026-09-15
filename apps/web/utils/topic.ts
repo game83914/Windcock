@@ -100,7 +100,6 @@ export function leadingOptions(topic: Topic, limit = 2) {
     .slice(0, limit);
 }
 
-export const VOTE_GUEST_NOTICE = '登入後即可一鍵投票，還能獲得點數。';
 export const VOTE_IDENTITY_NOTICE = '此身份僅供查閱，不能投票。';
 export const VOTE_LOGIN_LABEL = '門號登入投票';
 

@@ -16,17 +16,13 @@
           :key="o.id"
           type="button"
           class="focus-ring flex w-full items-center justify-between rounded-lg border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]"
-          @click.stop="showLoginHint = true"
+          @click.stop="goLogin"
         >
           <span>{{ o.label }}</span>
           <span aria-hidden="true">+</span>
         </button>
       </div>
       <button v-if="optionsCollapsed" type="button" class="focus-ring mt-2 w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
-      <div v-if="showLoginHint" class="mt-3 rounded-xl border border-[#b7c6ee] bg-[#e7ecff] p-3" @click.stop>
-        <p class="text-xs font-bold text-[#2746b4]">{{ VOTE_GUEST_NOTICE }}</p>
-        <UiButton :to="`/login?redirect=${encodeURIComponent('/')}`" variant="data" size="sm" class="mt-2" @click.stop>{{ VOTE_LOGIN_LABEL }}</UiButton>
-      </div>
     </div>
 
     <div v-else-if="isOptionPick && isOpen && auth.isAuthed && !auth.canVote" class="mt-4 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
@@ -97,7 +93,7 @@
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
 import { deadlineLabel, formatCompactNumber, isOptionPickType, optionPercentage, topicTypeLabel } from '~/utils/topic';
-import { OPTION_COLLAPSE_LIMIT, VOTE_GUEST_NOTICE, VOTE_IDENTITY_NOTICE, VOTE_LOGIN_LABEL } from '~/utils/topic';
+import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
 
@@ -110,7 +106,6 @@ const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
 const poll = ref<Topic>(props.topic);
 const voting = ref(false);
 const votingTargetId = ref<string | null>(null);
-const showLoginHint = ref(false);
 const expanded = ref(false);
 const showAllOptions = ref(false);
 
@@ -129,6 +124,10 @@ watch(() => props.topic, (topic) => { poll.value = topic; });
 function goTopic() {
   if (voting.value || expanded.value) return;
   router.push(`/topic/${poll.value.id}`);
+}
+
+function goLogin() {
+  router.push('/login');
 }
 
 async function onTap(option: TopicOption) {
@@ -169,7 +168,6 @@ async function changeVote(option: TopicOption) {
     const res = await api.patch<{ newBalance: string }>(`/topics/${poll.value.id}/vote`, { optionId: option.id });
     auth.updatePoints(res.newBalance);
     votingTargetId.value = null;
-    toastSuccess(`已更改為「${option.label}」`);
     await refreshPoll();
   } catch (e) {
     votingTargetId.value = null;
