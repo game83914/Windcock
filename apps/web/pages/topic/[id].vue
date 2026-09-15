@@ -71,24 +71,34 @@
           </UiButton>
         </template>
 
-        <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'MATCHING'">
-          <p class="text-sm leading-6 text-[#6d6861]">先點左側項目，再點右側對應的配對。配對正確即完成投票。</p>
+        <template v-else-if="isVotingOpen && topic.topicType === 'MATCHING'">
+          <p v-if="hasVotedGame" class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
+            <span aria-hidden="true">✓</span> 已投「{{ votedChoice }}」— 配對正確即完成換票。
+          </p>
+          <p v-else class="text-sm leading-6 text-[#6d6861]">先點左側項目，再點右側對應的配對。配對正確即完成投票。</p>
           <div class="mt-4 grid grid-cols-2 gap-3">
             <div class="space-y-2">
-              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring relative flex min-h-12 w-full items-center rounded-xl border-2 bg-white px-3 py-2.5 text-left text-sm font-bold transition" :class="[matchedPair?.includes(o.id) ? 'match-success border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : '', matchingLeftId === o.id ? 'matching-picked border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb]']" :disabled="voting || matchingPending || isInteractionLocked" @click="onMatchingLeft(o.id)">
+              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring relative flex min-h-12 w-full items-center rounded-xl border-2 bg-white px-3 py-2.5 text-left text-sm font-bold transition" :class="[matchedPair?.includes(o.id) ? 'match-success border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : '', matchingLeftId === o.id ? 'matching-picked border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#ded7cb]']" :disabled="voting || matchingPending || isInteractionLocked || !!matchedPair" @click="onMatchingLeft(o.id)">
                 <span class="min-w-0">{{ o.label }}</span>
                 <span v-if="matchingLeftId === o.id" class="ml-2 text-[#3157d5]" aria-hidden="true">●</span>
               </button>
             </div>
             <div class="space-y-2">
-              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring flex min-h-12 w-full items-center rounded-xl border-2 border-dashed bg-white px-3 py-2.5 text-left text-sm font-bold transition" :class="[matchedPair?.includes(o.id) ? 'match-success border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : '', matchingWrong === o.id ? 'match-wrong border-[#d84a36] bg-[#fbe9e5] text-[#a63222]' : '', matchingLeftId ? 'matching-ready border-[#3157d5] text-[#3157d5]' : 'border-[#cfc8bc] text-[#8b857d]']" :disabled="voting || matchingPending || isInteractionLocked || !matchingLeftId" @click="onMatchingRight(o.id)">{{ o.data?.match }}</button>
+              <button v-for="o in topic.options" :key="o.id" type="button" class="focus-ring flex min-h-12 w-full items-center rounded-xl border-2 border-dashed bg-white px-3 py-2.5 text-left text-sm font-bold transition" :class="[matchedPair?.includes(o.id) ? 'match-success border-[#3f7a58] bg-[#e5f1e9] text-[#3f7a58]' : '', matchingWrong === o.id ? 'match-wrong border-[#d84a36] bg-[#fbe9e5] text-[#a63222]' : '', matchingLeftId ? 'matching-ready border-[#3157d5] text-[#3157d5]' : 'border-[#cfc8bc] text-[#8b857d]']" :disabled="voting || matchingPending || isInteractionLocked || !!matchedPair || !matchingLeftId" @click="onMatchingRight(o.id)">{{ o.data?.match }}</button>
             </div>
           </div>
           <p v-if="matchingPending" class="mt-3 text-center text-xs font-bold text-[#3f7a58]">配對成功！送出中…</p>
+          <div class="mt-3 text-center">
+            <button v-if="matchedPair && hasVotedGame" type="button" class="focus-ring text-xs font-bold text-[#3157d5] hover:underline" @click="resetMatching">重新配對（換票）</button>
+          </div>
+          <UiQuickMiniResults v-if="topic.hasVoted" :topic="topic" class="mt-5" />
         </template>
 
-        <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'PUZZLE'">
-          <p class="text-sm leading-6 text-[#6d6861]">把下方打亂的字塊依正確順序點回原詞，拼完即完成投票。</p>
+        <template v-else-if="isVotingOpen && topic.topicType === 'PUZZLE'">
+          <p v-if="hasVotedGame" class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
+            <span aria-hidden="true">✓</span> 已投「{{ votedChoice }}」— 拼出另一詞即完成換票。
+          </p>
+          <p v-else class="text-sm leading-6 text-[#6d6861]">把下方打亂的字塊依正確順序點回原詞，拼完即完成投票。</p>
           <div class="mt-4 space-y-4">
             <div v-for="o in topic.options" :key="o.id">
               <p class="mb-2 flex items-center justify-between text-xs font-bold text-[#77716a]">
@@ -101,15 +111,19 @@
               </div>
             </div>
           </div>
+          <UiQuickMiniResults v-if="topic.hasVoted" :topic="topic" class="mt-5" />
         </template>
 
-        <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'SCRATCH'">
-          <p class="text-sm leading-6 text-[#6d6861]">按住卡片刮開偽裝貼紙，刮到底即投下那一票。</p>
+        <template v-else-if="isVotingOpen && topic.topicType === 'SCRATCH'">
+          <p v-if="hasVotedGame" class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
+            <span aria-hidden="true">✓</span> 已投「{{ votedChoice }}」— 刮開另一張即完成換票。
+          </p>
+          <p v-else class="text-sm leading-6 text-[#6d6861]">按住卡片刮開偽裝貼紙，刮到底即投下那一票。</p>
           <div class="mt-4 grid grid-cols-3 gap-3" @mouseup="scratchStop" @mouseleave="scratchStop" @touchend="scratchStop">
-            <button v-for="(o, index) in topic.options" :key="o.id" type="button" class="focus-ring relative aspect-square select-none overflow-hidden rounded-2xl border-2 bg-white text-xs font-black transition" :class="[voting || isInteractionLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer touch-none', (scratchProgress[o.id] ?? 0) > 0 && (scratchProgress[o.id] ?? 0) < 1 ? 'scratch-wiggle' : '', scratchDoneId === o.id ? 'scratch-win border-[#3f7a58]' : 'border-[#ded7cb]']" :disabled="voting || isInteractionLocked" @mousedown="scratchStart(o.id)" @touchstart.prevent="scratchStart(o.id)">
-              <span class="grid h-full w-full place-items-center px-1 text-center leading-tight" :class="scratchDoneId === o.id ? 'text-[#3f7a58]' : ''">{{ o.label }}</span>
-              <span v-if="scratchDoneId === o.id" class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-2xl text-[#3f7a58]" aria-hidden="true">✓</span>
-              <span class="scratch-pattern absolute inset-0 grid place-items-center rounded-xl bg-gradient-to-br from-[#9a6a12] to-[#c9a15e] text-xl font-black text-white" :style="{ opacity: 1 - (scratchProgress[o.id] ?? 0) }">
+            <button v-for="(o, index) in topic.options" :key="o.id" type="button" class="focus-ring relative aspect-square select-none overflow-hidden rounded-2xl border-2 bg-white text-xs font-black transition" :class="[voting || isInteractionLocked || (hasVotedGame && !redoMode) ? 'opacity-75' : 'cursor-pointer touch-none', (scratchProgress[o.id] ?? 0) > 0 && (scratchProgress[o.id] ?? 0) < 1 && !(hasVotedGame && !redoMode) ? 'scratch-wiggle' : '', votedOptionId === o.id && !redoMode ? 'scratch-win border-[#3f7a58]' : 'border-[#ded7cb]']" :disabled="voting || isInteractionLocked || (hasVotedGame && !redoMode)" @mousedown="scratchStart(o.id)" @touchstart.prevent="scratchStart(o.id)">
+              <span class="grid h-full w-full place-items-center px-1 text-center leading-tight" :class="votedOptionId === o.id && !redoMode ? 'text-[#3f7a58]' : ''">{{ o.label }}</span>
+              <span v-if="votedOptionId === o.id && !redoMode" class="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-2xl text-[#3f7a58]" aria-hidden="true">✓</span>
+              <span class="scratch-pattern absolute inset-0 grid place-items-center rounded-xl bg-gradient-to-br from-[#9a6a12] to-[#c9a15e] text-xl font-black text-white" :style="{ opacity: hasVotedGame && !redoMode ? 0 : 1 - (scratchProgress[o.id] ?? 0) }">
                 <span class="scratch-shine pointer-events-none absolute inset-0" />
                 <span class="grid h-full w-full place-items-center">{{ (scratchProgress[o.id] ?? 0) > 0 ? '刮' : '？' }}</span>
                 <span class="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-black/20 text-[10px] font-bold">{{ index + 1 }}</span>
@@ -117,9 +131,13 @@
               <UiConfetti v-if="scratchDoneId === o.id" :burst-key="`scratch-${o.id}`" :count="10" />
             </button>
           </div>
+          <div class="mt-3 text-center">
+            <button v-if="hasVotedGame" type="button" class="focus-ring text-xs font-bold text-[#3157d5] hover:underline" @click="resetScratch">重刮（換票）</button>
+          </div>
+          <UiQuickMiniResults v-if="topic.hasVoted" :topic="topic" class="mt-5" />
         </template>
 
-        <template v-else-if="isVotingOpen && topic.topicType === 'SPIN_WHEEL' && (!showResults || showGameAgain)">
+        <template v-else-if="isVotingOpen && topic.topicType === 'SPIN_WHEEL'">
           <div class="relative mx-auto w-full max-w-72">
             <span class="wheel-pointer absolute left-1/2 top-0 z-10 -ml-[10px]" aria-hidden="true" />
             <div class="relative">
@@ -131,7 +149,7 @@
                   </radialGradient>
                 </defs>
                 <g v-for="(o, index) in topic.options" :key="o.id">
-                  <path :d="wheelArc(index)" :fill="wheelColors[index % wheelColors.length]" stroke="#fffaf0" stroke-width="1.5" :class="{ 'wheel-hit': wheelHitIndex === index }" />
+                  <path :d="wheelArc(index)" :fill="wheelColors[index % wheelColors.length]" stroke="#fffaf0" stroke-width="1.5" :class="{ 'wheel-hit': (wheelHitIndex ?? votedOptionIndex) === index }" />
                   <text :x="wheelLabel(index).x" :y="wheelLabel(index).y" :transform="`rotate(${wheelLabel(index).rotate} ${wheelLabel(index).x} ${wheelLabel(index).y})`" text-anchor="middle" font-size="12" font-weight="700" fill="#fffaf0">{{ o.label }}</text>
                 </g>
                 <circle cx="100" cy="100" r="21" fill="url(#wheel-hub-grad)" stroke="#ded7cb" stroke-width="2" class="wheel-hub" :class="{ 'hub-pulse': !wheelSpinning }" />
@@ -141,13 +159,14 @@
               <UiConfetti v-if="wheelHitIndex !== null" :burst-key="`wheel-${wheelConfettiKey}`" :count="14" />
             </div>
             <div class="mt-4 flex flex-col items-center gap-1.5 text-center">
-              <UiButton variant="data" :disabled="wheelSpinning || voting || isInteractionLocked" @click="spinWheel">{{ wheelSpinning ? '轉動中…' : '轉一次！' }}</UiButton>
-              <button v-if="showGameAgain" type="button" class="focus-ring text-xs font-bold text-[#77716a] hover:underline" @click="showGameAgain = false">返回結果</button>
+              <p v-if="hasVotedGame" class="text-xs font-bold text-[#8f5d14]">你轉到了「{{ votedChoice }}」</p>
+              <UiButton variant="data" :disabled="wheelSpinning || voting || isInteractionLocked" @click="spinWheel">{{ wheelSpinning ? '轉動中…' : hasVotedGame ? '再抽一次（換票）' : '轉一次！' }}</UiButton>
             </div>
           </div>
+          <UiQuickMiniResults v-if="topic.hasVoted" :topic="topic" class="mt-5" />
         </template>
 
-        <template v-else-if="isVotingOpen && topic.topicType === 'LOTTERY' && (!showResults || showGameAgain)">
+<template v-else-if="isVotingOpen && topic.topicType === 'LOTTERY'">
           <div class="rounded-2xl border border-[#e0c9a0] bg-gradient-to-b from-[#fffaf0] to-[#fdf3e0] p-5">
             <div class="relative mx-auto max-w-sm overflow-hidden rounded-xl">
               <div class="lottery-shell relative">
@@ -157,7 +176,7 @@
                   <span class="lottery-lid-knob" aria-hidden="true" />
                 </div>
                 <div class="relative mx-auto flex h-40 flex-wrap items-center justify-center gap-2 px-3" :class="{ 'lottery-shake': lotteryState === 'shaking' }">
-                  <span v-for="(o, index) in topic.options" :key="o.id" class="lottery-ball grid size-14 place-items-center rounded-full border text-sm font-black shadow-sm" :class="lotteryResultId === o.id ? 'lottery-ball-hit' : 'border-[#e0c9a0] bg-white text-[#8f5d14]'">{{ index + 1 }}</span>
+                  <span v-for="(o, index) in topic.options" :key="o.id" class="lottery-ball grid size-14 place-items-center rounded-full border text-sm font-black shadow-sm" :class="(lotteryResultId ?? votedOptionId) === o.id ? 'lottery-ball-hit' : 'border-[#e0c9a0] bg-white text-[#8f5d14]'">{{ (lotteryResultId ?? votedOptionId) === o.id ? votedChoice : index + 1 }}</span>
                   <span v-if="lotteryState === 'drawing'" class="lottery-light-beam pointer-events-none absolute left-1/2 top-10 z-10 -translate-x-1/2" aria-hidden="true" />
                 </div>
               </div>
@@ -166,12 +185,12 @@
               </div>
               <UiConfetti v-if="lotteryState === 'result'" :burst-key="`lottery-${lotteryConfettiKey}`" :count="14" />
             </div>
-            <p class="mt-3 text-center text-xs font-bold text-[#8f5d14]">{{ lotteryStatusLabel }}</p>
+            <p class="mt-3 text-center text-xs font-bold text-[#8f5d14]">{{ hasVotedGame ? `抽到了「${votedChoice}」` : lotteryStatusLabel }}</p>
             <div class="mt-3 flex flex-col items-center gap-1.5 text-center">
-              <UiButton variant="data" :disabled="lotteryState === 'shaking' || lotteryState === 'drawing' || voting || isInteractionLocked" @click="shakeLottery">{{ voting ? '送出中…' : '搖一搖' }}</UiButton>
-              <button v-if="showGameAgain" type="button" class="focus-ring text-xs font-bold text-[#77716a] hover:underline" @click="showGameAgain = false; lotteryState = 'idle'; lotteryResultId = null">返回結果</button>
+              <UiButton variant="data" :disabled="lotteryState === 'shaking' || lotteryState === 'drawing' || voting || isInteractionLocked" @click="shakeLottery">{{ voting ? '送出中…' : hasVotedGame ? '再搖一次（換票）' : '搖一搖' }}</UiButton>
             </div>
           </div>
+          <UiQuickMiniResults v-if="topic.hasVoted" :topic="topic" class="mt-5" />
         </template>
 
         <template v-else-if="!showResults && isVotingOpen">
@@ -244,14 +263,10 @@
           </div>
         </template>
 
-        <template v-else-if="isQuick && isVotingOpen && showResults && !showGameAgain">
+        <template v-else-if="isQuick && isVotingOpen && showResults && !isGameType">
           <p class="mb-4 flex items-center gap-2 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">
             <span aria-hidden="true">✓</span> 已投票 — 快問結果即時更新，點選其他選項即可更改票。
           </p>
-          <button v-if="topic.topicType === 'SPIN_WHEEL' || topic.topicType === 'LOTTERY'" type="button" class="focus-ring mb-4 flex w-full items-center justify-between rounded-xl border border-[#3157d5] bg-[#e7ecff] px-4 py-3 text-left text-sm font-bold text-[#2746b4] transition hover:border-[#171717]" @click="showGameAgain = true">
-            <span>再來一次，交給運氣決定下一票</span>
-            <span aria-hidden="true">↻</span>
-          </button>
           <div class="space-y-2.5">
             <button
               v-for="o in topic.options"
@@ -382,6 +397,12 @@ const selectedOption = computed(() => topic.value?.options.find((option) => opti
 const confirmingOptionId = ref<string | null>(null);
 const confirmingSpectrum = ref(false);
 const myVoteOptionId = computed(() => topic.value?.options.find((option) => option.label === topic.value?.myVote?.choice)?.id ?? null);
+const votedOptionId = myVoteOptionId;
+const votedChoice = computed(() => topic.value?.myVote?.choice ?? '');
+const votedOptionIndex = computed(() => topic.value?.options.findIndex((option) => option.label === topic.value?.myVote?.choice));
+const hasVotedGame = computed(() => !!topic.value?.hasVoted);
+const redoMode = ref(false);
+const isGameType = computed(() => ['MATCHING', 'PUZZLE', 'SCRATCH', 'SPIN_WHEEL', 'LOTTERY'].includes(topic.value?.topicType ?? ''));
 const isQuick = computed(() => topic.value?.kind === 'QUICK');
 const isInteractionLocked = computed(() => !auth.isAuthed);
 const shortAnswerText = ref('');
@@ -406,7 +427,6 @@ const lotteryStatusLabel = computed(() => {
   return '每顆球代表一個選項，搖中即送出';
 });
 const wheelHitIndex = ref<number | null>(null);
-const showGameAgain = ref(false);
 const wheelConfettiKey = ref('');
 const lotteryConfettiKey = ref('');
 const matchingPending = ref(false);
@@ -604,8 +624,9 @@ function scratchStart(optionId: string) {
     if (scratchProgress[optionId] >= 1) {
       scratchStop();
       scratchDoneId.value = optionId;
+      redoMode.value = false;
       const option = topic.value?.options.find((item) => item.id === optionId);
-      if (option) window.setTimeout(() => void submitQuickVote(option), 380);
+      if (option) window.setTimeout(() => void submitLanded(option), 380);
     }
   }, 70);
 }
@@ -623,7 +644,7 @@ function onMatchingLeft(optionId: string) {
 }
 
 function onMatchingRight(optionId: string) {
-  if (voting.value || matchingPending.value || isInteractionLocked.value) return;
+  if (voting.value || matchingPending.value || isInteractionLocked.value || !!matchedPair.value) return;
   const leftId = matchingLeftId.value;
   if (!leftId || leftId === optionId) return;
   const left = topic.value?.options.find((option) => option.id === leftId);
@@ -634,8 +655,7 @@ function onMatchingRight(optionId: string) {
     matchedPair.value = [leftId, optionId];
     window.setTimeout(() => {
       matchingPending.value = false;
-      matchedPair.value = null;
-      void submitQuickVote(right);
+      void submitLanded(right);
     }, 340);
   } else {
     matchingWrong.value = optionId;
@@ -644,6 +664,17 @@ function onMatchingRight(optionId: string) {
       matchingWrong.value = null;
     }, 720);
   }
+}
+
+function resetMatching() {
+  matchedPair.value = null;
+  matchingLeftId.value = null;
+}
+
+function resetScratch() {
+  redoMode.value = true;
+  scratchDoneId.value = null;
+  for (const key of Object.keys(scratchProgress)) scratchProgress[key] = 0;
 }
 
 function onPuzzleTile(optionId: string, index: number, letter: string) {
@@ -658,8 +689,9 @@ function onPuzzleTile(optionId: string, index: number, letter: string) {
       if (puzzleJustIndex.value?.optionId === optionId && puzzleJustIndex.value?.index === index) puzzleJustIndex.value = null;
     }, 320);
     if (puzzleProgress[optionId] >= option.label.length) {
+      for (const key of Object.keys(puzzleProgress)) if (key !== optionId) delete puzzleProgress[key];
       puzzleDoneId.value = optionId;
-      window.setTimeout(() => void submitQuickVote(option), 380);
+      window.setTimeout(() => void submitLanded(option), 380);
     }
   } else {
     puzzleProgress[optionId] = 0;
@@ -701,8 +733,6 @@ function spinWheel() {
     wheelHitIndex.value = idx;
     wheelConfettiKey.value = `${option.id}-${Date.now()}`;
     window.setTimeout(async () => {
-      wheelHitIndex.value = null;
-      showGameAgain.value = false;
       await submitLanded(option);
     }, 620);
   }, 2800);
@@ -724,9 +754,6 @@ function shakeLottery() {
       lotteryResultId.value = option.id;
       lotteryConfettiKey.value = `${option.id}-${Date.now()}`;
       window.setTimeout(async () => {
-        lotteryResultId.value = null;
-        lotteryState.value = 'idle';
-        showGameAgain.value = false;
         await submitLanded(option);
       }, 620);
     }, 520);
@@ -813,7 +840,16 @@ onMounted(async () => {
 watch(topicId, async (nextId, previousId) => {
   leaveTopic(previousId);
   selectedStance.value = null;
-  showGameAgain.value = false;
+  redoMode.value = false;
+  matchedPair.value = null;
+  matchingLeftId.value = null;
+  puzzleDoneId.value = null;
+  scratchDoneId.value = null;
+  lotteryState.value = 'idle';
+  lotteryResultId.value = null;
+  wheelHitIndex.value = null;
+  for (const key of Object.keys(puzzleProgress)) delete puzzleProgress[key];
+  for (const key of Object.keys(scratchProgress)) scratchProgress[key] = 0;
   resetVoteIntents();
   activeSection.value = validSections.includes(route.query.section as TopicSection) ? route.query.section as TopicSection : 'vote';
   await load();
