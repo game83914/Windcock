@@ -160,7 +160,7 @@ const route = useRoute();
 const router = useRouter();
 const initialCategory = queryText(route.query.category) || 'all';
 const initialSearch = queryText(route.query.search);
-const initialPage = queryPage(route.query.page);
+const initialPage = 1;
 const initialSort = (['POPULAR', 'NEWEST', 'ACTIVITY'] as const).includes(queryText(route.query.sort) as 'POPULAR' | 'NEWEST' | 'ACTIVITY')
   ? (queryText(route.query.sort) as 'POPULAR' | 'NEWEST' | 'ACTIVITY')
   : 'ACTIVITY';
@@ -276,17 +276,20 @@ watch(() => route.query, (query) => {
   syncingFromRoute = true;
   const category = queryText(query.category) || 'all';
   const search = queryText(query.search);
-  const page = queryPage(query.page);
   const nextSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(query.sort)) ? queryText(query.sort) : 'ACTIVITY';
   if (activeCategory.value !== category) activeCategory.value = category;
   if (searchTerm.value !== search) searchTerm.value = search;
   if (searchInput.value !== search) searchInput.value = search;
-  if (topicPage.value !== page) topicPage.value = page;
   if (sort.value !== nextSort) sort.value = nextSort as 'POPULAR' | 'NEWEST' | 'ACTIVITY';
   nextTick(() => { syncingFromRoute = false; });
 });
 
 onMounted(() => {
+  if (route.query.page) {
+    const query = { ...route.query };
+    delete query.page;
+    void router.replace({ query });
+  }
   onCommentActivity((activity) => {
     commentActivities.value = [activity, ...commentActivities.value.filter((item) => item.id !== activity.id)].slice(0, 20);
   });
@@ -321,11 +324,6 @@ function emptyTopicList(limit: number): TopicListResponse {
 
 function queryText(value: unknown) {
   return typeof value === 'string' ? value : '';
-}
-
-function queryPage(value: unknown) {
-  const page = Number(queryText(value));
-  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 function selectCategory(category: string) {
@@ -377,16 +375,14 @@ function syncRouteQuery() {
   if (!import.meta.client) return;
   const currentCategory = queryText(route.query.category) || 'all';
   const currentSearch = queryText(route.query.search);
-  const currentPage = queryPage(route.query.page);
   const currentSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(route.query.sort)) ? queryText(route.query.sort) : 'ACTIVITY';
-  if (currentCategory === activeCategory.value && currentSearch === searchTerm.value && currentPage === topicPage.value && currentSort === sort.value) return;
+  if (currentCategory === activeCategory.value && currentSearch === searchTerm.value && currentSort === sort.value) return;
   const query = { ...route.query };
   if (activeCategory.value === 'all') delete query.category;
   else query.category = activeCategory.value;
   if (searchTerm.value) query.search = searchTerm.value;
   else delete query.search;
-  if (topicPage.value === 1) delete query.page;
-  else query.page = String(topicPage.value);
+  delete query.page;
   if (sort.value === 'ACTIVITY') delete query.sort;
   else query.sort = sort.value;
   void router.replace({ query });
