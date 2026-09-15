@@ -48,9 +48,8 @@
         <div class="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
           <template v-if="authed">
             <details class="group relative">
-              <summary class="focus-ring flex cursor-pointer list-none items-center gap-2 rounded-xl border border-[#ded7cb] bg-white px-2 py-1.5 hover:border-[#b9b0a3] [&::-webkit-details-marker]:hidden">
-                <UserAvatar :nickname="auth.nickname" :avatar-url="auth.avatarUrl" size="sm" />
-                <span class="hidden text-left sm:block"><strong class="block text-xs leading-none">{{ auth.nickname }}</strong><small class="mt-1 block text-[10px] text-[#77716a]">{{ auth.points }} 點</small></span>
+              <summary class="focus-ring grid size-9 cursor-pointer list-none place-items-center rounded-xl border border-[#ded7cb] bg-white text-[#171717] transition hover:border-[#b0761f] hover:text-[#b0761f] [&::-webkit-details-marker]:hidden" aria-label="會員功能表" title="會員中心">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               </summary>
               <div class="absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] p-1.5 shadow-[0_12px_36px_rgba(23,23,23,0.16)]">
                 <NuxtLink to="/me" class="focus-ring block px-3 py-2 text-sm font-black hover:bg-[#ebe6dc]">會員中心</NuxtLink>
