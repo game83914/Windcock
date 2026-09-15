@@ -1,5 +1,5 @@
 <template>
-  <NuxtLink :to="`/topic/${topic.id}`" class="group flex h-full flex-col border border-[#d7d1c6] bg-[#faf8f3] p-5 transition hover:-translate-y-1 hover:border-[#171717] hover:shadow-[6px_6px_0_#d7d1c6] focus-ring sm:p-6">
+  <NuxtLink :to="`/topic/${topic.id}`" class="group flex h-full flex-col rounded-2xl border border-[#d7d1c6] bg-[#faf8f3] p-5 transition hover:-translate-y-1 hover:border-[#171717] hover:shadow-[6px_6px_0_#d7d1c6] focus-ring sm:p-6">
     <div class="mb-5 flex items-center justify-between gap-3">
       <span class="eyebrow" :style="{ color: meta.color }">{{ meta.label }}</span>
       <div class="flex items-center gap-2">
