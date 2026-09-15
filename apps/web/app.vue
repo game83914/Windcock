@@ -47,7 +47,7 @@
 
         <div class="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
           <template v-if="authed">
-            <details class="group relative">
+            <details ref="memberMenuEl" class="group relative">
               <summary class="focus-ring grid size-9 cursor-pointer list-none place-items-center rounded-xl border border-[#ded7cb] bg-white text-[#171717] transition hover:border-[#b0761f] hover:text-[#b0761f] [&::-webkit-details-marker]:hidden" aria-label="會員功能表" title="會員中心">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
               </summary>
@@ -90,6 +90,7 @@ const unreadCount = ref(0);
 
 const createAreaEl = ref<HTMLElement | null>(null);
 const createMenuOpen = ref(false);
+const memberMenuEl = ref<HTMLDetailsElement | null>(null);
 const canCreateTopic = computed(() => authed.value && (auth.canAuthorTopics || auth.canSubmitTopicApplication));
 const canCreateQuick = computed(() => authed.value && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const showCreateButton = computed(() => canCreateTopic.value || canCreateQuick.value);
@@ -146,14 +147,19 @@ async function logout() {
 }
 
 function onOutsidePointerDown(event: PointerEvent) {
-  if (!createMenuOpen.value) return;
-  const el = createAreaEl.value;
-  if (el && !(event.target as Node).isConnected) return;
-  if (el && !el.contains(event.target as Node)) createMenuOpen.value = false;
+  const target = event.target as Node;
+  const createArea = createAreaEl.value;
+  if (createMenuOpen.value && createArea && !createArea.contains(target)) createMenuOpen.value = false;
+  const memberMenu = memberMenuEl.value;
+  if (memberMenu?.open && !memberMenu.contains(target)) memberMenu.open = false;
 }
 
 function onEscape(event: KeyboardEvent) {
-  if (event.key === 'Escape' && createMenuOpen.value) createMenuOpen.value = false;
+  if (event.key === 'Escape') {
+    if (createMenuOpen.value) createMenuOpen.value = false;
+    const memberMenu = memberMenuEl.value;
+    if (memberMenu?.open) memberMenu.open = false;
+  }
 }
 </script>
 
