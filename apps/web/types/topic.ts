@@ -34,6 +34,7 @@ export interface Topic {
   };
   proposedBy: Array<{ type: 'MEMBER' | 'ORGANIZATION'; label: string }>;
   createdAt: string;
+  updatedAt?: string;
   voteEndAt?: string | null;
   voteDurationDays: number;
   voteDurationHours?: number | null;

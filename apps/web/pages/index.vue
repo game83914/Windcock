@@ -53,44 +53,37 @@
       </div>
     </section>
 
-    <section v-if="quickTopics.length" class="-mx-4 border-y border-[#e0c9a0] bg-[#fff8ec] px-4 py-6 sm:mx-0 sm:px-6" aria-label="今天快問">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p class="eyebrow text-[#b0761f]">UGC 微投票 · 會員即時發起</p>
-          <h2 class="mt-1 text-xl font-black sm:text-2xl">今天快問</h2>
-        </div>
-        <NuxtLink
-          v-if="canCreateQuick"
-          to="/topics/quick"
-          class="focus-ring border border-[#b0761f] bg-white px-4 py-2.5 text-sm font-black text-[#8f5d14] transition hover:bg-[#b0761f] hover:text-white"
-        >＋ 發起快問</NuxtLink>
-      </div>
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <QuickPollCard v-for="t in quickTopics" :key="t.id" :topic="t" />
-      </div>
-    </section>
-
     <section
         :id="activeCategory === 'all' ? 'hot-topics' : `category-${activeCategory}`"
         class="scroll-mt-28 py-12 sm:py-16"
         :aria-busy="status === 'pending'"
       >
-        <div class="mb-6 flex flex-col gap-4 border-b-2 border-[#171717] pb-4 sm:flex-row sm:items-end sm:justify-between">
-          <div class="flex items-baseline gap-3">
+        <div class="mb-6 grid gap-3 border-b border-[#171717] pb-4 sm:flex sm:items-end sm:justify-between">
+          <div class="flex flex-wrap items-baseline gap-3">
             <h2 class="text-2xl font-black tracking-[-0.035em] sm:text-3xl">{{ sectionHeading }}</h2>
             <span class="text-xs font-bold tabular-nums text-[#77716a]">{{ status === 'pending' ? '載入中' : `${data.pagination.total} 筆` }}</span>
           </div>
-          <label class="block sm:w-72">
-            <span class="sr-only">搜尋議題</span>
-            <input
-              v-model="searchInput"
-              type="search"
-              maxlength="100"
-              placeholder="搜尋議題標題或描述"
-              aria-label="搜尋議題"
-              class="focus-ring w-full min-w-0 border border-[#bfb8ad] bg-white px-3.5 py-2 text-sm"
-            />
-          </label>
+          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+            <label class="flex items-center gap-2 rounded-2xl border border-[#d3cbc0] bg-white px-3 py-1.5 sm:w-44">
+              <span class="text-xs font-bold text-[#77716a]">排序</span>
+              <select v-model="sort" class="min-w-0 flex-1 bg-transparent py-1 text-sm font-bold outline-none" @change="selectSort">
+                <option value="ACTIVITY">更新時間</option>
+                <option value="POPULAR">熱門</option>
+                <option value="NEWEST">建立時間</option>
+              </select>
+            </label>
+            <label class="block sm:w-72">
+              <span class="sr-only">搜尋議題</span>
+              <input
+                v-model="searchInput"
+                type="search"
+                maxlength="100"
+                placeholder="搜尋議題標題或描述"
+                aria-label="搜尋議題"
+                class="focus-ring w-full min-w-0 border border-[#d3cbc0] bg-white px-3.5 py-2.5 text-sm rounded-xl"
+              />
+            </label>
+          </div>
         </div>
         <div class="-mx-4 mb-7 flex gap-2 overflow-x-auto px-4 pb-2 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="議題分類">
           <button
@@ -103,7 +96,7 @@
             全部 <span class="ml-1 opacity-60">{{ allTopicCount }}</span>
           </button>
           <button
-            v-for="category in activeCategories"
+            v-for="category in filterChips"
             :key="category.key"
             type="button"
             class="focus-ring shrink-0 border px-4 py-2.5 text-sm font-bold transition"
@@ -114,7 +107,8 @@
             @click="selectCategory(category.key)"
           >
             <span v-if="activeCategory !== category.key" class="mr-2 inline-block h-2 w-2 rounded-full" :style="{ backgroundColor: category.color }" />
-            {{ category.label }} <span class="ml-1 opacity-60">{{ categoryCounts[category.key] ?? 0 }}</span>
+            {{ category.key === 'quick' ? '⚡ ' : '' }}{{ category.label }}
+            <span v-if="category.key !== 'quick'" class="ml-1 opacity-60">{{ categoryCounts[category.key] ?? 0 }}</span>
           </button>
         </div>
         <p class="sr-only" aria-live="polite">{{ resultsAnnouncement }}</p>
@@ -126,7 +120,12 @@
           <div v-for="item in 3" :key="item" class="h-72 animate-pulse bg-[#e5e0d6] motion-reduce:animate-none" />
         </div>
         <div v-else-if="topics.length" class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          <HomeTopicCard v-for="topic in topics" :key="topic.id" :topic="topic" />
+          <component
+            :is="topic.kind === 'QUICK' ? QuickPollCard : HomeTopicCard"
+            v-for="topic in topics"
+            :key="topic.id"
+            :topic="topic"
+          />
         </div>
         <p v-else class="border border-[#d7d1c6] bg-[#faf8f3] py-16 text-center text-sm text-[#77716a]">{{ emptyMessage }}</p>
         <div v-if="status === 'success' && topicPage < totalPages" class="mt-10 flex flex-col items-center gap-3">
@@ -149,6 +148,8 @@ import type { Topic, TopicListResponse } from '~/types/topic';
 import type { CommentActivity } from '~/composables/useRealtime';
 import { useCategories } from '~/composables/useCategories';
 import { contrastTextColor } from '~/utils/topic';
+import HomeTopicCard from '~/components/home/TopicCard.vue';
+import QuickPollCard from '~/components/home/QuickPollCard.vue';
 
 useSeoMeta({
   title: '輿論測風向｜看見真實民意',
@@ -158,27 +159,32 @@ useSeoMeta({
 const api = useApi();
 const route = useRoute();
 const router = useRouter();
-const auth = useAuthStore();
 const initialCategory = queryText(route.query.category) || 'all';
 const initialSearch = queryText(route.query.search);
 const initialPage = queryPage(route.query.page);
+const initialSort = (['POPULAR', 'NEWEST', 'ACTIVITY'] as const).includes(queryText(route.query.sort) as 'POPULAR' | 'NEWEST' | 'ACTIVITY')
+  ? (queryText(route.query.sort) as 'POPULAR' | 'NEWEST' | 'ACTIVITY')
+  : 'ACTIVITY';
 const activeCategory = ref(initialCategory);
 const searchInput = ref(initialSearch);
 const searchTerm = ref(initialSearch);
 const topicPage = ref(initialPage);
+const sort = ref<'POPULAR' | 'NEWEST' | 'ACTIVITY'>(initialSort);
 
 const { active: activeCategories, refresh: refreshCategories } = useCategories();
-const [topicState, featuredState, commentState, quickState] = await Promise.all([
+const kindForFetch = computed<'FORMAL' | 'QUICK' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : 'FORMAL');
+const [topicState, featuredState, commentState] = await Promise.all([
   useAsyncData(
     'homepage-topics',
     () => api.get<TopicListResponse>('/topics', {
       page: topicPage.value,
       limit: 9,
-      category: activeCategory.value === 'all' ? undefined : activeCategory.value,
+      category: kindForFetch.value === 'FORMAL' ? activeCategory.value : undefined,
       search: searchTerm.value || undefined,
-      sort: 'POPULAR',
+      sort: sort.value,
+      kind: kindForFetch.value,
     }),
-    { default: () => emptyTopicList(9), watch: [activeCategory, searchTerm] },
+    { default: () => emptyTopicList(9), watch: [activeCategory, searchTerm, sort] },
   ),
   useAsyncData(
     'homepage-featured',
@@ -190,16 +196,10 @@ const [topicState, featuredState, commentState, quickState] = await Promise.all(
     () => api.get<CommentActivity[]>('/posts/activity/recent-comments'),
     { default: () => [] },
   ),
-  useAsyncData(
-    'homepage-quick',
-    () => api.get<Topic[]>('/topics/quick'),
-    { default: () => [] },
-  ),
 ]);
 
 const { data, status, error, refresh } = topicState;
 const { data: featuredData, refresh: refreshFeatured } = featuredState;
-const { data: quickTopics, refresh: refreshQuick } = quickState;
 const { data: initialCommentActivities, refresh: refreshComments } = commentState;
 const commentActivities = ref<CommentActivity[]>(initialCommentActivities.value);
 const { onCommentActivity, cleanup: cleanupRealtime } = useRealtime();
@@ -213,14 +213,17 @@ const topics = computed(() => visibleTopics.value);
 const featuredTopics = computed<Topic[]>(() => featuredData.value ?? []);
 const categoryCounts = computed(() => data.value.categoryCounts ?? {});
 const allTopicCount = computed(() => Object.values(categoryCounts.value).reduce((sum, count) => sum + count, 0));
-const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const totalPages = computed(() => Math.max(1, data.value.pagination.pages));
+const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#fff0d7' };
+const filterChips = computed(() => [quickCategoryChip, ...activeCategories.value]);
 const selectedCategory = computed(() => activeCategories.value.find((category) => category.key === activeCategory.value));
-const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : (selectedCategory.value?.label ?? '議題'));
+const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : activeCategory.value === 'quick' ? '快問' : (selectedCategory.value?.label ?? '議題'));
 const hasActiveFilters = computed(() => activeCategory.value !== 'all' || Boolean(searchTerm.value));
-const emptyMessage = computed(() => searchTerm.value
-  ? `找不到符合「${searchTerm.value}」的議題`
-  : `${sectionHeading.value}目前沒有進行中的議題`);
+const emptyMessage = computed(() => {
+  if (searchTerm.value) return `找不到符合「${searchTerm.value}」的議題`;
+  if (activeCategory.value === 'quick') return '目前沒有進行中的快問投票';
+  return `${sectionHeading.value}目前沒有進行中的議題`;
+});
 const resultsAnnouncement = computed(() => {
   if (status.value === 'pending') return '議題載入中';
   if (error.value) return '議題載入失敗';
@@ -263,10 +266,12 @@ watch(() => route.query, (query) => {
   const category = queryText(query.category) || 'all';
   const search = queryText(query.search);
   const page = queryPage(query.page);
+  const nextSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(query.sort)) ? queryText(query.sort) : 'ACTIVITY';
   if (activeCategory.value !== category) activeCategory.value = category;
   if (searchTerm.value !== search) searchTerm.value = search;
   if (searchInput.value !== search) searchInput.value = search;
   if (topicPage.value !== page) topicPage.value = page;
+  if (sort.value !== nextSort) sort.value = nextSort as 'POPULAR' | 'NEWEST' | 'ACTIVITY';
   nextTick(() => { syncingFromRoute = false; });
 });
 
@@ -302,6 +307,10 @@ function selectCategory(category: string) {
   topicPage.value = 1;
 }
 
+function selectSort() {
+  topicPage.value = 1;
+}
+
 async function loadMore() {
   if (loadingMore.value) return;
   const pages = data.value.pagination.pages;
@@ -311,9 +320,10 @@ async function loadMore() {
     const res = await api.get<TopicListResponse>('/topics', {
       page: topicPage.value + 1,
       limit: 9,
-      category: activeCategory.value === 'all' ? undefined : activeCategory.value,
+      category: kindForFetch.value === 'FORMAL' ? activeCategory.value : undefined,
       search: searchTerm.value || undefined,
-      sort: 'POPULAR',
+      sort: sort.value,
+      kind: kindForFetch.value,
     });
     visibleTopics.value.push(...res.items);
     topicPage.value += 1;
@@ -329,7 +339,8 @@ function syncRouteQuery() {
   const currentCategory = queryText(route.query.category) || 'all';
   const currentSearch = queryText(route.query.search);
   const currentPage = queryPage(route.query.page);
-  if (currentCategory === activeCategory.value && currentSearch === searchTerm.value && currentPage === topicPage.value) return;
+  const currentSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(route.query.sort)) ? queryText(route.query.sort) : 'ACTIVITY';
+  if (currentCategory === activeCategory.value && currentSearch === searchTerm.value && currentPage === topicPage.value && currentSort === sort.value) return;
   const query = { ...route.query };
   if (activeCategory.value === 'all') delete query.category;
   else query.category = activeCategory.value;
@@ -337,11 +348,13 @@ function syncRouteQuery() {
   else delete query.search;
   if (topicPage.value === 1) delete query.page;
   else query.page = String(topicPage.value);
+  if (sort.value === 'ACTIVITY') delete query.sort;
+  else query.sort = sort.value;
   void router.replace({ query });
 }
 
 async function refreshHomepage() {
-  await Promise.all([refresh(), refreshFeatured(), refreshComments(), refreshCategories(), refreshQuick()]);
+  await Promise.all([refresh(), refreshFeatured(), refreshComments(), refreshCategories()]);
 }
 
 function commentSnippet(content: string) {

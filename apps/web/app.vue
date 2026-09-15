@@ -12,11 +12,13 @@
         <div class="hidden flex-1 items-center justify-center gap-6 lg:flex">
           <NuxtLink to="/gifs" class="focus-ring text-sm font-black text-[#8f4f78] hover:text-[#d84a36]">GIF 市集</NuxtLink>
           <NuxtLink v-if="!authed || auth.canAuthorTopics || auth.canSubmitTopicApplication" :to="authed ? '/topics/create' : '/login?redirect=/topics/create'" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#d84a36] hover:text-[#171717]">{{ auth.canAuthorTopics ? '建立議題' : '提出議題' }}</NuxtLink>
+          <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#b0761f] hover:text-[#171717]">發起快問</NuxtLink>
         </div>
 
         <div class="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
           <NuxtLink to="/gifs" class="focus-ring text-xs font-black text-[#8f4f78] lg:hidden">GIF</NuxtLink>
           <template v-if="authed">
+            <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring rounded-lg bg-[#b0761f] px-3 py-2 text-xs font-bold text-white lg:hidden">快問</NuxtLink>
             <NuxtLink v-if="auth.canAuthorTopics || auth.canSubmitTopicApplication" to="/topics/create" class="focus-ring rounded-lg bg-[#d84a36] px-3 py-2 text-xs font-bold text-white lg:hidden">{{ auth.canAuthorTopics ? '建立' : '提案' }}</NuxtLink>
             <NuxtLink to="/me/notifications" class="focus-ring relative rounded-lg px-2 py-1.5 text-xs font-bold hover:bg-[#ebe6dc] hover:text-[#d84a36]">通知<span v-if="unreadCount" class="ml-1 inline-grid min-w-4 place-items-center rounded-full bg-[#d84a36] px-1 text-[9px] text-white">{{ unreadCount > 9 ? '9+' : unreadCount }}</span></NuxtLink>
             <details class="group relative">
@@ -77,6 +79,7 @@
 <script setup lang="ts">
 const auth = useAuthStore();
 const authed = computed(() => auth.isAuthed);
+const canCreateQuick = computed(() => authed.value && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const api = useApi();
 const unreadCount = ref(0);
 
