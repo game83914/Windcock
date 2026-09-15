@@ -1,7 +1,7 @@
 <template>
   <NuxtLink :to="`/topic/${topic.id}`" class="group flex h-full flex-col rounded-2xl border border-[#d7d1c6] bg-[#faf8f3] p-5 transition hover:-translate-y-1 hover:border-[#171717] hover:shadow-[6px_6px_0_#d7d1c6] focus-ring sm:p-6">
     <div class="mb-5 flex items-center justify-between gap-3">
-      <span class="eyebrow" :style="{ color: meta.color }">{{ meta.label }}</span>
+      <span class="rounded-full px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-white" :style="{ backgroundColor: meta.color }">{{ meta.label }}</span>
       <div class="flex items-center gap-2">
         <span v-if="topic.creator.type === 'MEMBER'" class="bg-[#ebe6dc] px-2 py-1 text-[11px] font-bold text-[#6d6861]">會員發起</span>
         <span v-if="topic.moderationStatus === 'PENDING_REVIEW'" class="bg-[#fff0d7] px-2 py-1 text-[11px] font-bold text-[#9a5b12]">待複核</span>
