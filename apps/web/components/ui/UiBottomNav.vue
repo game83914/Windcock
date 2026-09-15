@@ -3,7 +3,7 @@
     class="fixed inset-x-0 bottom-0 z-[60] border-t border-[#ded7cb] bg-[#faf8f3]/95 backdrop-blur lg:hidden"
     aria-label="主要導覽"
   >
-    <div class="mx-auto grid max-w-lg grid-cols-5">
+    <div class="mx-auto grid max-w-lg grid-cols-4">
       <template v-for="item in items" :key="item.to">
         <NuxtLink
           v-if="!item.requiresAuth || authed"
@@ -57,12 +57,6 @@ const items: NavItem[] = [
     requiresAuth: true,
     match: ['/topics/create', '/topics/quick'],
     icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
-  },
-  {
-    to: '/gifs',
-    label: 'GIF',
-    match: ['/gifs'],
-    icon: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="3"/><path d="M7 9h2v6H7zM12 9h5M12 12h4M12 15h5"/></svg>',
   },
   {
     to: '/me',

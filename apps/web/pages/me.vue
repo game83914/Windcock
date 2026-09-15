@@ -42,6 +42,16 @@
         <NuxtPage />
       </div>
     </div>
+
+    <section class="mt-12 border-t border-[#ded7cb] pt-6">
+      <div class="flex flex-wrap gap-x-6 gap-y-3 text-xs font-bold text-[#6d6861]">
+        <span class="cursor-not-allowed opacity-55" title="尚未開放">平台介紹</span>
+        <span class="cursor-not-allowed opacity-55" title="尚未開放">使用條款</span>
+        <NuxtLink to="/privacy" class="focus-ring hover:text-[#171717]">隱私權政策</NuxtLink>
+        <span class="cursor-not-allowed opacity-55" title="尚未開放">內容檢舉</span>
+      </div>
+      <p class="mt-4 text-[11px] text-[#817b73]">平台點數僅供娛樂互動使用，不具現金價值，亦不得兌換或轉讓。</p>
+    </section>
   </div>
 </template>
 
@@ -63,6 +73,7 @@ const navigation = [
   { label: '我的 GIF', to: '/me/gifs' },
   { label: '點數帳本', to: '/me/points' },
   { label: '通知中心', to: '/me/notifications' },
+  { label: 'GIF 市集', to: '/gifs' },
   { label: '資料與隱私', to: '/me/profile' },
 ];
 const unreadCount = computed(() => dashboard.value?.counts.unreadNotifications || 0);

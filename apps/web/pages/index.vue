@@ -113,11 +113,15 @@
           />
         </div>
         <p v-else class="border border-[#d7d1c6] bg-[#faf8f3] py-16 text-center text-sm text-[#77716a]">{{ emptyMessage }}</p>
-        <div v-if="status === 'success' && topicPage < totalPages" class="mt-10 flex flex-col items-center gap-3">
-          <UiButton variant="outline" :disabled="loadingMore" @click="loadMore">
-            {{ loadingMore ? '載入更多中…' : '載入更多議題' }}
-          </UiButton>
-          <p class="text-xs text-[#77716a]">已顯示 {{ topics.length }} / {{ data.pagination.total }} 筆</p>
+        <div v-if="status === 'success'" class="mt-8 flex flex-col items-center gap-3">
+          <div v-if="topicPage < totalPages" ref="loadMoreSentinel" class="flex min-h-14 w-full flex-col items-center justify-center gap-2 text-xs text-[#77716a]" aria-live="polite">
+            <span v-if="loadingMore" class="inline-block size-4 animate-spin rounded-full border-2 border-[#d3cbc0] border-t-[#d84a36]" />
+            <span>{{ loadingMore ? '載入中…' : '繼續下滑，自動載入更多' }}</span>
+          </div>
+          <p class="text-xs text-[#77716a]">
+            <template v-if="topicPage < totalPages">已顯示 {{ topics.length }} / {{ data.pagination.total }} 筆</template>
+            <span v-else>已顯示全部 {{ topics.length }} 筆・已到底部</span>
+          </p>
         </div>
       </section>
     </template>
@@ -221,6 +225,9 @@ const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let deadlineTimer: ReturnType<typeof setInterval> | null = null;
 let syncingFromRoute = false;
+let intersectionObserver: IntersectionObserver | null = null;
+let observedSentinel: Element | null = null;
+const loadMoreSentinel = ref<HTMLElement | null>(null);
 
 watch(searchInput, (value) => {
   if (syncingFromRoute) return;
@@ -264,9 +271,26 @@ onMounted(() => {
     commentActivities.value = [activity, ...commentActivities.value.filter((item) => item.id !== activity.id)].slice(0, 20);
   });
   deadlineTimer = setInterval(() => { deadlineNow.value = Date.now(); }, 60_000);
+  intersectionObserver = new IntersectionObserver((entries) => {
+    const entry = entries[0];
+    if (entry?.isIntersecting) loadMore();
+  }, { rootMargin: '500px 0px' });
+  if (loadMoreSentinel.value) {
+    observedSentinel = loadMoreSentinel.value;
+    intersectionObserver.observe(observedSentinel);
+  }
+});
+watch(loadMoreSentinel, (el) => {
+  if (!import.meta.client || !intersectionObserver) return;
+  if (observedSentinel) intersectionObserver.unobserve(observedSentinel);
+  observedSentinel = el;
+  if (el) intersectionObserver.observe(el);
 });
 onUnmounted(() => {
   cleanupRealtime();
+  intersectionObserver?.disconnect();
+  intersectionObserver = null;
+  observedSentinel = null;
   if (searchTimer) clearTimeout(searchTimer);
   if (deadlineTimer) clearInterval(deadlineTimer);
 });

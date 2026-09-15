@@ -10,13 +10,11 @@
         </NuxtLink>
 
         <div class="hidden flex-1 items-center justify-center gap-6 lg:flex">
-          <NuxtLink to="/gifs" class="focus-ring text-sm font-black text-[#8f4f78] hover:text-[#d84a36]">GIF 市集</NuxtLink>
           <NuxtLink v-if="authed && (auth.canAuthorTopics || auth.canSubmitTopicApplication)" to="/topics/create" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#d84a36] hover:text-[#171717]">{{ auth.canAuthorTopics ? '建立議題' : '提出議題' }}</NuxtLink>
           <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring border-l border-[#cfc8bc] pl-6 text-sm font-black text-[#b0761f] hover:text-[#171717]">發起快問</NuxtLink>
         </div>
 
         <div class="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
-          <NuxtLink to="/gifs" class="focus-ring text-xs font-black text-[#8f4f78] lg:hidden">GIF</NuxtLink>
           <template v-if="authed">
             <NuxtLink v-if="canCreateQuick" to="/topics/quick" class="focus-ring rounded-lg bg-[#b0761f] px-3 py-2 text-xs font-bold text-white lg:hidden">快問</NuxtLink>
             <NuxtLink v-if="auth.canAuthorTopics || auth.canSubmitTopicApplication" to="/topics/create" class="focus-ring rounded-lg bg-[#d84a36] px-3 py-2 text-xs font-bold text-white lg:hidden">{{ auth.canAuthorTopics ? '建立' : '提案' }}</NuxtLink>
@@ -55,23 +53,6 @@
 
     <UiToastHost />
     <UiBottomNav :authed="authed" :unread-count="unreadCount" />
-
-    <footer class="mt-16 border-t border-[#171717] bg-[#ebe6dc]">
-      <div class="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-[1fr_auto] sm:px-6">
-        <div>
-          <p class="text-lg font-black">輿論測風向</p>
-        </div>
-        <div class="flex flex-wrap gap-x-6 gap-y-3 text-xs font-bold text-[#6d6861]">
-          <span class="cursor-not-allowed opacity-55" title="尚未開放">平台介紹</span>
-          <span class="cursor-not-allowed opacity-55" title="尚未開放">使用條款</span>
-          <NuxtLink to="/privacy" class="focus-ring hover:text-[#171717]">隱私權政策</NuxtLink>
-          <span class="cursor-not-allowed opacity-55" title="尚未開放">內容檢舉</span>
-        </div>
-      </div>
-      <div class="border-t border-[#d0c9bd] px-4 py-4 text-center text-[11px] text-[#817b73]">
-        平台點數僅供娛樂互動使用，不具現金價值，亦不得兌換或轉讓。
-      </div>
-    </footer>
   </div>
 </template>
 
