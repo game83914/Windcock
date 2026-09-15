@@ -153,6 +153,7 @@ export class PostsService {
         },
       });
       await this.memes.recordUsage(tx, authorId, 'POST', created.id, ids);
+      await tx.topic.update({ where: { id: topicId }, data: { updatedAt: new Date() } });
       return created;
     });
     return {
@@ -201,6 +202,7 @@ export class PostsService {
         },
       });
       await this.memes.recordUsage(tx, authorId, 'COMMENT', created.id, ids);
+      await tx.topic.update({ where: { id: post.topic.id }, data: { updatedAt: new Date() } });
       return created;
     });
     this.realtime.broadcastCommentActivity({

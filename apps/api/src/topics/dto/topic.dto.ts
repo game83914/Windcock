@@ -155,10 +155,15 @@ export class ListTopicsQuery {
   @MaxLength(100)
   search?: string;
 
-  @ApiPropertyOptional({ enum: ['POPULAR', 'NEWEST', 'ENDING_SOON'] })
+  @ApiPropertyOptional({ enum: ['POPULAR', 'NEWEST', 'ENDING_SOON', 'ACTIVITY'] })
   @IsOptional()
-  @IsIn(['POPULAR', 'NEWEST', 'ENDING_SOON'])
-  sort?: 'POPULAR' | 'NEWEST' | 'ENDING_SOON';
+  @IsIn(['POPULAR', 'NEWEST', 'ENDING_SOON', 'ACTIVITY'])
+  sort?: 'POPULAR' | 'NEWEST' | 'ENDING_SOON' | 'ACTIVITY';
+
+  @ApiPropertyOptional({ enum: ['FORMAL', 'QUICK', 'ALL'], description: '議題類型，預設僅正式議題' })
+  @IsOptional()
+  @IsIn(['FORMAL', 'QUICK', 'ALL'])
+  kind?: 'FORMAL' | 'QUICK' | 'ALL';
 
   @ApiPropertyOptional({ enum: ['ALL', 'VOTED', 'UNVOTED', 'FOLLOWING'] })
   @IsOptional()

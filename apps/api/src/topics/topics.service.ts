@@ -42,7 +42,8 @@ export class TopicsService {
   list(userId: bigint | null, query: {
     category?: string;
     search?: string;
-    sort?: 'POPULAR' | 'NEWEST' | 'ENDING_SOON';
+    sort?: 'POPULAR' | 'NEWEST' | 'ENDING_SOON' | 'ACTIVITY';
+    kind?: 'FORMAL' | 'QUICK' | 'ALL';
     participation?: 'ALL' | 'VOTED' | 'UNVOTED' | 'FOLLOWING';
     page: number;
     limit: number;
@@ -51,12 +52,13 @@ export class TopicsService {
     const limit = Math.min(50, Math.max(1, query.limit));
     const participation = query.participation || 'ALL';
     if (participation !== 'ALL' && !userId) throw new ForbiddenException('請先登入再篩選會員議題');
+    const kind = query.kind || 'FORMAL';
     const where: Prisma.TopicWhereInput = {
-      kind: TopicKind.FORMAL,
       status: 'OPEN',
       moderationStatus: 'APPROVED',
       voteEndAt: { gt: new Date() },
     };
+    if (kind !== 'ALL') where.kind = kind === 'QUICK' ? TopicKind.QUICK : TopicKind.FORMAL;
     if (query.category) where.category = query.category;
     const search = query.search?.trim();
     if (search) where.OR = [
@@ -70,7 +72,9 @@ export class TopicsService {
       ? [{ createdAt: 'desc' }]
       : query.sort === 'ENDING_SOON'
         ? [{ voteEndAt: 'asc' }, { createdAt: 'desc' }]
-        : [{ totalVotes: 'desc' }, { createdAt: 'desc' }];
+        : query.sort === 'ACTIVITY'
+          ? [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
+          : [{ totalVotes: 'desc' }, { createdAt: 'desc' }];
 
     return this.prisma.$transaction(async (tx) => {
       let followedRootIds: bigint[] = [];
@@ -81,7 +85,7 @@ export class TopicsService {
       if (participation === 'FOLLOWING') {
         where.AND = [{ id: { in: followedRootIds } }];
       }
-      const categoryWhere = { ...where };
+      const categoryWhere = { ...where, kind: TopicKind.FORMAL };
       delete categoryWhere.category;
       const [topics, total] = await Promise.all([
         tx.topic.findMany({
@@ -880,6 +884,7 @@ export class TopicsService {
           data: { voteCount: { increment: 1 } },
         });
       }
+      await tx.topic.update({ where: { id: topicId }, data: { updatedAt: new Date() } });
 
       const user = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
       return {
@@ -1094,6 +1099,7 @@ export class TopicsService {
         return [`${type}:${label}`, { type, label }];
       })).values()),
       createdAt: topic.createdAt,
+      updatedAt: topic.updatedAt,
       voteEndAt: topic.voteEndAt,
       voteDurationDays: topic.voteDurationDays,
       voteDurationHours: topic.voteDurationHours ?? null,

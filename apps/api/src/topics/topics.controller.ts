@@ -25,6 +25,7 @@ export class TopicsController {
       category: query.category,
       search: query.search,
       sort: query.sort,
+      kind: query.kind,
       participation: query.participation,
       page: query.page || 1,
       limit: query.limit || 20,
