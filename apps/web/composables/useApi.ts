@@ -13,8 +13,13 @@ export function useApi() {
   const config = useRuntimeConfig();
   const auth = useAuthStore();
 
+  const rawBase = config.public.apiBase as string;
+  const apiBase = import.meta.client && rawBase.includes('localhost')
+    ? rawBase.replace('//localhost:', `//${window.location.hostname}:`)
+    : rawBase;
+
   const request = ofetch.create({
-    baseURL: config.public.apiBase as string,
+    baseURL: apiBase,
     timeout: 8000,
     onRequest({ options }) {
       if (auth.token) {

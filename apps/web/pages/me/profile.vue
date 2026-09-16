@@ -192,7 +192,11 @@ const zodiacLabels: Record<string, string> = { ARIES: '牡羊座', TAURUS: '金�
 const chineseZodiacLabels: Record<string, string> = { RAT: '鼠', OX: '牛', TIGER: '虎', RABBIT: '兔', DRAGON: '龍', SNAKE: '蛇', HORSE: '馬', GOAT: '羊', MONKEY: '猴', ROOSTER: '雞', DOG: '狗', PIG: '豬' };
 
 function presetUrl(preset: AvatarPreset) {
-  return `${String(config.public.apiBase).replace(/\/$/, '')}/avatars/presets/${preset}`;
+  const raw = String(config.public.apiBase);
+  const base = import.meta.client && raw.includes('localhost')
+    ? raw.replace('//localhost:', `//${window.location.hostname}:`)
+    : raw;
+  return `${base.replace(/\/$/, '')}/avatars/presets/${preset}`;
 }
 
 function optionPairs(items: string[][], includePrivate = false) {
