@@ -75,7 +75,7 @@
     <div v-else-if="isImagePick && isOpen && !auth.isAuthed" class="mt-4">
       <div class="grid grid-cols-2 gap-3">
         <div
-          v-for="o in poll.options"
+          v-for="o in visibleOptions"
           :key="o.id"
           class="focus-ring group relative aspect-square overflow-hidden rounded-lg border-2 border-[#e0c9a0] bg-white transition hover:border-[#b0761f]"
         >
@@ -87,6 +87,7 @@
           </button>
         </div>
       </div>
+      <button v-if="optionsCollapsed" type="button" class="focus-ring mt-2 w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
     </div>
 
     <div v-else-if="isImagePick && isOpen && auth.isAuthed && !auth.canVote" class="mt-4 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] px-3 py-2 text-xs font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
@@ -94,7 +95,7 @@
     <div v-else-if="isImagePick && isOpen" class="mt-4">
       <div class="grid grid-cols-2 gap-3">
         <div
-          v-for="o in poll.options"
+          v-for="o in visibleOptions"
           :key="o.id"
           class="focus-ring group relative aspect-square overflow-hidden rounded-lg border-2 text-left transition disabled:cursor-not-allowed"
           :class="myVoteOptionId === o.id ? 'border-[#b0761f] ring-2 ring-[#b0761f]' : 'border-[#e0c9a0] hover:border-[#b0761f]'"
@@ -110,12 +111,13 @@
           </button>
         </div>
       </div>
+      <button v-if="optionsCollapsed" type="button" class="focus-ring mt-2 w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
     </div>
 
     <div v-else-if="isImagePick" class="mt-4">
       <div class="grid grid-cols-2 gap-3">
         <div
-          v-for="o in poll.options"
+          v-for="o in visibleOptions"
           :key="o.id"
           class="focus-ring group relative aspect-square overflow-hidden rounded-lg border border-[#e0c9a0] bg-white text-left"
           :class="myVoteOptionId === o.id ? 'ring-2 ring-[#b0761f]' : ''"
@@ -131,6 +133,7 @@
           </button>
         </div>
       </div>
+      <button v-if="optionsCollapsed" type="button" class="focus-ring mt-2 w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
     </div>
 
     <div v-else class="mt-4">
