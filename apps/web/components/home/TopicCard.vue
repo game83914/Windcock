@@ -1,5 +1,6 @@
 <template>
   <NuxtLink :to="`/topic/${topic.id}`" class="group flex h-full flex-col rounded-2xl border border-[#d7d1c6] bg-[#faf8f3] p-5 transition hover:-translate-y-1 hover:border-[#171717] hover:shadow-[6px_6px_0_#d7d1c6] focus-ring sm:p-6">
+    <UiImageLightbox v-model:src="lightboxSrc" />
     <div class="mb-5 flex items-center justify-between gap-3">
       <span class="rounded-full px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-white" :style="{ backgroundColor: meta.color }">{{ meta.label }}</span>
       <div class="flex items-center gap-2">
@@ -26,7 +27,7 @@
     <div v-else class="mt-8 space-y-3">
       <div v-for="option in options" :key="option.id">
         <div class="mb-1 flex justify-between text-xs">
-          <span class="flex min-w-0 items-center gap-1.5 truncate pr-3 font-medium"><img v-if="option.data?.imageUrl" :src="option.data.imageUrl" alt="選項圖片" class="h-4 w-4 shrink-0 rounded border border-[#ded7cb] object-cover" /><span class="truncate">{{ option.label }}</span></span>
+          <span class="flex min-w-0 items-center gap-1.5 truncate pr-3 font-medium"><img v-if="option.data?.imageUrl" :src="option.data.imageUrl" :alt="`放大 ${option.label}`" class="h-6 w-6 shrink-0 cursor-zoom-in rounded-lg border border-[#ded7cb] object-cover transition hover:opacity-80" @click.stop="openLightbox(option.data.imageUrl)" /><span class="truncate">{{ option.label }}</span></span>
           <span class="font-bold tabular-nums">{{ optionPercentage(option, topic) }}%</span>
         </div>
         <div class="h-1.5 bg-[#dfdad0]">
@@ -49,6 +50,8 @@ const props = defineProps<{ topic: Topic }>();
 const meta = computed(() => getCategoryMeta(props.topic.category));
 const options = computed(() => leadingOptions(props.topic, 2));
 const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
+const lightboxSrc = ref<string | null>(null);
+function openLightbox(src: string) { lightboxSrc.value = src; }
 const spectrumValue = computed(() => props.topic.spectrumMedian === null || props.topic.spectrumMedian === undefined
   ? null
   : Number(props.topic.spectrumMedian));
