@@ -110,9 +110,14 @@ const [{ data, status, error, refresh }] = await Promise.all([
           participation: effectiveParticipation.value === 'UNVOTED' ? 'UNVOTED' : undefined,
         })
       : Promise.resolve(emptyTopicList(9)),
-    { default: () => emptyTopicList(9), watch: [searchTerm, effectiveParticipation], getCachedData: () => undefined },
+    { default: () => emptyTopicList(9), watch: [searchTerm, effectiveParticipation] },
   ),
 ]);
+
+const nuxtApp = useNuxtApp();
+if (import.meta.client && auth.isAuthed && nuxtApp.isHydrating) {
+  nuxtApp.hooks.hookOnce('app:suspense:resolve', () => void refresh());
+}
 
 const topics = computed<Topic[]>(() => data.value.items);
 const hasLoaded = ref(status.value === 'success');

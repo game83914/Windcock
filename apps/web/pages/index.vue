@@ -168,7 +168,7 @@ const [topicState, featuredState, commentState] = await Promise.all([
       kind: kindForFetch.value,
       participation: effectiveParticipation.value === 'UNVOTED' ? 'UNVOTED' : undefined,
     }),
-    { default: () => emptyTopicList(9), watch: [activeCategory, sort, effectiveParticipation], getCachedData: () => undefined },
+    { default: () => emptyTopicList(9), watch: [activeCategory, sort, effectiveParticipation] },
   ),
   useAsyncData(
     'homepage-featured',
@@ -187,6 +187,11 @@ const { data: featuredData, refresh: refreshFeatured } = featuredState;
 const { data: initialCommentActivities, refresh: refreshComments } = commentState;
 const commentActivities = ref<CommentActivity[]>(initialCommentActivities.value);
 const { onCommentActivity, cleanup: cleanupRealtime } = useRealtime();
+
+const nuxtApp = useNuxtApp();
+if (import.meta.client && auth.isAuthed && nuxtApp.isHydrating) {
+  nuxtApp.hooks.hookOnce('app:suspense:resolve', () => void refresh());
+}
 
 const loadingMore = ref(false);
 const visibleTopics = ref<Topic[]>([]);
