@@ -1,7 +1,8 @@
 <template>
   <div>
     <UiImageLightbox v-model:src="lightboxSrc" />
-    <div v-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
+    <RankImageRankVotePanel v-if="isImageRank" :topic="topic" @refreshed="emitRefreshed" />
+    <div v-else-if="!showResults && isVotingOpen && !participationReady" class="h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
     <div v-else-if="!showResults && isVotingOpen && auth.isAuthed && !auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
 
     <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'SPECTRUM'">
@@ -330,7 +331,7 @@
 
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
-import { isImageOptionType, isOptionPickType, optionPercentage } from '~/utils/topic';
+import { isImageOptionType, isImageRankType, isOptionPickType, optionPercentage } from '~/utils/topic';
 import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
@@ -348,7 +349,9 @@ const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabil
 const showResults = computed(() => props.topic.hasVoted || !isVotingOpen.value || (auth.isAuthed && participationReady.value && !auth.canVote));
 const isOptionPick = computed(() => isOptionPickType(props.topic.topicType));
 const isImageOption = computed(() => isImageOptionType(props.topic.topicType));
+const isImageRank = computed(() => isImageRankType(props.topic.topicType));
 const isInteractionLocked = computed(() => !auth.isAuthed);
+function emitRefreshed() { emit('refreshed'); }
 
 const voting = ref(false);
 const votingTargetId = ref<string | null>(null);

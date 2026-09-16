@@ -78,6 +78,7 @@ export const TOPIC_TYPE_LABEL: Record<string, string> = {
   BINARY: '二選一',
   MULTIPLE: '多選項',
   IMAGE_MULTIPLE: '圖片選項題',
+  IMAGE_RANK: '二選一排名賽',
   SPECTRUM: '光譜題',
   SHORT_ANSWER: '簡答題',
   MATCHING: '連連看',
@@ -93,6 +94,10 @@ export function isOptionPickType(topicType?: string) {
 
 export function isImageOptionType(topicType?: string) {
   return topicType === 'IMAGE_MULTIPLE';
+}
+
+export function isImageRankType(topicType?: string) {
+  return topicType === 'IMAGE_RANK';
 }
 
 export function topicTypeLabel(topicType?: string) {

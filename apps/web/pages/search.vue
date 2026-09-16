@@ -47,8 +47,15 @@
       </section>
 
       <section v-else-if="topics.length" :aria-busy="status === 'pending'">
-        <div class="mb-5 flex items-baseline gap-3">
+        <div class="mb-5 flex items-center justify-between gap-3">
           <h2 class="text-xl font-black tracking-[-0.035em]">搜尋「{{ searchTerm }}」</h2>
+          <label class="flex min-w-0 shrink-0 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white px-2.5 py-1.5" :title="auth.isAuthed ? '' : '登入後可篩選未投票議題'">
+            <svg class="shrink-0 text-[#77716a]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+            <select :value="effectiveParticipation" class="bg-transparent py-0.5 text-sm font-bold outline-none disabled:cursor-not-allowed disabled:text-[#aaa49b]" :disabled="!auth.isAuthed" aria-label="參與篩選" @change="onUnvotedChange">
+              <option value="ALL">全部</option>
+              <option value="UNVOTED">未投票</option>
+            </select>
+          </label>
         </div>
         <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           <component
@@ -79,11 +86,14 @@ useSeoMeta({
 });
 
 const api = useApi();
+const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const initialSearch = queryText(route.query.q);
 const searchInput = ref(initialSearch);
 const searchTerm = ref(initialSearch);
+const unvoted = ref<'ALL' | 'UNVOTED'>('UNVOTED');
+const effectiveParticipation = computed<'ALL' | 'UNVOTED'>(() => auth.isAuthed ? unvoted.value : 'ALL');
 
 const searchInputEl = ref<HTMLInputElement | null>(null);
 
@@ -97,9 +107,10 @@ const [{ data, status, error, refresh }] = await Promise.all([
           search: searchTerm.value,
           sort: 'ACTIVITY',
           kind: 'ALL',
+          participation: effectiveParticipation.value === 'UNVOTED' ? 'UNVOTED' : undefined,
         })
       : Promise.resolve(emptyTopicList(9)),
-    { default: () => emptyTopicList(9), watch: [searchTerm] },
+    { default: () => emptyTopicList(9), watch: [searchTerm, effectiveParticipation], getCachedData: () => undefined },
   ),
 ]);
 
@@ -139,6 +150,11 @@ function clearSearch() {
   searchInput.value = '';
   searchTerm.value = '';
   hasLoaded.value = false;
+}
+
+function onUnvotedChange(event: Event) {
+  const next = (event.target as HTMLSelectElement).value;
+  if (next === 'UNVOTED' || next === 'ALL') unvoted.value = next;
 }
 
 function emptyTopicList(limit: number): TopicListResponse {

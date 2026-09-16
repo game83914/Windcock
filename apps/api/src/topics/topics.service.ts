@@ -13,6 +13,7 @@ import { RealtimeService } from '../realtime/realtime.service';
 import { CreateTopicDto, CreateQuickTopicDto, MAX_FEATURED_TOPICS } from './dto/topic.dto';
 import { ImportTopicDto, ImportTopicStanceDto } from './dto/import-topic.dto';
 import { VoteDto } from './dto/vote.dto';
+import { SaveRankDto } from './dto/rank.dto';
 import { DemographicCryptoService, deriveDemographics } from '../profiles/demographic-crypto.service';
 import { DEMOGRAPHIC_CONSENT_VERSION } from '../profiles/demographic-profiles.service';
 import { resolveAvatarUrl } from '../avatars/avatar-url';
@@ -67,8 +68,6 @@ export class TopicsService {
       { description: { contains: search, mode: 'insensitive' } },
       { options: { some: { label: { contains: search, mode: 'insensitive' } } } },
     ];
-    if (participation === 'VOTED') where.votes = { some: { userId: userId! } };
-    if (participation === 'UNVOTED') where.votes = { none: { userId: userId! } };
 
     const orderBy: Prisma.TopicOrderByWithRelationInput[] = query.sort === 'NEWEST'
       ? [{ createdAt: 'desc' }]
@@ -80,12 +79,26 @@ export class TopicsService {
 
     return this.prisma.$transaction(async (tx) => {
       let followedRootIds: bigint[] = [];
+      const involvement = new Set<bigint>();
       if (userId) {
+        if (participation === 'VOTED' || participation === 'UNVOTED') {
+          const [votes, rankResults] = await Promise.all([
+            tx.vote.findMany({ where: { userId }, select: { topicId: true } }),
+            tx.topicRankResult.findMany({ where: { userId }, select: { topicId: true } }),
+          ]);
+          for (const vote of votes) involvement.add(vote.topicId);
+          for (const rankResult of rankResults) involvement.add(rankResult.topicId);
+          if (participation === 'VOTED') {
+            where.id = { in: [...involvement] };
+          } else {
+            where.id = { notIn: [...involvement] };
+          }
+        }
         const follows = await tx.topicFollow.findMany({ where: { userId }, select: { topicId: true } });
         followedRootIds = follows.map((follow) => follow.topicId);
-      }
-      if (participation === 'FOLLOWING') {
-        where.AND = [{ id: { in: followedRootIds } }];
+        if (participation === 'FOLLOWING') {
+          where.AND = [{ id: { in: followedRootIds } }];
+        }
       }
       const categoryWhere = { ...where, kind: TopicKind.FORMAL };
       delete categoryWhere.category;
@@ -105,20 +118,32 @@ export class TopicsService {
         _count: { _all: true },
       });
 
-      let votedTopicIds: Set<string> = new Set();
+      const rankDataById = new Map<string, { ranking: string[]; comparisons: number }>();
       if (userId && topics.length > 0) {
-        const votes = await tx.vote.findMany({
-          where: { userId, topicId: { in: topics.map((t) => t.id) } },
-          select: { topicId: true },
-        });
-        votedTopicIds = new Set(votes.map((v) => v.topicId.toString()));
+        const pageIds = topics.map((t) => t.id);
+        const [pageVotes, pageRanks] = await Promise.all([
+          tx.vote.findMany({ where: { userId, topicId: { in: pageIds } }, select: { topicId: true } }),
+          tx.topicRankResult.findMany({
+            where: { userId, topicId: { in: pageIds } },
+            select: { topicId: true, ranking: true, comparisons: true },
+          }),
+        ]);
+        for (const vote of pageVotes) involvement.add(vote.topicId);
+        for (const rankResult of pageRanks) {
+          involvement.add(rankResult.topicId);
+          rankDataById.set(rankResult.topicId.toString(), {
+            ranking: rankResult.ranking as string[],
+            comparisons: rankResult.comparisons,
+          });
+        }
       }
 
       return {
         items: topics.map((t) => this.serialize(
           t,
-          votedTopicIds.has(t.id.toString()),
+          involvement.has(t.id),
           followedRootIds.includes(t.id),
+          rankDataById.get(t.id.toString()) ?? null,
         )),
         categoryCounts: Object.fromEntries(categoryCounts.map((item) => [item.category, item._count._all])),
         pagination: { page, limit, total, pages: Math.ceil(total / limit) },
@@ -181,8 +206,10 @@ export class TopicsService {
     let hasVoted = false;
     let isFollowing = false;
     let myVote: { choice: string; spectrumValue: number | null } | null = null;
+    let myRanking: string[] | null = null;
+    let myRankingComparisons = 0;
     if (userId) {
-      const [vote, follow] = await Promise.all([
+      const [vote, follow, rankResult] = await Promise.all([
         this.prisma.vote.findUnique({
           where: { userId_topicId: { userId, topicId } },
           select: { option: { select: { label: true } }, spectrumValue: true },
@@ -191,9 +218,19 @@ export class TopicsService {
           where: { userId_topicId: { userId, topicId: topic.id } },
           select: { userId: true },
         }),
+        topic.topicType === 'IMAGE_RANK'
+          ? this.prisma.topicRankResult.findUnique({
+              where: { userId_topicId: { userId, topicId: topic.id } },
+              select: { ranking: true, comparisons: true },
+            })
+          : null,
       ]);
-      hasVoted = !!vote;
+      hasVoted = topic.topicType === 'IMAGE_RANK' ? !!rankResult : !!vote;
       isFollowing = !!follow;
+      if (rankResult) {
+        myRanking = rankResult.ranking as string[];
+        myRankingComparisons = rankResult.comparisons;
+      }
       if (vote) {
         myVote = {
           choice: vote.option?.label ?? `${vote.spectrumValue} 分`,
@@ -202,7 +239,7 @@ export class TopicsService {
       }
     }
 
-    return { ...this.serialize(topic, hasVoted, isFollowing), myVote, responses: await this.loadResponses(topic) };
+    return { ...this.serialize(topic, hasVoted, isFollowing), myVote, myRanking, myRankingComparisons, responses: await this.loadResponses(topic) };
   }
 
   private async loadResponses(topic: any) {
@@ -315,7 +352,7 @@ export class TopicsService {
     optionLabels.forEach((label) => assertClean(label, '選項'));
     this.assertOptionImagesLength(dto);
 
-    const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.IMAGE_MULTIPLE, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
+    const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
     const noOptionTypes: TopicType[] = [TopicType.SPECTRUM, TopicType.SHORT_ANSWER];
     if (optionTypes.includes(dto.topicType) && !optionLabels.length) {
       throw new BadRequestException('此題型必須設定選項');
@@ -332,6 +369,9 @@ export class TopicsService {
         break;
       case TopicType.IMAGE_MULTIPLE:
         if (optionLabels.length < 2 || optionLabels.length > 10) throw new BadRequestException('圖片選項題必須設定 2 到 10 個選項');
+        break;
+      case TopicType.IMAGE_RANK:
+        if (optionLabels.length < 4 || optionLabels.length > 50) throw new BadRequestException('二選一排名賽必須設定 4 到 50 張圖片');
         break;
       case TopicType.MATCHING:
         if (optionLabels.length < 2 || optionLabels.length > 6) throw new BadRequestException('連連看必須設定 2 到 6 組配對');
@@ -1011,6 +1051,78 @@ export class TopicsService {
     };
   }
 
+  async saveRank(topicId: bigint, userId: bigint, dto: SaveRankDto) {
+    await this.policy.assertPublicAction(userId, 'VOTE');
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${userId})`;
+      const lockedTopic = await tx.$queryRaw<Array<{ id: bigint }>>`SELECT id FROM topics WHERE id = ${topicId} FOR UPDATE`;
+      if (!lockedTopic.length) throw new NotFoundException('議題不存在');
+      const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: { select: { id: true } } } });
+      if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.topicType !== TopicType.IMAGE_RANK) throw new BadRequestException('此題型不支援排名結果');
+      if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放狀態');
+      if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
+      if (!topic.voteEndAt || topic.voteEndAt.getTime() <= Date.now()) throw new ForbiddenException('議題已截止');
+
+      const validIds = new Set(topic.options.map((option) => option.id.toString()));
+      if (!dto.ranking.length || dto.ranking.length !== topic.options.length) {
+        throw new BadRequestException('排名必須完整覆蓋全部選項');
+      }
+      if (new Set(dto.ranking).size !== dto.ranking.length) {
+        throw new BadRequestException('排名不可重複');
+      }
+      for (const id of dto.ranking) {
+        if (!validIds.has(String(id))) throw new BadRequestException('排名中包含不屬於此議題的選項');
+      }
+
+      const ranking = dto.ranking.map((id) => String(id));
+      const previous = await tx.topicRankResult.findUnique({
+        where: { userId_topicId: { userId, topicId: topic.id } },
+        select: { id: true },
+      });
+
+      await tx.topicRankResult.upsert({
+        where: { userId_topicId: { userId, topicId: topic.id } },
+        create: { userId, topicId: topic.id, ranking, comparisons: dto.comparisons ?? 0 },
+        update: { ranking, comparisons: dto.comparisons ?? 0 },
+      });
+
+      if (!previous) {
+        await tx.topic.update({ where: { id: topic.id }, data: { voterCount: { increment: 1 } } });
+      }
+
+      return { isNew: !previous };
+    });
+
+    const playCount = await this.prisma.topicRankResult.count({ where: { topicId } });
+    return { success: true, rewardPoints: 0, isNew: result.isNew, playCount };
+  }
+
+  async communityRanking(topicId: bigint) {
+    const topic = await this.publicTopicIdentity(topicId);
+    const rows = await this.prisma.$queryRaw<Array<{ optionId: string; avgRank: number; plays: bigint }>>`
+      SELECT rank_entry.value AS "optionId",
+             AVG(rank_entry.position) AS "avgRank",
+             COUNT(*)::bigint AS plays
+      FROM topic_rank_results
+      CROSS JOIN LATERAL jsonb_array_elements_text(ranking) WITH ORDINALITY AS rank_entry(value, position)
+      WHERE topic_id = ${topic.id}
+      GROUP BY rank_entry.value
+      ORDER BY AVG(rank_entry.position) ASC, rank_entry.value ASC
+      `;
+    const playCount = await this.prisma.topicRankResult.count({ where: { topicId: topic.id } });
+    return {
+      topicId: topicId.toString(),
+      playCount: Number(playCount),
+      ranking: rows.map((row) => ({
+        optionId: row.optionId,
+        rank: Number(row.avgRank),
+        plays: Number(row.plays),
+      })),
+    };
+  }
+
   private async createDemographicSnapshot(voteId: bigint, userId: bigint) {
     try {
       const profile = await this.prisma.userDemographicProfile.findUnique({ where: { userId }, include: { guardianConsent: true } });
@@ -1178,14 +1290,15 @@ export class TopicsService {
   }
 
   private assertOptionImagesLength(dto: { topicType: TopicType; options?: string[]; optionImages?: (string | null)[] }) {
-    if (dto.topicType === TopicType.IMAGE_MULTIPLE) {
+    if (dto.topicType === TopicType.IMAGE_MULTIPLE || dto.topicType === TopicType.IMAGE_RANK) {
+      const kindLabel = dto.topicType === TopicType.IMAGE_MULTIPLE ? '圖片選項題' : '二選一排名賽';
       const count = (dto.options || []).length;
       if (!dto.optionImages || dto.optionImages.length !== count) {
-        throw new BadRequestException('圖片選項題必須為每個選項提供圖片');
+        throw new BadRequestException(`${kindLabel}必須為每個選項提供圖片`);
       }
       for (const imageUrl of dto.optionImages) {
         if (!imageUrl || typeof imageUrl !== 'string' || !imageUrl.startsWith('/api/v1/option-images/')) {
-          throw new BadRequestException('圖片選項題的每個選項都必須是指定格式的圖片路徑');
+          throw new BadRequestException(`${kindLabel}的每個選項都必須是指定格式的圖片路徑`);
         }
       }
       return;
@@ -1200,12 +1313,12 @@ export class TopicsService {
   }
 
   private optionImageData(dto: { topicType: TopicType; optionImages?: (string | null)[] }, index: number) {
-    if (dto.topicType !== TopicType.IMAGE_MULTIPLE) return undefined;
+    if (dto.topicType !== TopicType.IMAGE_MULTIPLE && dto.topicType !== TopicType.IMAGE_RANK) return undefined;
     const imageUrl = this.optionImageAt(dto, index);
     return imageUrl ? { imageUrl } : undefined;
   }
 
-  private serialize(topic: any, hasVoted: boolean, isFollowing = false) {
+  private serialize(topic: any, hasVoted: boolean, isFollowing = false, myRankData: { ranking: string[]; comparisons: number } | null = null) {
     return {
       id: topic.id.toString(),
       title: topic.title,
@@ -1236,6 +1349,8 @@ export class TopicsService {
       spectrumStddev: topic.spectrumStddev?.toString() ?? null,
       hasVoted,
       isFollowing,
+      myRanking: myRankData?.ranking ?? null,
+      myRankingComparisons: myRankData?.comparisons ?? 0,
       blocks: (topic.contentBlocks || []).map((item: any) => ({
         id: item.id.toString(),
         type: item.type,

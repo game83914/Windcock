@@ -10,6 +10,7 @@ import { Capability } from '../identity/policy.service';
 import { TopicsService } from './topics.service';
 import { CreateTopicDto, CreateQuickTopicDto, FeaturedCandidatesQuery, FeaturedTopicsDto, ListTopicsQuery } from './dto/topic.dto';
 import { VoteDto } from './dto/vote.dto';
+import { SaveRankDto } from './dto/rank.dto';
 import { TopicAnalyticsService } from './topic-analytics.service';
 import { TopicDemographicAnalyticsQuery } from './dto/topic-analytics.dto';
 
@@ -176,5 +177,21 @@ export class TopicsController {
     @Body() dto: VoteDto,
   ) {
     return this.topicsService.revote(id, user.userId, dto);
+  }
+
+  @Post(':id/rank')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  saveRank(
+    @Param('id', ParsedIdPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: SaveRankDto,
+  ) {
+    return this.topicsService.saveRank(id, user.userId, dto);
+  }
+
+  @Get(':id/rankings')
+  communityRanking(@Param('id', ParsedIdPipe) id: bigint) {
+    return this.topicsService.communityRanking(id);
   }
 }

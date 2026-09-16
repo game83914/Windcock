@@ -136,29 +136,20 @@
       <button v-if="optionsCollapsed" type="button" class="focus-ring mt-2 w-full rounded-lg border border-dashed border-[#e0c9a0] px-3 py-2 text-xs font-bold text-[#8f5d14] hover:border-[#b0761f]" @click.stop="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${poll.options.length}）` }}</button>
     </div>
 
-    <div v-else class="mt-4">
-      <button
-        type="button"
-        class="focus-ring flex w-full items-center justify-between rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2.5 text-sm font-bold text-[#6b5323] transition hover:border-[#b0761f]"
-        @click.stop="auth.isAuthed ? (expanded = !expanded) : goLogin()"
-      >
-        <span>{{ expanded ? '收合' : `${topicTypeLabel(poll.topicType)} — 進去玩一票` }}</span>
-        <span aria-hidden="true">{{ expanded ? '收合' : '►' }}</span>
-      </button>
-      <div v-if="expanded" class="mt-3 rounded-xl border border-[#e0c9a0] bg-[#fffaf0] p-4" @click.stop>
-        <QuickVotePanel :topic="poll" @refreshed="onRefreshed" />
-      </div>
+    <div v-else class="mt-4 rounded-xl border border-[#e0c9a0] bg-[#fffaf0] p-4" @click.stop>
+      <QuickVotePanel :topic="poll" @refreshed="onRefreshed" />
     </div>
 
     <div class="mt-auto border-t border-[#f0e6d2] pt-3 text-xs text-[#77716a]">
-      <span>{{ formatCompactNumber(poll.totalVotes) }} 人已投</span>
+      <span v-if="isRankPick">{{ formatCompactNumber(poll.voterCount) }} 人已玩</span>
+      <span v-else>{{ formatCompactNumber(poll.totalVotes) }} 人已投</span>
     </div>
   </article>
 </template>
 
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
-import { deadlineLabel, formatCompactNumber, isImageOptionType, isOptionPickType, optionPercentage, topicTypeLabel } from '~/utils/topic';
+import { deadlineLabel, formatCompactNumber, isImageOptionType, isImageRankType, isOptionPickType, optionPercentage } from '~/utils/topic';
 import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
@@ -172,7 +163,6 @@ const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
 const poll = ref<Topic>(props.topic);
 const voting = ref(false);
 const votingTargetId = ref<string | null>(null);
-const expanded = ref(false);
 const showAllOptions = ref(false);
 const lightboxSrc = ref<string | null>(null);
 
@@ -181,6 +171,7 @@ function openLightbox(src: string) { lightboxSrc.value = src; }
 const isOpen = computed(() => poll.value.status === 'OPEN' && !!poll.value.voteEndAt && new Date(poll.value.voteEndAt).getTime() > Date.now());
 const isOptionPick = computed(() => isOptionPickType(poll.value.topicType) && poll.value.topicType !== 'SHORT_ANSWER');
 const isImagePick = computed(() => isImageOptionType(poll.value.topicType));
+const isRankPick = computed(() => isImageRankType(poll.value.topicType));
 const myVoteOptionId = computed(() => poll.value.options.find((option) => option.label === poll.value.myVote?.choice)?.id ?? null);
 const optionsCollapsed = computed(() => !showAllOptions.value && poll.value.options.length > OPTION_COLLAPSE_LIMIT);
 const visibleOptions = computed(() => optionsCollapsed.value ? poll.value.options.slice(0, OPTION_COLLAPSE_LIMIT) : poll.value.options);
@@ -192,7 +183,7 @@ function toggleOptions() {
 watch(() => props.topic, (topic) => { poll.value = topic; });
 
 function goTopic() {
-  if (voting.value || expanded.value) return;
+  if (voting.value) return;
   router.push(`/topic/${poll.value.id}`);
 }
 
@@ -225,6 +216,11 @@ async function submitVote(option: TopicOption) {
     await refreshPoll();
   } catch (e) {
     votingTargetId.value = null;
+    if ((e as { data?: { statusCode?: number } })?.data?.statusCode === 409) {
+      voting.value = false;
+      await changeVote(option);
+      return;
+    }
     toastError(errorMessage(e));
   } finally {
     voting.value = false;

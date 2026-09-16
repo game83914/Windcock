@@ -5,7 +5,7 @@ export interface TopicOption {
   data?: { match?: string; weight?: number; imageUrl?: string } | null;
 }
 
-export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
+export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'IMAGE_RANK' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
 
 export interface TopicShortAnswer {
   id: string;
@@ -25,6 +25,18 @@ export interface TopicContentBlock {
   sourceLabel?: string | null;
   sourceUrl?: string | null;
   occurredAt?: string | null;
+}
+
+export interface TopicRankingEntry {
+  optionId: string;
+  rank: number;
+  plays: number;
+}
+
+export interface TopicCommunityRanking {
+  topicId: string;
+  playCount: number;
+  ranking: TopicRankingEntry[];
 }
 
 export interface Topic {
@@ -56,6 +68,8 @@ export interface Topic {
   spectrumStddev?: string | null;
   hasVoted: boolean;
   myVote?: { choice: string; spectrumValue: number | null } | null;
+  myRanking?: string[] | null;
+  myRankingComparisons?: number;
   responses?: TopicShortAnswer[];
   blocks: TopicContentBlock[];
   options: TopicOption[];

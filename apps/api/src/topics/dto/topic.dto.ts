@@ -122,20 +122,20 @@ export class CreateQuickTopicDto {
   @IsString()
   category?: string;
 
-  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE, TopicType.IMAGE_MULTIPLE, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY], description: '選項題會依選項數自動區分：2 個為 BINARY，其餘為 MULTIPLE；圖片選項題每個選項需附圖片；其餘題型依各題型規則' })
-  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE, TopicType.IMAGE_MULTIPLE, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY])
-  topicType: 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
+  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY], description: '選項題會依選項數自動區分：2 個為 BINARY，其餘為 MULTIPLE；圖片選項題每個選項需附圖片；二選一排名賽為 4~50 張圖片逐步二選一排序；其餘題型依各題型規則' })
+  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY])
+  topicType: 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'IMAGE_RANK' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
 
-  @ApiPropertyOptional({ description: '選項題（2~10）、連連看（2~6）、拼圖題（2~4）、刮刮樂（1~9）、轉盤抽獎（2~8）、日式搖獎（2~10）；光譜題與簡答題不需選項' })
+  @ApiPropertyOptional({ description: '選項題（2~10）、連連看（2~6）、拼圖題（2~4）、刮刮樂（1~9）、轉盤抽獎（2~8）、日式搖獎（2~10）、二選一排名賽（4~50）；光譜題與簡答題不需選項' })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(50)
   @IsString({ each: true })
   @MinLength(1, { each: true })
   @MaxLength(50, { each: true })
   options?: string[];
 
-  @ApiPropertyOptional({ description: '圖片選項題（IMAGE_MULTIPLE）必填：與 options 對齊的選項圖片相對路徑（如 /api/v1/option-images/xxxx），每個選項都必須有圖；其他題型請勿提供' })
+  @ApiPropertyOptional({ description: '圖片選項題（IMAGE_MULTIPLE）與二選一排名賽（IMAGE_RANK）必填：與 options 對齊的選項圖片相對路徑（如 /api/v1/option-images/xxxx），每個選項都必須有圖；其他題型請勿提供' })
   @IsOptional()
   @IsArray()
   optionImages?: (string | null)[];
