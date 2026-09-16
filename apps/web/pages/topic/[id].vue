@@ -66,19 +66,20 @@
 
           <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'IMAGE_MULTIPLE'">
             <div class="grid grid-cols-2 gap-3">
-              <button
+              <div
                 v-for="o in topic.options"
                 :key="o.id"
-                type="button"
                 class="focus-ring group relative aspect-square overflow-hidden rounded-2xl border-2 bg-white transition"
                 :class="selectedOptionId === o.id ? 'border-[#3157d5] ring-2 ring-[#3157d5]' : 'border-[#ded7cb] hover:border-[#171717]'"
-                :disabled="voting || isInteractionLocked"
-                @click="onOptionTap(o.id)"
               >
-                <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" @click.stop="openLightbox(o.data?.imageUrl ?? '')" />
-                <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">{{ o.label }}</span>
-                <span v-if="selectedOptionId === o.id" class="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-[#3157d5] text-sm text-white" aria-hidden="true">✓</span>
-              </button>
+                <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
+                <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">{{ o.label }}</span>
+                <span v-if="selectedOptionId === o.id" class="pointer-events-none absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-[#3157d5] text-sm text-white" aria-hidden="true">✓</span>
+                <button type="button" class="focus-ring absolute inset-0" :disabled="voting || isInteractionLocked" :aria-label="`選擇 ${o.label}`" @click="onOptionTap(o.id)" />
+                <button type="button" class="focus-ring absolute left-1.5 top-1.5 z-10 grid size-7 place-items-center rounded-full bg-black/45 text-white transition hover:bg-black/70" :disabled="voting || isInteractionLocked" aria-label="放大檢視圖片" @click.stop="openLightbox(o.data?.imageUrl ?? '')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                </button>
+              </div>
             </div>
             <div v-if="confirmingOptionId" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
               <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedOption?.label }}」？送出後無法修改。</p>
@@ -150,7 +151,7 @@
             </template>
             <template v-else-if="topic.topicType === 'IMAGE_MULTIPLE'">
               <div class="grid grid-cols-2 gap-3">
-                <div v-for="o in topic.options" :key="o.id" class="relative overflow-hidden rounded-2xl border border-[#ded7cb]">
+                <div v-for="o in topic.options" :key="o.id" class="group relative overflow-hidden rounded-2xl border border-[#ded7cb]">
                   <span class="relative block aspect-square">
                     <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" @click.stop="openLightbox(o.data?.imageUrl ?? '')" />
                     <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">
@@ -160,6 +161,9 @@
                       </span>
                     </span>
                     <span class="absolute inset-x-0 bottom-0 h-1.5 bg-white/20"><span class="block h-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
+                    <button type="button" class="focus-ring absolute left-1.5 top-1.5 z-10 grid size-7 place-items-center rounded-full bg-black/45 text-white transition hover:bg-black/70" aria-label="放大檢視圖片" @click.stop="openLightbox(o.data?.imageUrl ?? '')">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                    </button>
                   </span>
                 </div>
               </div>
