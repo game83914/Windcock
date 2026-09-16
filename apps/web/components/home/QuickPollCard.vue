@@ -9,6 +9,8 @@
       {{ poll.title }}
     </NuxtLink>
 
+    <UiImageLightbox v-model:src="lightboxSrc" />
+
     <div v-if="isOptionPick && isOpen && !auth.isAuthed" class="mt-4">
       <div class="space-y-2">
         <button
@@ -72,16 +74,18 @@
 
     <div v-else-if="isImagePick && isOpen && !auth.isAuthed" class="mt-4">
       <div class="grid grid-cols-2 gap-3">
-        <button
+        <div
           v-for="o in poll.options"
           :key="o.id"
-          type="button"
           class="focus-ring group relative aspect-square overflow-hidden rounded-lg border-2 border-[#e0c9a0] bg-white transition hover:border-[#b0761f]"
-          @click.stop="goLogin"
         >
           <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
-          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-black text-white">{{ o.label }}</span>
-        </button>
+          <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-black text-white">{{ o.label }}</span>
+          <button type="button" class="focus-ring absolute inset-0" :aria-label="`投票給 ${o.label}`" @click.stop="goLogin" />
+          <button type="button" class="focus-ring absolute left-1 top-1 z-10 grid size-6 place-items-center rounded-full bg-black/45 text-white transition hover:bg-black/70" aria-label="放大檢視圖片" @click.stop="openLightbox(o.data?.imageUrl ?? '')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -89,40 +93,43 @@
 
     <div v-else-if="isImagePick && isOpen" class="mt-4">
       <div class="grid grid-cols-2 gap-3">
-        <button
+        <div
           v-for="o in poll.options"
           :key="o.id"
-          type="button"
           class="focus-ring group relative aspect-square overflow-hidden rounded-lg border-2 text-left transition disabled:cursor-not-allowed"
           :class="myVoteOptionId === o.id ? 'border-[#b0761f] ring-2 ring-[#b0761f]' : 'border-[#e0c9a0] hover:border-[#b0761f]'"
-          :disabled="voting"
-          @click.stop="onTap(o)"
         >
           <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
-          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-black text-white">{{ o.label }}</span>
-          <span v-if="voting && votingTargetId === o.id" class="absolute inset-0 grid place-items-center bg-black/30"><span class="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" /></span>
-          <span v-else-if="myVoteOptionId === o.id" class="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-[#b0761f] text-xs text-white" aria-hidden="true">✓</span>
-          <span v-if="poll.hasVoted" class="absolute inset-x-0 bottom-0 h-1 bg-white/20"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
-        </button>
+          <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-black text-white">{{ o.label }}</span>
+          <span v-if="voting && votingTargetId === o.id" class="pointer-events-none absolute inset-0 grid place-items-center bg-black/30"><span class="size-5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true" /></span>
+          <span v-else-if="myVoteOptionId === o.id" class="pointer-events-none absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-[#b0761f] text-xs text-white" aria-hidden="true">✓</span>
+          <span v-if="poll.hasVoted" class="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-white/20"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
+          <button type="button" class="focus-ring absolute inset-0" :disabled="voting" :aria-label="`投票給 ${o.label}`" @click.stop="onTap(o)" />
+          <button type="button" class="focus-ring absolute left-1 top-1 z-10 grid size-6 place-items-center rounded-full bg-black/45 text-white transition hover:bg-black/70" aria-label="放大檢視圖片" @click.stop="openLightbox(o.data?.imageUrl ?? '')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+          </button>
+        </div>
       </div>
     </div>
 
     <div v-else-if="isImagePick" class="mt-4">
       <div class="grid grid-cols-2 gap-3">
-        <button
+        <div
           v-for="o in poll.options"
           :key="o.id"
-          type="button"
           class="focus-ring group relative aspect-square overflow-hidden rounded-lg border border-[#e0c9a0] bg-white text-left"
           :class="myVoteOptionId === o.id ? 'ring-2 ring-[#b0761f]' : ''"
-          @click.stop="goTopic"
         >
           <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
-          <span class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1.5 pt-5 text-[10px] font-black text-white">
+          <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1.5 pt-5 text-[10px] font-black text-white">
             <span class="flex items-center justify-between gap-1"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓</span>{{ o.label }}<span class="shrink-0 tabular-nums">{{ optionPercentage(o, poll) }}%</span></span>
           </span>
-          <span class="absolute inset-x-0 bottom-0 h-1 bg-white/20"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
-        </button>
+          <span class="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-white/20"><span class="block h-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, poll)}%` }" /></span>
+          <button type="button" class="focus-ring absolute inset-0" :aria-label="`查看 ${o.label}`" @click.stop="goTopic" />
+          <button type="button" class="focus-ring absolute left-1 top-1 z-10 grid size-6 place-items-center rounded-full bg-black/45 text-white transition hover:bg-black/70" aria-label="放大檢視圖片" @click.stop="openLightbox(o.data?.imageUrl ?? '')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -164,6 +171,9 @@ const voting = ref(false);
 const votingTargetId = ref<string | null>(null);
 const expanded = ref(false);
 const showAllOptions = ref(false);
+const lightboxSrc = ref<string | null>(null);
+
+function openLightbox(src: string) { lightboxSrc.value = src; }
 
 const isOpen = computed(() => poll.value.status === 'OPEN' && !!poll.value.voteEndAt && new Date(poll.value.voteEndAt).getTime() > Date.now());
 const isOptionPick = computed(() => isOptionPickType(poll.value.topicType) && poll.value.topicType !== 'SHORT_ANSWER');
