@@ -51,3 +51,28 @@ export interface MemberVotesResponse {
   items: MemberVote[];
   pagination: { page: number; limit: number; total: number; pages: number };
 }
+
+export interface ChannelProfile {
+  id: string;
+  nickname: string;
+  avatarUrl: string | null;
+  channelBio: string | null;
+  followerCount: number;
+  followingCount: number;
+  isFollowing?: boolean;
+  isSelf?: boolean;
+}
+
+export interface ChannelConnection {
+  user: {
+    id: string;
+    nickname: string;
+    avatarUrl: string | null;
+  };
+  createdAt: string;
+}
+
+export interface ChannelConnectionsResponse {
+  items: ChannelConnection[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+}

@@ -18,7 +18,7 @@ describe('AuthoringService stance drafts', () => {
     const client = { assertAvailable: jest.fn(), complete: jest.fn().mockResolvedValue(drafts) };
     const rateLimit = { consume: jest.fn() };
     const policy = { assertCanSubmitStanceApplication: jest.fn() };
-    const service = new AuthoringService(prisma as never, {} as never, client as never, rateLimit as never, policy as never, {} as never);
+    const service = new AuthoringService(prisma as never, {} as never, client as never, rateLimit as never, policy as never, {} as never, { assertCanInteract: jest.fn() } as never);
     return { service, prisma, client, rateLimit, policy };
   }
 

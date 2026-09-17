@@ -65,12 +65,36 @@ enum TopicApplicationStatus {
 enum TopicKind {
   FORMAL
   QUICK
+  SURVEY
+}
+
+enum TopicVisibility {
+  PUBLIC
+  PRIVATE_LINK
+}
+
+enum TopicAudience {
+  MEMBER_ONLY
+  FOLLOWERS_ONLY
 }
 
 enum TopicType {
   BINARY
   MULTIPLE
+  STAR_RATING
+  LIKERT_5
+  LIKERT_7
+  MULTI_SELECT
+  IMAGE_MULTIPLE
+  IMAGE_RANK
   SPECTRUM
+  SHORT_ANSWER
+  MATCHING
+  PUZZLE
+  SCRATCH
+  SPIN_WHEEL
+  LOTTERY
+  SURVEY
 }
 
 enum TopicStatus {
@@ -97,6 +121,7 @@ enum TopicContentBlockType {
 
 enum NotificationType {
   TOPIC_REVISION_APPROVED
+  CHANNEL_NEW_TOPIC
 }
 
 enum Gender {
@@ -386,6 +411,7 @@ model User {
   phoneNumber     String         @unique @map("phone_number")
   nickname        String
   avatarUrl       String?        @map("avatar_url")
+  channelBio      String?        @map("channel_bio")
   pointsBalance   BigInt         @default(0) @map("points_balance")
   isPhoneVerified Boolean        @default(false) @map("is_phone_verified")
   status          UserStatus     @default(ACTIVE)
@@ -395,11 +421,14 @@ model User {
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
   votes                      Vote[]
+  rankResults                TopicRankResult[]
   posts                      Post[]
   comments                   Comment[]
   likes                      Like[]
   pointTransactions          PointTransaction[]
   createdTopics              Topic[]                     @relation("TopicCreator")
+  audienceOwnedTopics        Topic[]                     @relation("TopicAudienceOwner")
+  topicShareGrants           TopicShareGrant[]
   reviewedTopics             Topic[]                     @relation("TopicReviewer")
   notifications              Notification[]
   demographicProfile         UserDemographicProfile?
@@ -410,6 +439,8 @@ model User {
   memeCollections            MemeCollection[]
   memeReports                MemeReport[]
   topicFollows               TopicFollow[]
+  channelFollows             ChannelFollow[]             @relation("ChannelFollowFollower")
+  channelFollowers           ChannelFollow[]             @relation("ChannelFollowOwner")
   createdStances             TopicStance[]               @relation("StanceCreator")
   stanceSignals              TopicStanceSignal[]
   stanceReports              TopicStanceReport[]
@@ -445,36 +476,48 @@ model Category {
 }
 
 model Topic {
-  id               BigInt                @id @default(autoincrement())
-  title            String
-  description      String?
-  category         String
-  categoryMeta     Category              @relation(fields: [category], references: [key])
-  featuredOrder    Int?                  @unique @map("featured_order")
-  kind             TopicKind             @default(FORMAL)
-  topicType        TopicType             @default(BINARY) @map("topic_type")
-  status           TopicStatus           @default(DRAFT)
-  moderationStatus TopicModerationStatus @default(APPROVED) @map("moderation_status")
-  creatorId        BigInt?               @map("creator_id")
-  creator          User?                 @relation("TopicCreator", fields: [creatorId], references: [id])
-  reviewedById     BigInt?               @map("reviewed_by_id")
-  reviewer         User?                 @relation("TopicReviewer", fields: [reviewedById], references: [id])
-  reviewedAt       DateTime?             @map("reviewed_at")
-  moderationNote   String?               @map("moderation_note")
-  voteDurationDays Int                   @default(7) @map("vote_duration_days")
-  voteDurationHours Int?                 @map("vote_duration_hours")
-  voteEndAt        DateTime?             @map("vote_end_at")
-  minVotes         Int?                  @map("min_votes")
-  totalVotes       BigInt                @default(0) @map("total_votes")
-  voterCount       BigInt                @default(0) @map("voter_count")
-  spectrumMedian   Decimal?              @map("spectrum_median") @db.Decimal(5, 2)
-  spectrumStddev   Decimal?              @map("spectrum_stddev") @db.Decimal(5, 2)
-  createdAt        DateTime              @default(now()) @map("created_at")
-  updatedAt        DateTime              @updatedAt @map("updated_at")
+  id                BigInt                @id @default(autoincrement())
+  title             String
+  description       String?
+  category          String
+  categoryMeta      Category              @relation(fields: [category], references: [key])
+  featuredOrder     Int?                  @unique @map("featured_order")
+  parentTopicId     BigInt?               @map("parent_topic_id")
+  parentTopic       Topic?                @relation("SurveyQuestions", fields: [parentTopicId], references: [id], onDelete: Cascade)
+  questions         Topic[]               @relation("SurveyQuestions")
+  sortOrder         Int                   @default(0) @map("sort_order")
+  kind              TopicKind             @default(FORMAL)
+  visibility        TopicVisibility       @default(PUBLIC)
+  audience          TopicAudience         @default(MEMBER_ONLY)
+  topicType         TopicType             @default(BINARY) @map("topic_type")
+  status            TopicStatus           @default(DRAFT)
+  moderationStatus  TopicModerationStatus @default(APPROVED) @map("moderation_status")
+  creatorId         BigInt?               @map("creator_id")
+  creator           User?                 @relation("TopicCreator", fields: [creatorId], references: [id])
+  audienceOwnerId   BigInt?               @map("audience_owner_id")
+  audienceOwner     User?                 @relation("TopicAudienceOwner", fields: [audienceOwnerId], references: [id], onDelete: SetNull)
+  reviewedById      BigInt?               @map("reviewed_by_id")
+  reviewer          User?                 @relation("TopicReviewer", fields: [reviewedById], references: [id])
+  reviewedAt        DateTime?             @map("reviewed_at")
+  moderationNote    String?               @map("moderation_note")
+  voteDurationDays  Int                   @default(7) @map("vote_duration_days")
+  voteDurationHours Int?                  @map("vote_duration_hours")
+  voteEndAt         DateTime?             @map("vote_end_at")
+  minVotes          Int?                  @map("min_votes")
+  scaleMinLabel     String?               @map("scale_min_label")
+  scaleMaxLabel     String?               @map("scale_max_label")
+  maxSelections     Int?                  @map("max_selections")
+  totalVotes        BigInt                @default(0) @map("total_votes")
+  voterCount        BigInt                @default(0) @map("voter_count")
+  spectrumMedian    Decimal?              @map("spectrum_median") @db.Decimal(5, 2)
+  spectrumStddev    Decimal?              @map("spectrum_stddev") @db.Decimal(5, 2)
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
 
   options            TopicOption[]
   contentBlocks      TopicContentBlock[]
   votes              Vote[]
+  rankResults        TopicRankResult[]
   posts              Post[]
   notifications      Notification[]
   demographicAudits  DemographicAnalysisAudit[]
@@ -483,12 +526,17 @@ model Topic {
   stanceApplications StanceApplication[]
   roleAssignments    RoleAssignment[]
   applicationResults TopicApplicationResult[]
+  shareLink          TopicShareLink?
+  shareGrants        TopicShareGrant[]
 
   @@index([status, voteEndAt])
   @@index([kind, status, voteEndAt])
   @@index([kind, createdAt(sort: Desc)])
+  @@index([parentTopicId, sortOrder])
   @@index([moderationStatus, createdAt(sort: Desc)])
   @@index([creatorId, createdAt(sort: Desc)])
+  @@index([audienceOwnerId, audience, createdAt(sort: Desc)])
+  @@index([visibility, status, voteEndAt])
   @@map("topics")
 }
 
@@ -562,6 +610,7 @@ model TopicApplication {
   options          Json?
   blocks           Json?
   voteDurationDays Int                           @default(7) @map("vote_duration_days")
+  audience         TopicAudience                 @default(MEMBER_ONLY)
   note             String?
   revisionNumber   Int                           @default(1) @map("revision_number")
   createdAt        DateTime                      @default(now()) @map("created_at")
@@ -589,6 +638,7 @@ model TopicApplicationRevision {
   options          Json?
   blocks           Json?
   voteDurationDays Int                    @map("vote_duration_days")
+  audience         TopicAudience          @default(MEMBER_ONLY)
   note             String?
   reviewNote       String?                @map("review_note")
   reviewedById     BigInt?                @map("reviewed_by_id")
@@ -624,6 +674,46 @@ model TopicFollow {
   @@id([userId, topicId])
   @@index([topicId, createdAt(sort: Desc)])
   @@map("topic_follows")
+}
+
+model TopicShareLink {
+  id        BigInt   @id @default(autoincrement())
+  topicId   BigInt   @unique @map("topic_id")
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique @map("token_hash")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  grants TopicShareGrant[]
+
+  @@map("topic_share_links")
+}
+
+model TopicShareGrant {
+  shareLinkId BigInt         @map("share_link_id")
+  shareLink   TopicShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  topicId     BigInt         @map("topic_id")
+  topic       Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  userId      BigInt         @map("user_id")
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@id([shareLinkId, userId])
+  @@index([topicId, userId])
+  @@map("topic_share_grants")
+}
+
+model ChannelFollow {
+  followingId    BigInt   @map("following_id")
+  following      User     @relation("ChannelFollowFollower", fields: [followingId], references: [id], onDelete: Cascade)
+  channelOwnerId BigInt   @map("channel_owner_id")
+  channelOwner   User     @relation("ChannelFollowOwner", fields: [channelOwnerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@id([followingId, channelOwnerId])
+  @@index([channelOwnerId, createdAt(sort: Desc)])
+  @@map("channel_follows")
 }
 
 model TopicStance {
@@ -880,10 +970,12 @@ model TopicOption {
   topicId   BigInt   @map("topic_id")
   topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   label     String
+  data      Json?    @map("data")
   voteCount BigInt   @default(0) @map("vote_count")
   createdAt DateTime @default(now()) @map("created_at")
 
-  votes Vote[]
+  votes          Vote[]
+  voteSelections VoteSelection[]
 
   @@index([topicId])
   @@map("topic_options")
@@ -898,8 +990,10 @@ model Vote {
   optionId            BigInt?                  @map("option_id")
   option              TopicOption?             @relation(fields: [optionId], references: [id])
   spectrumValue       Int?                     @map("spectrum_value")
+  answerText          String?                  @map("answer_text")
   createdAt           DateTime                 @default(now()) @map("created_at")
   demographicSnapshot VoteDemographicSnapshot?
+  selections          VoteSelection[]
 
   @@unique([userId, topicId])
   @@index([topicId, userId])
@@ -907,19 +1001,47 @@ model Vote {
   @@map("votes")
 }
 
+model VoteSelection {
+  voteId    BigInt      @map("vote_id")
+  vote      Vote        @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  optionId  BigInt      @map("option_id")
+  option    TopicOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@id([voteId, optionId])
+  @@index([optionId])
+  @@map("vote_selections")
+}
+
+model TopicRankResult {
+  id          BigInt   @id @default(autoincrement())
+  userId      BigInt   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  topicId     BigInt   @map("topic_id")
+  topic       Topic    @relation(fields: [topicId], references: [id])
+  ranking     Json     @map("ranking")
+  comparisons Int      @default(0) @map("comparisons")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, topicId])
+  @@index([topicId])
+  @@map("topic_rank_results")
+}
+
 model PointTransaction {
-  id             BigInt      @id @default(autoincrement())
-  userId         BigInt      @map("user_id")
-  user           User        @relation(fields: [userId], references: [id])
+  id             BigInt               @id @default(autoincrement())
+  userId         BigInt               @map("user_id")
+  user           User                 @relation(fields: [userId], references: [id])
   amount         BigInt
-  balanceBefore  BigInt      @map("balance_before")
-  balanceAfter   BigInt      @map("balance_after")
+  balanceBefore  BigInt               @map("balance_before")
+  balanceAfter   BigInt               @map("balance_after")
   txType         PointTxType          @map("tx_type")
   referenceType  PointTxReferenceType @map("reference_type")
   referenceId    String               @map("reference_id")
-  idempotencyKey String      @unique @map("idempotency_key")
+  idempotencyKey String               @unique @map("idempotency_key")
   note           String?
-  createdAt      DateTime    @default(now()) @map("created_at")
+  createdAt      DateTime             @default(now()) @map("created_at")
 
   memeUsageReward MemeUsageEvent?
 

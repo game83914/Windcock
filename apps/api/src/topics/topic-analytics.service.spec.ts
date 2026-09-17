@@ -31,7 +31,7 @@ describe('TopicAnalyticsService', () => {
       voteDemographicSnapshot: { count: jest.fn().mockResolvedValue(12) },
     };
     const policy = analyticsPolicy(false);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     await expect(service.access(1n, null)).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -49,7 +49,7 @@ describe('TopicAnalyticsService', () => {
       vote: { findMany: jest.fn().mockResolvedValue(votes) },
     };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     const result = await service.trends(1n, 9n);
     expect(result.options).toEqual([
@@ -69,7 +69,7 @@ describe('TopicAnalyticsService', () => {
       voteDemographicSnapshot: { count: jest.fn().mockResolvedValue(30) },
     };
     const policy = analyticsPolicy(false);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     await expect(service.access(1n, 2n)).rejects.toBeInstanceOf(HttpException);
   });
@@ -87,7 +87,7 @@ describe('TopicAnalyticsService', () => {
       demographicAnalysisAudit: { create: jest.fn().mockResolvedValue({}) },
     };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     const result = await service.demographics(1n, 9n, 'AGE_BAND');
     expect(result.suppressed).toBe(true);
@@ -107,7 +107,7 @@ describe('TopicAnalyticsService', () => {
       demographicAnalysisAudit: { create: jest.fn().mockResolvedValue({}) },
     };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     const result = await service.demographics(1n, 9n, 'PERSONALITY_TYPE');
     expect(result.available).toBe(false);
@@ -124,7 +124,7 @@ describe('TopicAnalyticsService', () => {
       demographicAnalysisAudit: { create: jest.fn().mockResolvedValue({}) },
     };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     const result = await service.demographics(1n, 9n, 'DISTRICT');
     expect(result.available).toBe(false);
@@ -139,7 +139,7 @@ describe('TopicAnalyticsService', () => {
       demographicAnalysisAudit: { create },
     };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     await service.demographics(1n, 9n, 'AGE_BAND');
 
@@ -157,7 +157,7 @@ describe('TopicAnalyticsService', () => {
       ] }],
     }) };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, stances as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, stances as never, policy as never, { assertCanView: jest.fn() } as never);
 
     const result = await service.stanceInsights(1n, 9n);
 
@@ -169,7 +169,7 @@ describe('TopicAnalyticsService', () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const prisma = { topic: { findMany } };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     await expect(service.comparison(9n, [1n, 2n], 'AGE_BAND')).rejects.toBeInstanceOf(NotFoundException);
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
@@ -180,7 +180,7 @@ describe('TopicAnalyticsService', () => {
   it('does not expose analytics for a draft topic', async () => {
     const prisma = { topic: { findUnique: jest.fn().mockResolvedValue({ ...topic, moderationStatus: 'PENDING' }) } };
     const policy = analyticsPolicy(true);
-    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never);
+    const service = new TopicAnalyticsService(prisma as never, {} as never, policy as never, { assertCanView: jest.fn() } as never);
 
     await expect(service.trends(1n, 9n)).rejects.toBeInstanceOf(NotFoundException);
   });

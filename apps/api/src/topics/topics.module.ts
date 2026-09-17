@@ -12,11 +12,12 @@ import { EditorialTopicsController } from './editorial-topics.controller';
 import { TopicAnalyticsService } from './topic-analytics.service';
 import { AnalyticsController } from './analytics.controller';
 import { CategoriesModule } from '../categories/categories.module';
+import { TopicAccessModule } from './topic-access.module';
 
 @Module({
-  imports: [AuthModule, DemographicProfilesModule, IdentityModule, CategoriesModule],
+  imports: [AuthModule, DemographicProfilesModule, IdentityModule, CategoriesModule, TopicAccessModule],
   controllers: [TopicsController, MyTopicsController, AdminTopicsController, EditorialTopicsController, StancesController, AdminStancesController, AnalyticsController],
   providers: [TopicsService, StancesService, TopicAnalyticsService],
-  exports: [TopicsService, TopicAnalyticsService],
+  exports: [TopicsService, TopicAnalyticsService, TopicAccessModule],
 })
 export class TopicsModule {}

@@ -1,23 +1,25 @@
 <template>
   <div class="mx-auto max-w-6xl pb-12">
-    <div class="mb-8 border-b-2 border-[#171717] pb-6">
-      <h1 class="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">{{ editingId ? '編輯議題' : auth.canAuthorTopics ? '建立正式議題' : '提出議題提案' }}</h1>
+    <UiImageLightbox v-model:src="lightboxSrc" />
+    <div class="mb-8 border-b border-[#ded7cb] pb-6">
+      <p class="eyebrow-modern text-[#d84a36]">{{ editingId ? '內容複核' : auth.canAuthorTopics ? '議題小組工具' : '會員發起' }}</p>
+      <h1 class="mt-1 text-3xl font-black tracking-[-0.04em] sm:text-4xl">{{ editingId ? '編輯議題' : auth.canAuthorTopics ? '建立正式議題' : '提出議題提案' }}</h1>
       <p class="mt-2 max-w-2xl text-sm leading-6 text-[#6d6861]">{{ auth.canAuthorTopics ? '議題小組可整理內容並直接公開；所有發布都會留下操作紀錄。' : '資深會員或合作組織可提出構想，由議題小組整理成正式議題。' }}</p>
     </div>
 
-    <div v-if="savedTopic" class="border-2 border-[#171717] bg-[#faf8f3] p-8 text-center sm:p-12">
+    <div v-if="savedTopic" class="surface-card p-8 text-center sm:p-12">
       <h2 class="mt-3 text-2xl font-black">{{ editingId ? '修改已儲存' : auth.canAuthorTopics ? '議題已公開' : '議題提案已送出' }}</h2>
       <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6d6861]">{{ auth.canAuthorTopics ? '議題已進入公開列表並開始計算投票期限。' : '議題小組會查看內容，需要補充時可在提案紀錄追蹤。' }}</p>
-      <NuxtLink to="/me/topics" class="focus-ring mt-7 inline-block bg-[#171717] px-6 py-3 text-sm font-bold text-white">查看我的議題</NuxtLink>
+      <UiButton :to="'/me/topics'" class="mt-7">查看我的議題</UiButton>
     </div>
 
-    <div v-else-if="loading" class="h-96 animate-pulse bg-[#e5e0d6]" />
+    <div v-else-if="loading" class="h-96 animate-pulse rounded-2xl bg-[#e5e0d6]" />
 
-    <div v-else-if="!canSubmit" class="border-2 border-[#171717] bg-[#faf8f3] p-6 sm:p-8">
-      <p class="eyebrow text-[#d84a36]">新進會員</p>
+    <div v-else-if="!canSubmit" class="surface-card p-6 sm:p-8">
+      <p class="eyebrow-modern text-[#d84a36]">新進會員</p>
       <h2 class="mt-2 text-xl font-black">達成資深會員資格後即可提出議題</h2>
       <p class="mt-3 text-sm leading-6 text-[#6d6861]">帳號需滿 30 天，並在至少 10 個不同議題完成投票。目前為 {{ eligibility?.accountAgeDays ?? 0 }} 天、{{ eligibility?.distinctTopicsVoted ?? 0 }} 個議題。</p>
-      <NuxtLink to="/" class="focus-ring mt-5 inline-block bg-[#171717] px-5 py-3 text-sm font-black text-white">探索可投票議題</NuxtLink>
+      <UiButton :to="'/'" class="mt-5">探索可投票議題</UiButton>
     </div>
 
     <div v-else class="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
@@ -27,82 +29,94 @@
           :categories="categories"
           @applied="onApplyImport"
         />
-        <section v-if="!auth.canAuthorTopics && partnerOrganizations.length" class="border border-[#d7d1c6] bg-[#faf8f3] p-5 sm:p-7">
-          <p class="eyebrow text-[#77716a]">提案身份</p>
-          <select v-model="selectedOrganizationId" class="focus-ring mt-3 min-h-11 w-full border border-[#bfb8ad] bg-white px-3 text-sm">
+        <section v-if="!auth.canAuthorTopics && partnerOrganizations.length" class="surface-card p-5 sm:p-7">
+          <p class="eyebrow-modern text-[#77716a]">提案身份</p>
+          <select v-model="selectedOrganizationId" class="field-input mt-3 !py-2.5">
             <option value="" :disabled="auth.capabilitySummary?.membershipTier !== 'SENIOR'">以資深會員身份提案</option>
             <option v-for="organization in partnerOrganizations" :key="organization.id" :value="organization.id">代表 {{ organization.name }}</option>
           </select>
         </section>
-        <section class="border border-[#d7d1c6] bg-[#faf8f3] p-5 sm:p-7">
-          <p class="eyebrow text-[#77716a]">01 / 投票問題</p>
+        <section class="surface-card p-5 sm:p-7">
+          <p class="eyebrow-modern text-[#77716a]">01 / 投票問題</p>
           <div class="mt-6 space-y-5">
             <label class="block">
               <span class="mb-2 flex justify-between text-sm font-bold"><span>議題標題</span><span class="font-normal text-[#8b857d]">{{ title.length }} / 100</span></span>
-              <input v-model.trim="title" data-field="title" maxlength="100" placeholder="例如：你支持台灣企業試辦週休三日嗎？" class="focus-ring w-full border bg-white px-4 py-3 text-sm" :class="fieldErrors.title ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
+              <input v-model.trim="title" :data-field="'title'" maxlength="100" placeholder="例如：你支持台灣企業試辦週休三日嗎？" class="field-input" :class="{ 'field-input-error': fieldErrors.title }" />
               <p v-if="fieldErrors.title" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors.title }}</p>
             </label>
             <label class="block">
               <span class="mb-2 flex justify-between text-sm font-bold"><span>一句話說明 <small class="font-normal text-[#8b857d]">（選填）</small></span><span class="font-normal text-[#8b857d]">{{ description.length }} / 2000</span></span>
-              <textarea v-model.trim="description" data-field="description" maxlength="2000" rows="3" placeholder="若題目本身已足夠清楚，可以留空。" class="focus-ring w-full resize-y border bg-white px-4 py-3 text-sm leading-6" :class="fieldErrors.description ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
+              <textarea v-model.trim="description" :data-field="'description'" maxlength="2000" rows="3" placeholder="若題目本身已足夠清楚，可以留空。" class="field-input resize-y leading-6" :class="{ 'field-input-error': fieldErrors.description }" />
               <p v-if="fieldErrors.description" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors.description }}</p>
             </label>
           </div>
         </section>
 
-        <section class="border border-[#d7d1c6] bg-[#faf8f3] p-5 sm:p-7">
-          <p class="eyebrow text-[#77716a]">02 / 投票設定</p>
+        <section class="surface-card p-5 sm:p-7">
+          <p class="eyebrow-modern text-[#77716a]">02 / 投票設定</p>
           <div class="mt-6">
             <span class="mb-2 block text-sm font-bold">議題分類</span>
             <div class="flex flex-wrap gap-2">
-              <button v-for="item in categories" :key="item.key" type="button" class="focus-ring flex items-center gap-2 border px-4 py-2 text-sm font-bold" :class="category === item.key ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-white'" @click="category = item.key"><span class="inline-block h-2 w-2 rounded-full" :style="{ backgroundColor: getCategoryMeta(item.key).color }" />{{ getCategoryMeta(item.key).label }}</button>
+              <button v-for="item in categories" :key="item.key" type="button" class="focus-ring flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition" :class="category === item.key ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-white hover:border-[#171717]'" @click="category = item.key"><span class="inline-block h-2 w-2 rounded-full" :style="{ backgroundColor: getCategoryMeta(item.key).color }" />{{ getCategoryMeta(item.key).label }}</button>
             </div>
           </div>
-          <div class="mt-6 grid gap-3 sm:grid-cols-3">
-            <button v-for="item in topicTypes" :key="item.value" type="button" class="focus-ring border p-4 text-left" :class="topicType === item.value ? 'border-[#d84a36] bg-[#fbe9e5]' : 'border-[#cfc8bc] bg-white'" @click="topicType = item.value">
+          <div class="mt-6 grid gap-3 sm:grid-cols-4">
+            <button v-for="item in topicTypes" :key="item.value" type="button" class="focus-ring rounded-2xl border-2 p-4 text-left transition" :class="topicType === item.value ? 'border-[#d84a36] bg-[#fbe9e5]' : 'border-[#ded7cb] bg-white hover:border-[#d84a36]'" @click="topicType = item.value">
               <strong class="block text-sm">{{ item.label }}</strong>
               <span class="mt-1 block text-xs leading-5 text-[#77716a]">{{ item.description }}</span>
             </button>
           </div>
-          <div v-if="topicType !== 'SPECTRUM'" class="mt-6 border-t border-[#ded8cd] pt-5">
+          <div v-if="topicType !== 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-5">
             <div class="flex items-center justify-between">
-              <span class="text-sm font-bold">投票選項</span>
-              <button v-if="topicType === 'MULTIPLE' && options.length < 6" type="button" class="focus-ring text-xs font-bold text-[#d84a36]" @click="options.push('')">＋ 新增選項</button>
+              <span class="text-sm font-bold">{{ topicType === 'IMAGE_MULTIPLE' ? '圖片選項' : '投票選項' }}</span>
+              <button v-if="topicType !== 'BINARY' && options.length < 6" type="button" class="focus-ring rounded-full text-xs font-bold text-[#d84a36] hover:underline" @click="addOption">＋ 新增{{ topicType === 'IMAGE_MULTIPLE' ? '圖片' : '選項' }}</button>
             </div>
-            <div class="mt-3 space-y-3">
-              <div v-for="(_, index) in options" :key="index" class="flex items-center gap-3">
-                <span class="grid h-8 w-8 shrink-0 place-items-center bg-[#ebe6dc] text-xs font-black">{{ index + 1 }}</span>
-                <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="`選項 ${index + 1}`" class="focus-ring min-w-0 flex-1 border bg-white px-4 py-3 text-sm" :class="fieldErrors[`option-${index}`] ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
-                <button v-if="topicType === 'MULTIPLE' && options.length > 2" type="button" class="focus-ring px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="options.splice(index, 1)">&times;</button>
+            <div ref="optionsEl" class="mt-3 space-y-3">
+              <div v-for="(_, index) in options" :key="optionIds[index]">
+                <div class="flex items-center gap-3">
+                  <span data-drag-handle class="grid h-8 w-8 shrink-0 cursor-grab place-items-center rounded-full bg-[#f8e3de] text-xs font-black text-[#a63222] active:cursor-grabbing" title="拖曳以排序" aria-label="拖曳以排序">{{ index + 1 }}</span>
+                  <TopicsOptionImageInput v-if="topicType === 'IMAGE_MULTIPLE'" v-model="optionImages[index]" @preview="lightboxSrc = $event" />
+                  <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="topicType === 'IMAGE_MULTIPLE' ? `圖片 ${index + 1} 的說明（選填）` : `選項 ${index + 1}`" class="flex-1 field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
+                  <button v-if="topicType !== 'BINARY' && options.length > 2" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="removeOption(index)">&times;</button>
+                </div>
+                <p v-if="fieldErrors[`option-${index}`]" class="mt-2 pl-11 text-xs font-bold text-[#a63222]">{{ fieldErrors[`option-${index}`] }}</p>
               </div>
             </div>
           </div>
-          <div class="mt-6 border-t border-[#ded8cd] pt-5">
+          <div class="mt-6 border-t border-[#f0e6d2] pt-5">
             <span class="mb-2 block text-sm font-bold">核准後開放投票</span>
             <div class="flex flex-wrap gap-2">
-              <button v-for="days in durations" :key="days" type="button" class="focus-ring border px-4 py-2.5 text-sm font-bold" :class="voteDurationDays === days ? 'border-[#3157d5] bg-[#e7ecff] text-[#3157d5]' : 'border-[#cfc8bc] bg-white'" @click="voteDurationDays = days">{{ days }} 天</button>
+              <button v-for="days in durations" :key="days" type="button" class="focus-ring rounded-full border px-4 py-2.5 text-sm font-bold transition" :class="voteDurationDays === days ? 'border-[#3157d5] bg-[#3157d5] text-white' : 'border-[#cfc8bc] bg-white hover:border-[#3157d5]'" @click="voteDurationDays = days">{{ days }} 天</button>
             </div>
+          </div>
+          <div class="mt-6 border-t border-[#f0e6d2] pt-5">
+            <span class="mb-2 block text-sm font-bold">查看與參與資格</span>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <button type="button" class="focus-ring rounded-xl border p-3 text-left" :class="audience === 'MEMBER_ONLY' ? 'border-[#3157d5] bg-[#eef1fb]' : 'border-[#cfc8bc] bg-white'" @click="audience = 'MEMBER_ONLY'"><strong class="block text-sm">所有會員</strong><span class="mt-1 block text-xs text-[#77716a]">內容公開，登入會員可參與。</span></button>
+              <button type="button" class="focus-ring rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-40" :disabled="!canUseFollowersAudience" :class="audience === 'FOLLOWERS_ONLY' ? 'border-[#3157d5] bg-[#eef1fb]' : 'border-[#cfc8bc] bg-white'" @click="audience = 'FOLLOWERS_ONLY'"><strong class="block text-sm">僅限追蹤者</strong><span class="mt-1 block text-xs text-[#77716a]">只有目前追蹤你頻道的會員能查看與互動。</span></button>
+            </div>
+            <p v-if="!canUseFollowersAudience" class="mt-2 text-xs text-[#77716a]">組織或議題小組發布的內容沒有個人頻道追蹤者，因此只能選所有會員。</p>
           </div>
         </section>
 
-        <section class="border border-[#d7d1c6] bg-[#faf8f3] p-5 sm:p-7">
+        <section class="surface-card p-5 sm:p-7">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <p class="eyebrow text-[#77716a]">03 / 補充內容 <span class="normal-case tracking-normal">（選填）</span></p>
+              <p class="eyebrow-modern text-[#77716a]">03 / 補充內容 <span class="normal-case tracking-normal">（選填）</span></p>
               <h2 class="mt-2 text-lg font-black">需要時才新增模組</h2>
               <p class="mt-1 text-xs leading-5 text-[#77716a]">簡單議題可以直接略過；所有補充內容都會納入複核。</p>
             </div>
             <span class="shrink-0 text-xs text-[#8b857d]">{{ blocks.length }} / 8</span>
           </div>
           <details v-if="blocks.length < 8" ref="blockMenu" class="relative mt-5">
-            <summary class="focus-ring flex min-h-11 w-full cursor-pointer list-none items-center justify-between border border-[#171717] bg-white px-4 py-3 text-sm font-black marker:hidden sm:w-72">
+            <summary class="focus-ring flex min-h-11 w-full cursor-pointer list-none items-center justify-between rounded-xl border-2 border-[#d84a36] bg-white px-4 py-3 text-sm font-black marker:hidden sm:w-72">
               <span>＋ 新增補充內容</span>
               <span aria-hidden="true">⌄</span>
             </summary>
-            <div class="absolute left-0 z-20 mt-1 w-full border-2 border-[#171717] bg-white p-2 shadow-[4px_4px_0_#171717] sm:w-80">
+            <div class="absolute left-0 z-20 mt-1 w-full rounded-2xl border border-[#ded7cb] bg-white p-2 shadow-[0_12px_32px_rgba(23,23,23,0.14)] sm:w-80">
               <div v-for="group in blockGroups" :key="group.label" class="py-1">
                 <p class="px-3 py-1 text-[10px] font-black tracking-[0.14em] text-[#8b857d]">{{ group.label }}</p>
-                <button v-for="item in group.items" :key="item.type" type="button" class="focus-ring flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-[#f1eee7]" @click="addBlock(item.type)">
+                <button v-for="item in group.items" :key="item.type" type="button" class="focus-ring flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-[#f1eee7]" @click="addBlock(item.type)">
                   <strong class="min-w-20 text-sm">{{ item.label }}</strong>
                   <span class="text-xs leading-5 text-[#77716a]">{{ item.short }}</span>
                 </button>
@@ -111,57 +125,52 @@
           </details>
 
           <div v-if="blocks.length" class="mt-5 space-y-3">
-            <article v-for="(item, index) in blocks" :key="item.key" class="border border-[#cfc8bc] bg-white">
+            <article v-for="(item, index) in blocks" :key="item.key" class="rounded-2xl border border-[#ded7cb] bg-white">
               <header class="flex items-center gap-3 px-4 py-3">
-                <span class="grid h-7 w-7 place-items-center text-xs font-black text-white" :style="{ backgroundColor: blockMeta(item.type).color }">{{ index + 1 }}</span>
-                <button type="button" class="focus-ring min-w-0 flex-1 text-left" @click="item.expanded = !item.expanded">
+                <span class="grid h-7 w-7 place-items-center rounded-full text-xs font-black text-white" :style="{ backgroundColor: blockMeta(item.type).color }">{{ index + 1 }}</span>
+                <button type="button" class="focus-ring min-w-0 flex-1 rounded-lg text-left" @click="item.expanded = !item.expanded">
                   <strong class="block text-sm">{{ blockMeta(item.type).label }}</strong>
                   <span class="block truncate text-xs text-[#77716a]">{{ item.title || '尚未填寫標題' }}</span>
                 </button>
-                <button type="button" class="focus-ring text-xs text-[#77716a]" :aria-label="item.expanded ? '收合' : '展開'" @click="item.expanded = !item.expanded">{{ item.expanded ? '收合' : '編輯' }}</button>
-                <button type="button" class="focus-ring text-lg text-[#a63222]" aria-label="移除模組" @click="blocks.splice(index, 1)">&times;</button>
+                <button type="button" class="focus-ring rounded-full text-xs text-[#77716a]" :aria-label="item.expanded ? '收合' : '展開'" @click="item.expanded = !item.expanded">{{ item.expanded ? '收合' : '編輯' }}</button>
+                <button type="button" class="focus-ring rounded-full px-1.5 text-lg text-[#a63222]" aria-label="移除模組" @click="blocks.splice(index, 1)">&times;</button>
               </header>
-              <div v-if="item.expanded" class="space-y-4 border-t border-[#ded8cd] bg-[#f8f6f1] p-4">
+              <div v-if="item.expanded" class="space-y-4 border-t border-[#f0e6d2] bg-[#faf8f3] p-4">
                 <label class="block">
                   <span class="mb-2 block text-xs font-bold">{{ blockMeta(item.type).titleLabel }}</span>
-                  <input v-model.trim="item.title" :data-field="`block-${index}-title`" maxlength="120" :placeholder="blockMeta(item.type).titlePlaceholder" class="focus-ring w-full border bg-white px-4 py-3 text-sm" :class="fieldErrors[`block-${index}-title`] ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
+                  <input v-model.trim="item.title" :data-field="`block-${index}-title`" maxlength="120" :placeholder="blockMeta(item.type).titlePlaceholder" class="field-input" :class="{ 'field-input-error': fieldErrors[`block-${index}-title`] }" />
                   <p v-if="fieldErrors[`block-${index}-title`]" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors[`block-${index}-title`] }}</p>
                 </label>
                 <label class="block">
                   <span class="mb-2 block text-xs font-bold">{{ blockMeta(item.type).contentLabel }}</span>
-                  <textarea v-model.trim="item.content" :data-field="`block-${index}-content`" maxlength="2000" rows="4" :placeholder="blockMeta(item.type).contentPlaceholder" class="focus-ring w-full resize-y border bg-white px-4 py-3 text-sm leading-6" :class="fieldErrors[`block-${index}-content`] ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
+                  <textarea v-model.trim="item.content" :data-field="`block-${index}-content`" maxlength="2000" rows="4" :placeholder="blockMeta(item.type).contentPlaceholder" class="field-input resize-y leading-6" :class="{ 'field-input-error': fieldErrors[`block-${index}-content`] }" />
                   <p v-if="fieldErrors[`block-${index}-content`]" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors[`block-${index}-content`] }}</p>
                 </label>
                 <div class="grid gap-4 sm:grid-cols-2">
                   <label class="block">
                     <span class="mb-2 block text-xs font-bold">資料來源名稱</span>
-                    <input v-model.trim="item.sourceLabel" maxlength="100" placeholder="例如：中央選舉委員會" class="focus-ring w-full border border-[#bfb8ad] bg-white px-4 py-3 text-sm" />
+                    <input v-model.trim="item.sourceLabel" maxlength="100" placeholder="例如：中央選舉委員會" class="field-input" />
                   </label>
                   <label v-if="item.type === 'CASE'" class="block">
                     <span class="mb-2 block text-xs font-bold">案例日期</span>
-                    <input v-model="item.occurredAt" type="date" class="focus-ring w-full border border-[#bfb8ad] bg-white px-4 py-3 text-sm" />
+                    <input v-model="item.occurredAt" type="date" class="field-input" />
                   </label>
                 </div>
                 <label class="block">
                   <span class="mb-2 block text-xs font-bold">來源網址 {{ item.type === 'SOURCE' ? '（必填）' : '（選填）' }}</span>
-                  <input v-model.trim="item.sourceUrl" type="url" :data-field="`block-${index}-source-url`" maxlength="500" placeholder="https://" class="focus-ring w-full border bg-white px-4 py-3 text-sm" :class="fieldErrors[`block-${index}-source-url`] ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
+                  <input v-model.trim="item.sourceUrl" type="url" :data-field="`block-${index}-source-url`" maxlength="500" placeholder="https://" class="field-input" :class="{ 'field-input-error': fieldErrors[`block-${index}-source-url`] }" />
                   <p v-if="fieldErrors[`block-${index}-source-url`]" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors[`block-${index}-source-url`] }}</p>
                 </label>
                 <div class="flex justify-end gap-3 text-xs font-bold">
-                  <button type="button" :disabled="index === 0" class="focus-ring disabled:opacity-30" @click="moveBlock(index, -1)">向上</button>
-                  <button type="button" :disabled="index === blocks.length - 1" class="focus-ring disabled:opacity-30" @click="moveBlock(index, 1)">向下</button>
+                  <button type="button" :disabled="index === 0" class="focus-ring rounded-full disabled:opacity-30" @click="moveBlock(index, -1)">向上</button>
+                  <button type="button" :disabled="index === blocks.length - 1" class="focus-ring rounded-full disabled:opacity-30" @click="moveBlock(index, 1)">向下</button>
                 </div>
               </div>
             </article>
           </div>
         </section>
 
-        <label class="flex cursor-pointer items-start gap-3 border border-[#d7d1c6] bg-[#ebe6dc] p-5 text-sm leading-6">
-          <input v-model="agreed" type="checkbox" class="mt-1 h-4 w-4 accent-[#d84a36]" />
-          <span>我確認內容為善意公共討論，未涉及誹謗、個人資料、違法內容或未經證實的指控，並同意平台在核准後公開。</span>
-        </label>
-
-        <p v-if="formError" class="border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm text-[#a63222]">{{ formError }}</p>
+        <p v-if="formError" class="rounded-2xl border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm text-[#a63222]">{{ formError }}</p>
         <AiAuthoringWizard
           target="TOPIC"
           :form-context="{ title, description, category, topicType, options, voteDurationDays }"
@@ -169,13 +178,13 @@
           @apply="applyAiTopicDraft"
         />
         <template v-if="importMode">
-          <div v-if="importedStances.length" class="border border-[#d7d1c6] bg-[#faf8f3] p-4">
-            <p class="eyebrow text-[#77716a]">立場樹（由 JSON 帶入，建立時一併送出）</p>
+          <div v-if="importedStances.length" class="surface-card p-4">
+            <p class="eyebrow-modern text-[#77716a]">立場樹（由 JSON 帶入，建立時一併送出）</p>
             <ul class="mt-3 space-y-2">
               <li v-for="(stance, index) in importedStances" :key="index" class="text-sm">
                 <span class="font-bold">{{ stance.title }}</span>
                 <p v-if="stance.rationale" class="mt-0.5 text-xs leading-5 text-[#77716a]">{{ stance.rationale }}</p>
-                <ul v-if="stance.children?.length" class="mt-2 space-y-2 border-l-2 border-[#ded8cd] pl-4">
+                <ul v-if="stance.children?.length" class="mt-2 space-y-2 border-l-2 border-[#f0e6d2] pl-4">
                   <li v-for="(child, childIndex) in stance.children" :key="childIndex" class="text-sm">
                     <span class="font-bold">{{ child.title }}</span>
                     <p v-if="child.rationale" class="mt-0.5 text-xs leading-5 text-[#77716a]">{{ child.rationale }}</p>
@@ -186,39 +195,39 @@
             <p class="mt-3 text-xs text-[#8b857d]">立場直接沿用上方 JSON 內容；如需調整請回到生成器重新匯入。</p>
           </div>
           <div class="grid gap-3 sm:grid-cols-2">
-            <button type="submit" class="focus-ring bg-[#3157d5] px-6 py-4 text-sm font-black text-white hover:bg-[#171717] disabled:cursor-not-allowed disabled:opacity-50" :disabled="submitting || !agreed" @click.prevent="submitImport(false)">
+            <UiButton type="button" variant="data" block size="lg" :disabled="submitting" @click="submitImport(false)">
               {{ submitting ? '儲存中…' : '建立草稿（含立場）' }}
-            </button>
-            <button type="submit" class="focus-ring bg-[#d84a36] px-6 py-4 text-sm font-black text-white hover:bg-[#171717] disabled:cursor-not-allowed disabled:opacity-50" :disabled="submitting || !agreed" @click.prevent="submitImport(true)">
+            </UiButton>
+            <UiButton type="button" variant="action" block size="lg" :disabled="submitting" @click="submitImport(true)">
               {{ submitting ? '儲存中…' : '建立並公開（含立場）' }}
-            </button>
+            </UiButton>
           </div>
           <p class="text-center text-xs text-[#77716a]">建立草稿後可再由「直接公開」發布；建立並公開會立刻開票。</p>
         </template>
-        <button v-else type="submit" class="focus-ring w-full bg-[#d84a36] px-6 py-4 text-sm font-black text-white hover:bg-[#171717] disabled:cursor-not-allowed disabled:opacity-50" :disabled="submitting || !agreed">
+        <UiButton v-else type="submit" variant="action" block size="lg" :disabled="submitting">
           {{ submitting ? '儲存中…' : editingId ? '儲存內容' : auth.canAuthorTopics ? '直接公開議題' : '送出議題提案' }}
-        </button>
+        </UiButton>
       </form>
 
       <aside class="lg:sticky lg:top-28 lg:self-start">
-        <p class="eyebrow mb-3 text-[#77716a]">議題預覽</p>
-        <div class="border-t-4 bg-[#171717] p-6 text-white" :style="{ borderColor: getCategoryMeta(category).color }">
+        <p class="eyebrow-modern mb-3 text-[#77716a]">議題預覽</p>
+        <div class="overflow-hidden rounded-2xl border-t-4 bg-[#171717] p-6 text-white" :style="{ borderColor: getCategoryMeta(category).color }">
           <div class="flex items-center justify-between text-xs"><span class="font-bold">{{ getCategoryMeta(category).label }}</span><span class="text-white/45">待複核 · 尚未開票</span></div>
           <h2 class="mt-6 text-2xl font-black leading-snug">{{ title || '你的議題標題會顯示在這裡' }}</h2>
           <p v-if="description" class="mt-3 text-sm leading-6 text-white/55">{{ description }}</p>
           <div v-if="blocks.length" class="mt-6 flex flex-wrap gap-2 border-t border-white/15 pt-4">
-            <span v-for="item in blocks" :key="item.key" class="border border-white/20 px-2 py-1 text-[10px] text-white/65">{{ blockMeta(item.type).label }}</span>
+            <span v-for="item in blocks" :key="item.key" class="rounded-full border border-white/20 px-2.5 py-1 text-[10px] text-white/65">{{ blockMeta(item.type).label }}</span>
           </div>
           <p class="mt-7 border-t border-white/15 pt-4 text-xs text-white/45">核准後開放 {{ voteDurationDays }} 天 · 會員發起</p>
         </div>
-        <div class="mt-4 border border-[#d7d1c6] bg-[#faf8f3] p-5 text-xs leading-6 text-[#6d6861]">待複核期間只有你與管理員看得到，也可以繼續修改。核准開票後，內容即不可直接覆蓋。</div>
+        <div class="mt-4 surface-card p-5 text-xs leading-6 text-[#6d6861]">待複核期間只有你與管理員看得到，也可以繼續修改。核准開票後，內容即不可直接覆蓋。</div>
       </aside>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { Category, Topic, TopicContentBlockType, TopicImportPayload, TopicImportStance } from '~/types/topic';
+import type { Category, Topic, TopicAudience, TopicContentBlockType, TopicImportPayload, TopicImportStance } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
 import { applyCategoryRules, getCategoryMeta } from '~/utils/topic';
 import type { StanceAuthoringForm, TopicAuthoringForm } from '~/types/authoring';
@@ -226,7 +235,7 @@ import type { CapabilitySummary } from '~/stores/auth';
 
 definePageMeta({ middleware: 'auth' });
 
-type TopicType = 'BINARY' | 'MULTIPLE' | 'SPECTRUM';
+type TopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'SPECTRUM';
 interface DraftBlock {
   key: number;
   type: TopicContentBlockType;
@@ -265,6 +274,7 @@ const durations = [3, 7, 14, 30];
 const topicTypes: { value: TopicType; label: string; description: string }[] = [
   { value: 'BINARY', label: '二元題', description: '兩個明確選項' },
   { value: 'MULTIPLE', label: '多選題', description: '2 到 6 個方向' },
+  { value: 'IMAGE_MULTIPLE', label: '圖片選項題', description: '以圖片為選項，2 到 6 張' },
   { value: 'SPECTRUM', label: '光譜題', description: '以 0 到 100 表態' },
 ];
 const blockGroups: BlockGroup[] = [
@@ -290,10 +300,16 @@ const title = ref('');
 const description = ref('');
 const category = ref('');
 const topicType = ref<TopicType>('BINARY');
+let optionSeq = 0;
+const nextOptionId = () => `opt-${optionSeq++}`;
 const options = ref(['支持', '反對']);
+const optionIds = ref([nextOptionId(), nextOptionId()]);
+const optionImages = ref<(string | null)[]>([null, null]);
+const optionsEl = ref<HTMLElement | null>(null);
+const lightboxSrc = ref<string | null>(null);
 const blocks = ref<DraftBlock[]>([]);
 const voteDurationDays = ref(7);
-const agreed = ref(false);
+const audience = ref<TopicAudience>('MEMBER_ONLY');
 const loading = ref(true);
 const submitting = ref(false);
 const formError = ref('');
@@ -307,13 +323,56 @@ const eligibility = computed(() => auth.capabilitySummary?.seniorEligibility);
 const partnerOrganizations = computed(() => auth.capabilitySummary?.partnerOrganizations ?? []);
 const canSubmit = computed(() => auth.canAuthorTopics || auth.canSubmitTopicApplication);
 const importMode = computed(() => Boolean(appliedImport.value && !editingId.value && auth.canAuthorTopics));
+const canUseFollowersAudience = computed(() => !auth.canAuthorTopics && !selectedOrganizationId.value);
 let nextBlockKey = 1;
 
+watch(canUseFollowersAudience, (allowed) => { if (!allowed) audience.value = 'MEMBER_ONLY'; });
+
 watch(topicType, (type, previous) => {
-  if (type === 'SPECTRUM') options.value = [];
-  else if (type === 'BINARY') options.value = ['支持', '反對'];
-  else if (previous !== 'MULTIPLE') options.value = ['選項一', '選項二', '其他'];
+  if (type === 'SPECTRUM') {
+    options.value = [];
+    optionImages.value = [];
+  } else if (type === 'BINARY') {
+    options.value = ['支持', '反對'];
+    optionImages.value = [null, null];
+  } else if (type === 'IMAGE_MULTIPLE') {
+    options.value = ['', ''];
+    optionImages.value = [null, null];
+  } else if (previous === 'SPECTRUM') {
+    options.value = ['選項一', '選項二', '其他'];
+    optionImages.value = [null, null, null];
+  }
+  optionIds.value = options.value.map(() => nextOptionId());
 });
+
+function moveItem<T>(list: T[], from: number, to: number) {
+  const [item] = list.splice(from, 1);
+  if (item === undefined) return;
+  list.splice(to, 0, item);
+}
+
+function removeOption(index: number) {
+  options.value.splice(index, 1);
+  optionImages.value.splice(index, 1);
+  optionIds.value.splice(index, 1);
+}
+
+function addOption() {
+  options.value.push('');
+  optionImages.value.push(null);
+  optionIds.value.push(nextOptionId());
+}
+
+function reorderOptions(from: number, to: number) {
+  moveItem(options.value, from, to);
+  moveItem(optionImages.value, from, to);
+  moveItem(optionIds.value, from, to);
+  for (const key of Object.keys(fieldErrors)) {
+    if (/^option-\d+$/.test(key)) delete fieldErrors[key];
+  }
+}
+
+useDragSort(optionsEl, reorderOptions);
 
 function blockMeta(type: TopicContentBlockType) {
   return blockDefinitions.find((item) => item.type === type)!;
@@ -339,6 +398,8 @@ async function onApplyImport(payload: TopicImportPayload) {
   topicType.value = payload.topicType;
   await nextTick();
   options.value = [...(payload.options ?? [])];
+  optionImages.value = (payload.options ?? []).map(() => null);
+  optionIds.value = options.value.map(() => nextOptionId());
   voteDurationDays.value = payload.voteDurationDays;
   blocks.value = (payload.blocks ?? []).map((item) => ({
     key: nextBlockKey++,
@@ -364,6 +425,8 @@ async function applyAiTopicDraft(form: TopicAuthoringForm | StanceAuthoringForm)
   topicType.value = form.topicType;
   await nextTick();
   options.value = [...form.options];
+  optionImages.value = form.options.map(() => null);
+  optionIds.value = options.value.map(() => nextOptionId());
   voteDurationDays.value = form.voteDurationDays;
   blocks.value = form.blocks.map((item) => ({
     key: nextBlockKey++, type: item.type, title: item.title, content: item.content,
@@ -376,10 +439,13 @@ function validateForm() {
   if (title.value.length < 10) fieldErrors.title = '議題標題至少需要 10 個字';
   if (description.value && description.value.length < 20) fieldErrors.description = '若填寫說明，至少需要 20 個字；也可以留空';
   if (topicType.value !== 'SPECTRUM') {
+    const isImageMultiple = topicType.value === 'IMAGE_MULTIPLE';
     options.value.forEach((option, index) => {
-      if (!option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}`;
+      if (!isImageMultiple && !option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}`;
+      if (isImageMultiple && !optionImages.value[index]) fieldErrors[`option-${index}`] = `請為選項 ${index + 1} 上傳圖片`;
     });
-    if (new Set(options.value.map((item) => item.trim())).size !== options.value.length) formError.value = '投票選項不可重複。';
+    if (!isImageMultiple && new Set(options.value.map((item) => item.trim())).size !== options.value.length) formError.value = '投票選項不可重複。';
+    if (isImageMultiple && options.value.length < 2) formError.value = '圖片選項題至少需要 2 個選項。';
   }
   blocks.value.forEach((item, index) => {
     if (item.title.length < 3) fieldErrors[`block-${index}-title`] = '模組標題至少需要 3 個字';
@@ -404,7 +470,9 @@ function payload() {
     category: category.value,
     topicType: topicType.value,
     options: topicType.value === 'SPECTRUM' ? undefined : options.value,
+    optionImages: topicType.value === 'IMAGE_MULTIPLE' ? optionImages.value : undefined,
     voteDurationDays: voteDurationDays.value,
+    audience: audience.value,
     blocks: blocks.value.map(({ key, expanded, ...item }) => ({
       ...item,
       sourceLabel: item.sourceLabel || undefined,
@@ -469,7 +537,7 @@ onMounted(async () => {
       api.get<Category[]>('/categories'),
     ]);
     auth.setCapabilities(summary);
-    categories.value = categoryItems.filter((item) => item.isActive);
+    categories.value = categoryItems.filter((item) => item.isActive && item.key !== 'quick');
     applyCategoryRules(categoryItems);
     if (!category.value && categories.value[0]) category.value = categories.value[0].key;
     if (summary.membershipTier !== 'SENIOR' && summary.partnerOrganizations.length) {
@@ -488,10 +556,13 @@ onMounted(async () => {
     title.value = topic.title;
     description.value = topic.description || '';
     category.value = topic.category;
-    topicType.value = topic.topicType;
+    topicType.value = topic.topicType as TopicType;
     await nextTick();
     options.value = topic.options.map((item) => item.label);
+    optionImages.value = topic.options.map((item) => item.data?.imageUrl ?? null);
+    optionIds.value = options.value.map(() => nextOptionId());
     voteDurationDays.value = topic.voteDurationDays;
+    audience.value = topic.audience;
     blocks.value = topic.blocks.map((item) => ({
       key: nextBlockKey++,
       type: item.type,

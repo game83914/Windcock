@@ -10,10 +10,12 @@ import { DemographicProfilesModule } from './profiles/demographic-profiles.modul
 import { MemberCenterModule } from './member-center/member-center.module';
 import { MemesModule } from './memes/memes.module';
 import { AvatarsModule } from './avatars/avatars.module';
+import { OptionImagesModule } from './option-images/option-images.module';
 import { HealthController } from './health.controller';
 import { AuthoringModule } from './authoring/authoring.module';
 import { IdentityModule } from './identity/identity.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ChannelsModule } from './channels/channels.module';
 
 @Module({
   imports: [
@@ -28,9 +30,11 @@ import { CategoriesModule } from './categories/categories.module';
     MemberCenterModule,
     MemesModule,
     AvatarsModule,
+    OptionImagesModule,
     AuthoringModule,
     IdentityModule,
     CategoriesModule,
+    ChannelsModule,
   ],
   controllers: [HealthController],
 })

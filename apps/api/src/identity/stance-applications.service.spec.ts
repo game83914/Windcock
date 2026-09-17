@@ -5,7 +5,7 @@ describe('StanceApplicationsService', () => {
   it('rejects a new member before creating an application', async () => {
     const prisma = { stanceApplication: { create: jest.fn() } };
     const policy = { assertCanSubmitStanceApplication: jest.fn().mockRejectedValue(new ForbiddenException()) };
-    const service = new StanceApplicationsService(prisma as never, policy as never);
+    const service = new StanceApplicationsService(prisma as never, policy as never, { assertCanInteract: jest.fn() } as never);
 
     await expect(service.submit(1n, { topicId: '2', title: '新的立場' })).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.stanceApplication.create).not.toHaveBeenCalled();
@@ -13,18 +13,18 @@ describe('StanceApplicationsService', () => {
 
   it('requires an editorial scope when listing applications', async () => {
     const policy = { editorialScopes: jest.fn().mockResolvedValue({ organizationIds: [], topicIds: [] }) };
-    const service = new StanceApplicationsService({} as never, policy as never);
+    const service = new StanceApplicationsService({} as never, policy as never, { assertCanInteract: jest.fn() } as never);
 
     await expect(service.list(1n, { page: 1, limit: 20 })).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects a title that is empty after trimming', async () => {
     const prisma = {
-      topic: { findUnique: jest.fn().mockResolvedValue({ status: 'OPEN', moderationStatus: 'APPROVED', voteEndAt: new Date(Date.now() + 60_000) }) },
+      topic: { findUnique: jest.fn().mockResolvedValue({ status: 'OPEN', moderationStatus: 'APPROVED', voteEndAt: new Date(Date.now() + 60_000), creatorId: 4n, audienceOwnerId: 4n, visibility: 'PUBLIC', audience: 'MEMBER_ONLY' }) },
       stanceApplication: { create: jest.fn() },
     };
     const policy = { assertCanSubmitStanceApplication: jest.fn().mockResolvedValue(undefined) };
-    const service = new StanceApplicationsService(prisma as never, policy as never);
+    const service = new StanceApplicationsService(prisma as never, policy as never, { assertCanInteract: jest.fn() } as never);
 
     await expect(service.submit(1n, { topicId: '2', title: '  ' })).rejects.toThrow('立場名稱至少 2 個字');
     expect(prisma.stanceApplication.create).not.toHaveBeenCalled();
@@ -37,7 +37,7 @@ describe('StanceApplicationsService', () => {
     const updateRevision = jest.fn().mockResolvedValue({});
     const prisma = {
       stanceApplication: { findUnique: jest.fn().mockResolvedValue(application) },
-      topic: { findUnique: jest.fn().mockResolvedValue({ status: 'OPEN', moderationStatus: 'APPROVED', voteEndAt: new Date(Date.now() + 60_000) }) },
+      topic: { findUnique: jest.fn().mockResolvedValue({ status: 'OPEN', moderationStatus: 'APPROVED', voteEndAt: new Date(Date.now() + 60_000), creatorId: 4n, audienceOwnerId: 4n, visibility: 'PUBLIC', audience: 'MEMBER_ONLY' }) },
       topicStance: { findFirst: jest.fn().mockResolvedValue({ depth: 1 }) },
       $transaction: jest.fn((callback) => callback({
         $queryRaw: jest.fn(),
@@ -48,7 +48,7 @@ describe('StanceApplicationsService', () => {
       })),
     };
     const policy = { assert: jest.fn().mockResolvedValue(undefined) };
-    const service = new StanceApplicationsService(prisma as never, policy as never);
+    const service = new StanceApplicationsService(prisma as never, policy as never, { assertCanInteract: jest.fn() } as never);
 
     await service.publish(7n, 8n);
     expect(create).toHaveBeenCalledWith({ data: { topicId: 2n, parentId: 3n, creatorId: 7n, title: '衍生立場', rationale: '理由', depth: 2, applicationResults: { create: { applicationId: 8n } } } });
@@ -63,10 +63,10 @@ describe('StanceApplicationsService', () => {
     const tx = {
       $queryRaw: jest.fn(),
       stanceApplication: { findUnique: jest.fn().mockResolvedValue(application), update },
-      topic: { findUnique: jest.fn().mockResolvedValue({ status: 'OPEN', moderationStatus: 'APPROVED', voteEndAt: new Date(Date.now() + 60_000) }) },
+      topic: { findUnique: jest.fn().mockResolvedValue({ status: 'OPEN', moderationStatus: 'APPROVED', voteEndAt: new Date(Date.now() + 60_000), creatorId: 4n, audienceOwnerId: 4n, visibility: 'PUBLIC', audience: 'MEMBER_ONLY' }) },
     };
     const prisma = { $transaction: jest.fn((callback) => callback(tx)) };
-    const service = new StanceApplicationsService(prisma as never, {} as never);
+    const service = new StanceApplicationsService(prisma as never, {} as never, { assertCanInteract: jest.fn() } as never);
 
     await service.updateMine(4n, 8n, { title: '修改後立場', rationale: '', note: '', expectedUpdatedAt: updatedAt.toISOString() });
     expect(update).toHaveBeenCalledWith(expect.objectContaining({
@@ -94,7 +94,7 @@ describe('StanceApplicationsService', () => {
       $transaction: jest.fn((callback) => callback(tx)),
     };
     const policy = { assert: jest.fn() };
-    const service = new StanceApplicationsService(prisma as never, policy as never);
+    const service = new StanceApplicationsService(prisma as never, policy as never, { assertCanInteract: jest.fn() } as never);
 
     await service.resolve(7n, { outputs: [
       { applicationIds: ['8', '9'], title: '整併立場' },
@@ -124,7 +124,7 @@ describe('StanceApplicationsService', () => {
         count: jest.fn().mockResolvedValue(1),
       },
     };
-    const service = new StanceApplicationsService(prisma as never, {} as never);
+    const service = new StanceApplicationsService(prisma as never, {} as never, { assertCanInteract: jest.fn() } as never);
 
     const result = await service.listMine(4n, 1, 20);
     expect(result.items[0].target).toEqual(expect.objectContaining({
@@ -151,7 +151,7 @@ describe('StanceApplicationsService', () => {
       $transaction: jest.fn((callback) => callback(tx)),
     };
     const policy = { assert: jest.fn() };
-    const service = new StanceApplicationsService(prisma as never, policy as never);
+    const service = new StanceApplicationsService(prisma as never, policy as never, { assertCanInteract: jest.fn() } as never);
 
     await expect(service.review(7n, 8n, { status: 'IN_REVIEW', expectedUpdatedAt: oldUpdatedAt.toISOString() })).rejects.toBeInstanceOf(ConflictException);
     expect(tx.stanceApplicationRevision.update).not.toHaveBeenCalled();
@@ -168,7 +168,7 @@ describe('StanceApplicationsService', () => {
       },
       stanceApplicationRevision: { update: updateRevision },
     };
-    const service = new StanceApplicationsService({ $transaction: jest.fn((callback) => callback(tx)) } as never, {} as never);
+    const service = new StanceApplicationsService({ $transaction: jest.fn((callback) => callback(tx)) } as never, {} as never, { assertCanInteract: jest.fn() } as never);
 
     await expect(service.withdrawMine(4n, 8n)).resolves.toEqual({ withdrawn: true });
     expect(updateRevision).toHaveBeenCalledWith({ where: { applicationId_revisionNumber: { applicationId: 8n, revisionNumber: 2 } }, data: { status: 'WITHDRAWN' } });

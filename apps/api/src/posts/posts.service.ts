@@ -11,6 +11,7 @@ import { resolveAvatarUrl } from '../avatars/avatar-url';
 import { assertClean } from '../common/sensitive';
 import { PolicyService } from '../identity/policy.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { TopicAccessService } from '../topics/topic-access.service';
 
 @Injectable()
 export class PostsService {
@@ -19,9 +20,11 @@ export class PostsService {
     private readonly memes: MemesService,
     private readonly policy: PolicyService,
     private readonly realtime: RealtimeService,
+    private readonly access: TopicAccessService,
   ) {}
 
-  async listPosts(topicId: bigint, stanceId: bigint | null, page: number, limit: number) {
+  async listPosts(topicId: bigint, stanceId: bigint | null, page: number, limit: number, userId: bigint | null) {
+    await this.assertCanViewTopic(topicId, userId);
     const p = Math.max(1, page);
     const l = Math.min(50, Math.max(1, limit));
     const where = stanceId ? { topicId, stanceId } : { topicId };
@@ -59,11 +62,12 @@ export class PostsService {
     };
   }
 
-  async listComments(postId: bigint, page: number, limit: number) {
+  async listComments(postId: bigint, page: number, limit: number, userId: bigint | null) {
     const p = Math.max(1, page);
     const l = Math.min(100, Math.max(1, limit));
-    const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { id: true, topicId: true } });
     if (!post) throw new NotFoundException('貼文不存在');
+    await this.assertCanViewTopic(post.topicId, userId);
     const [items, total] = await Promise.all([
       this.prisma.comment.findMany({
         where: { postId },
@@ -97,7 +101,7 @@ export class PostsService {
 
   async recentCommentActivity() {
     const comments = await this.prisma.comment.findMany({
-      where: { post: { topic: { moderationStatus: 'APPROVED' } } },
+      where: { post: { topic: { moderationStatus: 'APPROVED', visibility: 'PUBLIC', audience: 'MEMBER_ONLY' } } },
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: {
@@ -120,6 +124,7 @@ export class PostsService {
 
   async createPost(topicId: bigint, authorId: bigint, dto: CreatePostDto) {
     await this.policy.assertPublicAction(authorId, 'DISCUSS');
+    await this.assertCanInteractTopic(topicId, authorId);
     const topic = await this.prisma.topic.findUnique({ where: { id: topicId }, select: { id: true, status: true, moderationStatus: true } });
     if (!topic) throw new NotFoundException('議題不存在');
     if (topic.status !== 'OPEN' || topic.moderationStatus !== 'APPROVED') throw new BadRequestException('此議題目前不開放討論');
@@ -153,6 +158,7 @@ export class PostsService {
         },
       });
       await this.memes.recordUsage(tx, authorId, 'POST', created.id, ids);
+      await tx.topic.update({ where: { id: topicId }, data: { updatedAt: new Date() } });
       return created;
     });
     return {
@@ -173,9 +179,10 @@ export class PostsService {
     await this.policy.assertPublicAction(authorId, 'DISCUSS');
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
-      select: { id: true, topic: { select: { id: true, title: true, status: true, moderationStatus: true } } },
+      select: { id: true, topic: { select: { id: true, title: true, status: true, moderationStatus: true, visibility: true, audience: true } } },
     });
     if (!post) throw new NotFoundException('貼文不存在');
+    await this.assertCanInteractTopic(post.topic.id, authorId);
     if (post.topic.status !== 'OPEN' || post.topic.moderationStatus !== 'APPROVED') throw new BadRequestException('此議題目前不開放留言');
     const content = dto.content?.trim() || '';
     const memeIds = dto.memeIds || [];
@@ -201,16 +208,19 @@ export class PostsService {
         },
       });
       await this.memes.recordUsage(tx, authorId, 'COMMENT', created.id, ids);
+      await tx.topic.update({ where: { id: post.topic.id }, data: { updatedAt: new Date() } });
       return created;
     });
-    this.realtime.broadcastCommentActivity({
-      id: comment.id.toString(),
-      topicId: post.topic.id.toString(),
-      topicTitle: post.topic.title,
-      author: comment.author.nickname,
-      content: content || '（GIF）',
-      createdAt: comment.createdAt.toISOString(),
-    });
+    if (post.topic.visibility === 'PUBLIC' && post.topic.audience === 'MEMBER_ONLY') {
+      this.realtime.broadcastCommentActivity({
+        id: comment.id.toString(),
+        topicId: post.topic.id.toString(),
+        topicTitle: post.topic.title,
+        author: comment.author.nickname,
+        content: content || '（GIF）',
+        createdAt: comment.createdAt.toISOString(),
+      });
+    }
     return {
       id: comment.id.toString(),
       postId: comment.postId.toString(),
@@ -224,6 +234,12 @@ export class PostsService {
 
   async toggleLike(userId: bigint, targetType: 'post' | 'comment', targetId: bigint) {
     await this.policy.assertPublicAction(userId, 'DISCUSS');
+    const target = targetType === 'post'
+      ? await this.prisma.post.findUnique({ where: { id: targetId }, select: { topicId: true } })
+      : await this.prisma.comment.findUnique({ where: { id: targetId }, select: { post: { select: { topicId: true } } } });
+    const topicId = targetType === 'post' ? (target as any)?.topicId : (target as any)?.post.topicId;
+    if (!topicId) throw new NotFoundException(targetType === 'post' ? '貼文不存在' : '留言不存在');
+    await this.assertCanInteractTopic(topicId, userId);
     const existing = await this.prisma.like.findUnique({
       where: { userId_targetType_targetId: { userId, targetType, targetId } },
     });
@@ -252,5 +268,17 @@ export class PostsService {
   private async ensureExists(model: any, id: bigint, name: string) {
     const found = await model.findUnique({ where: { id }, select: { id: true } });
     if (!found) throw new NotFoundException(`${name}不存在`);
+  }
+
+  private async assertCanViewTopic(topicId: bigint, userId: bigint | null) {
+    const topic = await this.prisma.topic.findUnique({ where: { id: topicId }, select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true } });
+    if (!topic) throw new NotFoundException('議題不存在');
+    await this.access.assertCanView(topic, userId);
+  }
+
+  private async assertCanInteractTopic(topicId: bigint, userId: bigint) {
+    const topic = await this.prisma.topic.findUnique({ where: { id: topicId }, select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true } });
+    if (!topic) throw new NotFoundException('議題不存在');
+    await this.access.assertCanInteract(topic, userId);
   }
 }

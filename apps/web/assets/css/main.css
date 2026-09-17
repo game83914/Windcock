@@ -44,8 +44,76 @@ body {
   outline-offset: 3px;
 }
 
+/* 年輕化：卡片、按鈕、輸入框圓角 + 柔和陰影 */
+.btn-soft {
+  border-radius: 0.75rem;
+  font-weight: 700;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.btn-soft:active {
+  transform: scale(0.98);
+}
+.btn-soft:focus-visible {
+  outline: 3px solid #d84a36;
+  outline-offset: 3px;
+}
+.field-input {
+  width: 100%;
+  border: 1px solid #d3cbc0;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease;
+}
+.field-input::placeholder {
+  color: #9a948a;
+}
+.field-input:focus-visible {
+  outline: 3px solid #d84a36;
+  outline-offset: 3px;
+}
+.field-input:focus {
+  border-color: #171717;
+}
+.field-input-error {
+  border-color: #d84a36;
+}
+.surface-card {
+  border: 1px solid #ded7cb;
+  border-radius: 1rem;
+  background: #faf8f3;
+  box-shadow: 0 1px 3px rgba(23, 23, 23, 0.06);
+}
+.surface-quick {
+  border: 1px solid #e6cf9e;
+  border-radius: 1rem;
+  background: #fff8ec;
+}
+.eyebrow-modern {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+/* 底部導覽預留空間（行動端） */
+@media (max-width: 1023px) {
+  body {
+    padding-bottom: 4.75rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+}
+
+/* 行動裝置輸入框維持 16px，避免 iOS Safari 聚焦自動放大頁面 */
+@media (max-width: 767px) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }

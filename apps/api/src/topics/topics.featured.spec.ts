@@ -19,6 +19,7 @@ describe('TopicsService featured topics', () => {
     {} as never,
     policy as never,
     {} as never,
+    { discoveryWhere: jest.fn().mockReturnValue({}) } as never,
   );
 
   beforeEach(() => {
@@ -41,14 +42,14 @@ describe('TopicsService featured topics', () => {
   });
 
   it('rejects non-public topics', async () => {
-    findMany.mockResolvedValue([{ id: BigInt(1), moderationStatus: 'APPROVED', status: 'CANCELLED' }]);
+    findMany.mockResolvedValue([{ id: BigInt(1), moderationStatus: 'APPROVED', status: 'CANCELLED', visibility: 'PUBLIC', audience: 'MEMBER_ONLY' }]);
 
     await expect(service.setFeatured(BigInt(1), ['1'])).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('allows ended public topics', async () => {
     findMany
-      .mockResolvedValueOnce([{ id: BigInt(1), moderationStatus: 'APPROVED', status: 'SETTLED' }])
+      .mockResolvedValueOnce([{ id: BigInt(1), moderationStatus: 'APPROVED', status: 'SETTLED', visibility: 'PUBLIC', audience: 'MEMBER_ONLY' }])
       .mockResolvedValueOnce([]);
 
     await expect(service.setFeatured(BigInt(1), ['1'])).resolves.toEqual([]);

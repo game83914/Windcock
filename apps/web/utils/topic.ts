@@ -14,6 +14,7 @@ const KEY_META: Record<string, CategoryMeta> = {
   life: { key: 'life', label: '生活', eyebrow: '生活選擇', color: '#3f7a58', soft: '#e5f1e9' },
   technology: { key: 'technology', label: '科技', eyebrow: '科技與數位', color: '#7a5cbf', soft: '#efeafb' },
   entertainment: { key: 'entertainment', label: '娛樂', eyebrow: '娛樂與文化', color: '#b0761f', soft: '#f8f0e3' },
+  quick: { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#f8ecd6' },
 };
 
 const LABEL_TO_KEY: Record<string, string> = { 政治: 'politics', 社會: 'society', 生活: 'life', 科技: 'technology', 娛樂: 'entertainment' };
@@ -73,8 +74,72 @@ export function optionPercentage(option: TopicOption, topic: Topic) {
   return total > 0 ? Math.round((Number(option.voteCount) / total) * 100) : 0;
 }
 
+export const TOPIC_TYPE_LABEL: Record<string, string> = {
+  BINARY: '二選一',
+  MULTIPLE: '單選題',
+  IMAGE_MULTIPLE: '圖片選項題',
+  IMAGE_RANK: '二選一排名賽',
+  SPECTRUM: '光譜題',
+  SHORT_ANSWER: '簡答題',
+  MATCHING: '連連看',
+  PUZZLE: '拼圖題',
+  SCRATCH: '刮刮樂',
+  SPIN_WHEEL: '轉盤抽獎',
+  LOTTERY: '日式搖獎',
+  STAR_RATING: '五星評分',
+  LIKERT_5: '五點量表',
+  LIKERT_7: '七點量表',
+  MULTI_SELECT: '複選題',
+};
+
+export function isOptionPickType(topicType?: string) {
+  return !!topicType && ['BINARY', 'MULTIPLE'].includes(topicType);
+}
+
+export function isImageOptionType(topicType?: string) {
+  return topicType === 'IMAGE_MULTIPLE';
+}
+
+export function isImageRankType(topicType?: string) {
+  return topicType === 'IMAGE_RANK';
+}
+
+export function isRatingType(topicType?: string): topicType is 'STAR_RATING' | 'LIKERT_5' | 'LIKERT_7' {
+  return !!topicType && ['STAR_RATING', 'LIKERT_5', 'LIKERT_7'].includes(topicType);
+}
+
+export function ratingScaleSize(topicType?: string) {
+  return topicType === 'LIKERT_7' ? 7 : 5;
+}
+
+export function optionValue(option: TopicOption, index: number) {
+  if (option.data?.value == null) return index + 1;
+  const value = Number(option.data.value);
+  return Number.isFinite(value) ? value : index + 1;
+}
+
+export function weightedOptionAverage(topic: Topic) {
+  const total = topic.options.reduce((sum, option) => sum + Number(option.voteCount), 0);
+  if (!total) return 0;
+  return topic.options.reduce((sum, option, index) => sum + optionValue(option, index) * Number(option.voteCount), 0) / total;
+}
+
+export function multiSelectPercentage(option: TopicOption, topic: Topic) {
+  const voters = Number(topic.voterCount);
+  return voters > 0 ? Math.round((Number(option.voteCount) / voters) * 100) : 0;
+}
+
+export function topicTypeLabel(topicType?: string) {
+  return TOPIC_TYPE_LABEL[topicType ?? ''] ?? '選項題';
+}
+
 export function leadingOptions(topic: Topic, limit = 2) {
   return [...topic.options]
     .sort((a, b) => Number(b.voteCount) - Number(a.voteCount))
     .slice(0, limit);
 }
+
+export const VOTE_IDENTITY_NOTICE = '此身份僅供查閱，不能投票。';
+export const VOTE_LOGIN_LABEL = '門號登入投票';
+
+export const OPTION_COLLAPSE_LIMIT = 4;

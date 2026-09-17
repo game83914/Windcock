@@ -12,6 +12,7 @@ const categories = [
   { key: 'life', label: '生活', eyebrow: '生活選擇', color: '#3f7a58', soft: '#e5f1e9', sortOrder: 2 },
   { key: 'technology', label: '科技', eyebrow: '科技與數位', color: '#7a5cbf', soft: '#efeafb', sortOrder: 3 },
   { key: 'entertainment', label: '娛樂', eyebrow: '娛樂與文化', color: '#b0761f', soft: '#f8f0e3', sortOrder: 4 },
+  { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#f8ecd6', sortOrder: 5 },
 ] as const;
 
 interface SeedTopic {

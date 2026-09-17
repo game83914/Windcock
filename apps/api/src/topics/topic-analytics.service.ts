@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DEMOGRAPHIC_CONSENT_VERSION, LEGACY_ANALYTICS_CONSENT_VERSION } from '../profiles/demographic-profiles.service';
 import { PolicyService } from '../identity/policy.service';
 import { NodeView, StancesService } from './stances.service';
+import { TopicAccessService } from './topic-access.service';
 
 const ANALYTICS_MODULES = ['RESULT_TRENDS', 'DEMOGRAPHICS', 'STANCE_INSIGHTS'] as const;
 type AnalyticsModule = typeof ANALYTICS_MODULES[number];
@@ -29,10 +30,12 @@ export class TopicAnalyticsService {
     private readonly prisma: PrismaService,
     private readonly stances: StancesService,
     private readonly policy: PolicyService,
+    private readonly topicAccess: TopicAccessService,
   ) {}
 
   async access(topicId: bigint, userId: bigint | null) {
     const topic = await this.requireTopic(topicId);
+    await this.topicAccess.assertCanView(topic, userId);
     await this.assertAnalyticsAccess(userId, topicId);
     const demographicSamples = await this.prisma.voteDemographicSnapshot.count({
       where: { vote: { topicId }, consentVersion: { in: [LEGACY_ANALYTICS_CONSENT_VERSION, DEMOGRAPHIC_CONSENT_VERSION] } },
@@ -55,7 +58,7 @@ export class TopicAnalyticsService {
     const votes = await this.prisma.vote.findMany({
       where: { topicId },
       orderBy: { createdAt: 'asc' },
-      select: { optionId: true, spectrumValue: true, createdAt: true },
+      select: { optionId: true, spectrumValue: true, createdAt: true, selections: { select: { optionId: true } } },
     });
     const now = Date.now();
     const last24Hours = votes.filter((vote) => vote.createdAt.getTime() > now - 86_400_000).length;
@@ -63,20 +66,20 @@ export class TopicAnalyticsService {
     const recentVotes = votes.filter((vote) => vote.createdAt.getTime() > now - 86_400_000);
     const previousVotes = votes.filter((vote) => vote.createdAt.getTime() > now - 172_800_000 && vote.createdAt.getTime() <= now - 86_400_000);
     const timeline = this.timeline(topic, votes);
-    const options = topic.options.map((option) => {
-      const count = votes.filter((vote) => vote.optionId === option.id).length;
-      return { optionId: option.id.toString(), label: option.label, count, percentage: percentage(count, votes.length) };
+    const options = topic.options.map((option, index) => {
+      const count = votes.filter((vote) => voteOptionIds(vote).includes(option.id)).length;
+      return { optionId: option.id.toString(), label: optionDisplayLabel(option.label, topic.topicType, index), count, percentage: percentage(count, votes.length) };
     });
     const ranked = [...options].sort((a, b) => b.count - a.count);
     const spectrumValues = votes.map((vote) => vote.spectrumValue).filter((value): value is number => value !== null).sort((a, b) => a - b);
-    const optionMomentum = topic.options.map((option) => {
-      const recentCount = recentVotes.filter((vote) => vote.optionId === option.id).length;
-      const previousCount = previousVotes.filter((vote) => vote.optionId === option.id).length;
+    const optionMomentum = topic.options.map((option, index) => {
+      const recentCount = recentVotes.filter((vote) => voteOptionIds(vote).includes(option.id)).length;
+      const previousCount = previousVotes.filter((vote) => voteOptionIds(vote).includes(option.id)).length;
       const recentShare = percentage(recentCount, recentVotes.length);
       const previousShare = percentage(previousCount, previousVotes.length);
       return {
         optionId: option.id.toString(),
-        label: option.label,
+        label: optionDisplayLabel(option.label, topic.topicType, index),
         last24Hours: recentCount,
         previous24Hours: previousCount,
         shareChange: round1(recentShare - previousShare),
@@ -114,7 +117,7 @@ export class TopicAnalyticsService {
     const thresholds = demographicThresholds(dimension);
     const snapshots = await this.prisma.voteDemographicSnapshot.findMany({
       where: { vote: { topicId }, consentVersion: { in: consentVersions(dimension) } },
-      include: { vote: { select: { optionId: true, spectrumValue: true } } },
+      include: { vote: { select: { optionId: true, spectrumValue: true, selections: { select: { optionId: true } } } } },
     });
     const values = snapshots.filter((item) => item[field] !== null);
     const base = {
@@ -157,7 +160,7 @@ export class TopicAnalyticsService {
 
   async stanceInsights(topicId: bigint, userId: bigint | null) {
     const topic = await this.requireModule(topicId, userId, 'STANCE_INSIGHTS');
-    const tree = await this.stances.list(topicId, null, true);
+    const tree = await this.stances.list(topicId, userId, true);
     const optionTotals = new Map(topic.options.map((option) => [option.id.toString(), Number(option.voteCount)]));
     const nodes = flattenStances(tree.roots).map((node) => {
       const camps = node.camps?.map((camp) => ({
@@ -217,7 +220,7 @@ export class TopicAnalyticsService {
       const activeStart = topic.reviewedAt?.getTime() ?? topic.createdAt.getTime();
       const activeEnd = Math.min(topic.voteEndAt?.getTime() ?? Date.now(), Date.now());
       const durationDays = Math.max(1, Math.ceil((activeEnd - activeStart) / 86_400_000));
-      const optionCounts = topic.options.map((option) => ({ optionId: option.id.toString(), label: option.label, count: Number(option.voteCount), percentage: percentage(Number(option.voteCount), Number(topic.totalVotes)) }));
+      const optionCounts = topic.options.map((option, index) => ({ optionId: option.id.toString(), label: optionDisplayLabel(option.label, topic.topicType, index), count: Number(option.voteCount), percentage: percentage(Number(option.voteCount), Number(topic.totalVotes)) }));
       const ranked = [...optionCounts].sort((a, b) => b.count - a.count);
       const field = demographicField(dimension);
       const demographicSamples = await this.prisma.voteDemographicSnapshot.count({
@@ -256,6 +259,7 @@ export class TopicAnalyticsService {
 
   private async requireModule(topicId: bigint, userId: bigint | null, module: AnalyticsModule) {
     const topic = await this.requireTopic(topicId);
+    await this.topicAccess.assertCanView(topic, userId);
     void module;
     await this.assertAnalyticsAccess(userId, topicId);
     return topic;
@@ -277,7 +281,7 @@ export class TopicAnalyticsService {
     return topic;
   }
 
-  private timeline(topic: AnalyticsTopic, votes: Array<{ optionId: bigint | null; spectrumValue: number | null; createdAt: Date }>) {
+  private timeline(topic: AnalyticsTopic, votes: Array<{ optionId: bigint | null; spectrumValue: number | null; createdAt: Date; selections: Array<{ optionId: bigint }> }>) {
     const buckets = new Map<string, typeof votes>();
     for (const vote of votes) {
       const key = taipeiDate(vote.createdAt);
@@ -288,19 +292,26 @@ export class TopicAnalyticsService {
     return [...buckets.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, items]) => {
       cumulativeTotal += items.length;
       for (const item of items) {
-        const key = item.optionId?.toString() ?? 'SPECTRUM';
-        cumulative.set(key, (cumulative.get(key) ?? 0) + 1);
+        const optionIds = voteOptionIds(item);
+        if (optionIds.length) {
+          for (const optionId of optionIds) {
+            const key = optionId.toString();
+            cumulative.set(key, (cumulative.get(key) ?? 0) + 1);
+          }
+        } else {
+          cumulative.set('SPECTRUM', (cumulative.get('SPECTRUM') ?? 0) + 1);
+        }
       }
       return {
         date,
         votes: items.length,
         cumulativeVotes: cumulativeTotal,
-        options: topic.options.map((option) => ({ optionId: option.id.toString(), label: option.label, count: cumulative.get(option.id.toString()) ?? 0, percentage: percentage(cumulative.get(option.id.toString()) ?? 0, cumulativeTotal) })),
+        options: topic.options.map((option, index) => ({ optionId: option.id.toString(), label: optionDisplayLabel(option.label, topic.topicType, index), count: cumulative.get(option.id.toString()) ?? 0, percentage: percentage(cumulative.get(option.id.toString()) ?? 0, cumulativeTotal) })),
       };
     });
   }
 
-  private demographicGroup(topic: AnalyticsTopic, key: string, values: Array<{ vote: { optionId: bigint | null; spectrumValue: number | null } }>) {
+  private demographicGroup(topic: AnalyticsTopic, key: string, values: Array<{ vote: { optionId: bigint | null; spectrumValue: number | null; selections: Array<{ optionId: bigint }> } }>) {
     if (topic.topicType === 'SPECTRUM') {
       const scores = values.map((item) => item.vote.spectrumValue).filter((value): value is number => value !== null).sort((a, b) => a - b);
       return { key, count: values.length, median: median(scores), options: null };
@@ -309,9 +320,9 @@ export class TopicAnalyticsService {
       key,
       count: values.length,
       median: null,
-      options: topic.options.map((option) => {
-        const count = values.filter((item) => item.vote.optionId === option.id).length;
-        return { optionId: option.id.toString(), label: option.label, count, percentage: percentage(count, values.length) };
+      options: topic.options.map((option, index) => {
+        const count = values.filter((item) => voteOptionIds(item.vote).includes(option.id)).length;
+        return { optionId: option.id.toString(), label: optionDisplayLabel(option.label, topic.topicType, index), count, percentage: percentage(count, values.length) };
       }),
     };
   }
@@ -398,6 +409,15 @@ function spectrumSummary(values: number[]) {
 
 function taipeiDate(date: Date) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
+function optionDisplayLabel(label: string, topicType: string, index: number) {
+  if (label) return label;
+  return topicType === 'IMAGE_MULTIPLE' || topicType === 'IMAGE_RANK' ? `圖片 ${index + 1}` : label;
+}
+
+function voteOptionIds(vote: { optionId: bigint | null; selections?: Array<{ optionId: bigint }> }) {
+  return vote.selections?.length ? vote.selections.map((selection) => selection.optionId) : vote.optionId === null ? [] : [vote.optionId];
 }
 
 function flattenStances(nodes: NodeView[]): NodeView[] {

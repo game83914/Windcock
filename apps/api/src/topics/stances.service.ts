@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { resolveAvatarUrl } from '../avatars/avatar-url';
 import { ReportStanceDto } from './dto/stances.dto';
 import { PolicyService } from '../identity/policy.service';
+import { TopicAccessService } from './topic-access.service';
 
 const COMMON_GROUND_MIN = Number(process.env.STANCE_COMMON_GROUND_MIN || 3);
 const MAX_DEPTH = Number(process.env.STANCE_MAX_DEPTH || 4);
@@ -42,7 +43,7 @@ export interface NodeView {
 
 @Injectable()
 export class StancesService {
-  constructor(private readonly prisma: PrismaService, private readonly policy: PolicyService) {}
+  constructor(private readonly prisma: PrismaService, private readonly policy: PolicyService, private readonly access: TopicAccessService) {}
 
   async list(topicId: bigint, userId: bigint | null, includeAnalytics = false) {
     const topic = await this.prisma.topic.findUnique({
@@ -51,6 +52,7 @@ export class StancesService {
     });
     if (!topic) throw new NotFoundException('議題不存在');
     if (topic.moderationStatus !== 'APPROVED') throw new NotFoundException('議題尚未公開');
+    await this.access.assertCanView(topic, userId);
 
     const rows = await this.prisma.topicStance.findMany({
       where: { topicId, status: 'ACTIVE' },
@@ -177,6 +179,7 @@ export class StancesService {
   }
 
   async remove(topicId: bigint, stanceId: bigint, userId: bigint) {
+    await this.assertCanInteract(topicId, userId);
     const stance = await this.prisma.topicStance.findFirst({
       where: { id: stanceId, topicId },
       include: { applicationResults: { select: { applicationId: true }, take: 1 }, _count: { select: { children: true, posts: true, signals: true, pendingApplications: true } } },
@@ -192,6 +195,7 @@ export class StancesService {
   }
 
   async toggleSignal(topicId: bigint, stanceId: bigint, userId: bigint, signal: TopicStanceSignalType) {
+    await this.assertCanInteract(topicId, userId);
     await this.policy.assertPublicAction(userId, 'SIGNAL');
     const stance = await this.prisma.topicStance.findFirst({
       where: { id: stanceId, topicId, status: 'ACTIVE' },
@@ -238,6 +242,7 @@ export class StancesService {
   }
 
   async report(topicId: bigint, stanceId: bigint, reporterId: bigint, dto: ReportStanceDto) {
+    await this.assertCanInteract(topicId, reporterId);
     await this.policy.assertPublicAction(reporterId, 'REPORT');
     const stance = await this.prisma.topicStance.findFirst({
       where: { id: stanceId, topicId, status: 'ACTIVE' },
@@ -318,6 +323,15 @@ export class StancesService {
     return { restored: true };
   }
 
+  private async assertCanInteract(topicId: bigint, userId: bigint) {
+    const topic = await this.prisma.topic.findUnique({
+      where: { id: topicId },
+      select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true },
+    });
+    if (!topic) throw new NotFoundException('議題不存在');
+    await this.access.assertCanInteract(topic, userId);
+  }
+
   private async nodeView(stanceId: bigint, userId: bigint) {
     const stance = await this.prisma.topicStance.findUnique({
       where: { id: stanceId },
@@ -352,13 +366,13 @@ export class StancesService {
 
   private campOptions(topic: { topicType: TopicType; options: Array<{ id: bigint; label: string }> }) {
     if (topic.topicType === 'BINARY') return topic.options.slice(0, 2);
-    if (topic.topicType === 'MULTIPLE') return topic.options;
+    if (topic.topicType === 'MULTIPLE' || topic.topicType === 'IMAGE_MULTIPLE') return topic.options;
     return null;
   }
 
   private campHeadings(topic: { topicType: TopicType; options: Array<{ id: bigint; label: string }> }) {
     const camps = this.campOptions(topic);
-    return camps ? camps.map((option) => ({ optionId: option.id.toString(), label: option.label })) : null;
+    return camps ? camps.map((option, index) => ({ optionId: option.id.toString(), label: option.label || (topic.topicType === 'IMAGE_MULTIPLE' || topic.topicType === 'IMAGE_RANK' ? `圖片 ${index + 1}` : option.label) })) : null;
   }
 
 }

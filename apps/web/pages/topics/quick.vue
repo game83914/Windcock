@@ -1,97 +1,133 @@
 <template>
   <div class="mx-auto max-w-6xl pb-12">
-    <div class="mb-8 border-b-2 border-[#171717] pb-6">
-      <h1 class="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">發起今天快問</h1>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-[#6d6861]">資深會員可發起輕量微投票，立即開票、即時看風向，適合今天就想知道答案的生活問題。</p>
+    <UiImageLightbox v-model:src="lightboxSrc" />
+    <div class="mb-8 border-b border-[#ded7cb] pb-6">
+      <h1 class="mt-1 text-3xl font-black tracking-[-0.04em] sm:text-4xl">發起快問</h1>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-[#6d6861]">任何小事都能問問</p>
     </div>
 
-    <div v-if="savedTopic" class="border-2 border-[#171717] bg-[#faf8f3] p-8 text-center sm:p-12">
-      <p class="eyebrow text-[#b0761f]">快問已開票</p>
+    <div v-if="savedTopic" class="surface-card p-8 text-center sm:p-12">
+      <p class="eyebrow-modern text-[#b0761f]">快問已開票</p>
       <h2 class="mt-3 text-2xl font-black">你的快問上線了</h2>
-      <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6d6861]">投票時間 {{ savedTopic.voteDurationHours }} 小時，結束後會依集票情況結算。現在就可以到詳情頁投下第一票。</p>
+      <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6d6861]">投票時間 {{ savedTopic.voteDurationHours }} 小時，結束後會依集票情況結算。現在就可以到詳情頁玩第一票。</p>
       <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-        <NuxtLink :to="`/topic/${savedTopic.id}`" class="focus-ring bg-[#171717] px-6 py-3 text-sm font-bold text-white hover:bg-[#d84a36]">前往快問詳情</NuxtLink>
-        <NuxtLink to="/me/quick" class="focus-ring border border-[#cfc8bc] px-6 py-3 text-sm font-bold text-[#5f5a53] hover:border-[#171717]">查看我的快問</NuxtLink>
+        <UiButton v-if="savedTopic.sharePath" variant="primary" @click="copySharePath(savedTopic.sharePath)">{{ copied ? '已複製連結' : '複製私密連結' }}</UiButton>
+        <UiButton :to="`/topic/${savedTopic.id}`" variant="quick">前往快問詳情</UiButton>
+        <UiButton :to="'/me/quick'" variant="outline">查看我的快問</UiButton>
       </div>
     </div>
 
-    <div v-else-if="loading" class="h-96 animate-pulse bg-[#e5e0d6]" />
+    <div v-else-if="loading" class="h-96 animate-pulse rounded-2xl bg-[#e5e0d6]" />
 
-    <div v-else-if="!canCreateQuick" class="border-2 border-[#171717] bg-[#faf8f3] p-6 sm:p-8">
-      <p class="eyebrow text-[#b0761f]">資深會員限定</p>
+    <div v-else-if="!canCreateQuick" class="surface-card p-6 sm:p-8">
+      <p class="eyebrow-modern text-[#b0761f]">資深會員限定</p>
       <h2 class="mt-2 text-xl font-black">成為資深會員後即可發起快問</h2>
       <p class="mt-3 text-sm leading-6 text-[#6d6861]">帳號需滿 30 天，並在至少 10 個不同議題完成投票。目前為 {{ eligibility?.accountAgeDays ?? 0 }} 天、{{ eligibility?.distinctTopicsVoted ?? 0 }} 個議題。</p>
-      <NuxtLink to="/" class="focus-ring mt-5 inline-block bg-[#171717] px-5 py-3 text-sm font-black text-white">先來探索快問</NuxtLink>
+      <UiButton :to="'/'" variant="primary" class="mt-5">先來探索快問</UiButton>
     </div>
 
     <div v-else class="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
       <form class="space-y-6" novalidate @submit.prevent="submit">
-        <section class="border border-[#d7d1c6] bg-[#faf8f3] p-5 sm:p-7">
-          <p class="eyebrow text-[#b0761f]">01 / 投票問題</p>
-          <label class="mt-6 block">
-            <span class="mb-2 flex justify-between text-sm font-bold"><span>快問標題</span><span class="font-normal text-[#8b857d]">{{ title.length }} / 100</span></span>
-            <input v-model.trim="title" data-field="title" maxlength="100" minlength="5" placeholder="例如：你今天中午打算吃什麼？" class="focus-ring w-full border bg-white px-4 py-3 text-sm" :class="fieldErrors.title ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
+        <section class="surface-card p-5 sm:p-7">
+          <label class="block">
+            <span class="mb-2 flex justify-between text-sm font-bold"><span>標題</span><span class="font-normal text-[#8b857d]">{{ title.length }} / 100</span></span>
+            <input v-model.trim="title" data-field="title" maxlength="100" minlength="5" placeholder="例如：你今天中午打算吃什麼？" class="field-input" :class="{ 'field-input-error': fieldErrors.title }" />
             <p v-if="fieldErrors.title" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors.title }}</p>
           </label>
-        </section>
 
-        <section class="border border-[#d7d1c6] bg-[#faf8f3] p-5 sm:p-7">
-          <p class="eyebrow text-[#b0761f]">02 / 投票設定</p>
           <div class="mt-6">
-            <span class="mb-2 block text-sm font-bold">分類</span>
-            <div class="flex flex-wrap gap-2">
-              <button v-for="item in categories" :key="item.key" type="button" class="focus-ring flex items-center gap-2 border px-4 py-2 text-sm font-bold" :class="category === item.key ? 'border-[#171717] bg-[#171717] text-white' : 'border-[#cfc8bc] bg-white'" @click="category = item.key"><span class="inline-block h-2 w-2 rounded-full" :style="{ backgroundColor: getCategoryMeta(item.key).color }" />{{ getCategoryMeta(item.key).label }}</button>
-            </div>
+            <TopicsTopicQuestionBuilder
+              ref="builderRef"
+              v-model:type="builderType"
+              v-model:rows="rows"
+              v-model:prompt="prompt"
+              v-model:scale-min-label="scaleMinLabel"
+              v-model:scale-max-label="scaleMaxLabel"
+              v-model:max-selections="maxSelections"
+            />
           </div>
-          <div class="mt-6 grid gap-3 sm:grid-cols-2">
-            <button v-for="item in topicTypes" :key="item.value" type="button" class="focus-ring border p-4 text-left" :class="topicType === item.value ? 'border-[#b0761f] bg-[#f8ecd6]' : 'border-[#cfc8bc] bg-white'" @click="setTopicType(item.value)">
-              <strong class="block text-sm">{{ item.label }}</strong>
-              <span class="mt-1 block text-xs leading-5 text-[#77716a]">{{ item.description }}</span>
-            </button>
-          </div>
-          <div class="mt-6 border-t border-[#ded8cd] pt-5">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-bold">投票選項</span>
-              <button v-if="topicType === 'MULTIPLE' && options.length < 4" type="button" class="focus-ring text-xs font-bold text-[#b0761f]" @click="options.push('')">＋ 新增選項</button>
+
+          <details class="group mt-6 border-t border-[#f0e6d2] pt-5">
+            <summary class="focus-ring flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-1 py-1 text-sm font-bold text-[#8f5d14] marker:hidden">
+              <span>進階設定</span>
+              <span class="flex min-w-0 items-center gap-2 text-xs font-bold text-[#8f5d14]">
+                <span class="truncate">{{ advancedSummary }}</span>
+                <span class="shrink-0 transition-transform group-open:rotate-180" aria-hidden="true">⌄</span>
+              </span>
+            </summary>
+            <div class="mt-4 grid gap-5 sm:grid-cols-3">
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">投票時間</span>
+                <select v-model="voteDurationHours" class="field-input w-full font-bold"><option v-for="item in durationOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">曝光方式</span>
+                <select v-model="visibility" class="field-input w-full font-bold"><option v-for="item in visibilityOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">查看與參與資格</span>
+                <select v-model="audience" class="field-input w-full font-bold"><option v-for="item in audienceOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+              </label>
+              <p class="text-xs leading-5 text-[#77716a] sm:col-span-3">{{ settingHint }}</p>
             </div>
-            <div class="mt-3 space-y-3">
-              <div v-for="(_, index) in options" :key="index" class="flex items-center gap-3">
-                <span class="grid h-8 w-8 shrink-0 place-items-center bg-[#ebe6dc] text-xs font-black">{{ index + 1 }}</span>
-                <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="`選項 ${index + 1}`" class="focus-ring min-w-0 flex-1 border bg-white px-4 py-3 text-sm" :class="fieldErrors[`option-${index}`] ? 'border-[#d84a36]' : 'border-[#bfb8ad]'" />
-                <button v-if="topicType === 'MULTIPLE' && options.length > 2" type="button" class="focus-ring px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="options.splice(index, 1)">&times;</button>
-              </div>
-            </div>
-          </div>
-          <div class="mt-6 border-t border-[#ded8cd] pt-5">
-            <span class="mb-2 block text-sm font-bold">投票時間</span>
-            <div class="flex flex-wrap gap-2">
-              <button v-for="item in durationOptions" :key="item.value" type="button" class="focus-ring border px-4 py-2.5 text-sm font-bold" :class="voteDurationHours === item.value ? 'border-[#b0761f] bg-[#f8ecd6] text-[#8f5d14]' : 'border-[#cfc8bc] bg-white'" @click="voteDurationHours = item.value">{{ item.label }}</button>
-            </div>
-          </div>
+          </details>
         </section>
 
-        <label class="flex cursor-pointer items-start gap-3 border border-[#d7d1c6] bg-[#ebe6dc] p-5 text-sm leading-6">
-          <input v-model="agreed" type="checkbox" class="mt-1 h-4 w-4 accent-[#b0761f]" />
-          <span>我確認內容為善意生活觀察，未涉及誹謗、個人資料、違法內容或未經證實的指控，並同意平台即時公開開票。</span>
-        </label>
+        <p v-if="formError" class="rounded-2xl border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm text-[#a63222]">{{ formError }}</p>
 
-        <p v-if="formError" class="border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm text-[#a63222]">{{ formError }}</p>
-
-        <button type="submit" class="focus-ring w-full bg-[#b0761f] px-6 py-4 text-sm font-black text-white hover:bg-[#171717] disabled:cursor-not-allowed disabled:opacity-50" :disabled="submitting || !agreed">
-          {{ submitting ? '開票中…' : '發起快問並開票' }}
-        </button>
-        <p class="text-center text-xs text-[#77716a]">資深會員每天最多發起 3 則快問。</p>
+        <div class="flex flex-col items-center gap-2">
+          <UiButton type="submit" variant="quick" block size="lg" :disabled="submitting">
+            {{ submitting ? '開票中…' : '發起快問並開票' }}
+          </UiButton>
+        </div>
       </form>
 
       <aside class="lg:sticky lg:top-28 lg:self-start">
-        <p class="eyebrow mb-3 text-[#77716a]">快問預覽</p>
-        <div class="border-2 border-[#b0761f] bg-[#fff8ec] p-6">
-          <div class="flex items-center justify-between text-xs"><span class="font-bold" :style="{ color: getCategoryMeta(category).color }">{{ category ? getCategoryMeta(category).label : '尚未選擇分類' }}</span><span class="bg-[#b0761f] px-2 py-0.5 text-[10px] font-black text-white">快問</span></div>
+        <p class="eyebrow-modern mb-3 text-[#77716a]">快問預覽</p>
+        <div class="surface-quick p-6">
+          <div class="flex items-center justify-between text-xs">
+            <span class="rounded-full bg-[#b0761f] px-2.5 py-0.5 text-[10px] font-black text-white">{{ currentBuilder?.label }}</span>
+            <span class="font-bold text-[#b0761f]">快問</span>
+          </div>
           <h2 class="mt-6 text-2xl font-black leading-snug">{{ title || '你的快問會顯示在這裡' }}</h2>
-          <ul class="mt-6 space-y-2 border-t border-[#e0c9a0] pt-4">
-            <li v-for="option in visibleOptions" :key="option" class="flex items-center gap-3 text-sm"><span class="grid h-6 w-6 shrink-0 place-items-center bg-[#e0c9a0] text-[10px] font-black">{{ options.indexOf(option) + 1 }}</span><span class="font-medium">{{ option || '⋯' }}</span></li>
-          </ul>
-          <p class="mt-7 border-t border-[#e0c9a0] pt-4 text-xs text-[#8f5d14]">立即開票 · {{ durationLabel }} · 投完即見分佈</p>
+
+          <div v-if="builderType === 'STAR_RATING'" class="mt-6 border-t border-[#f0e6d2] pt-4 text-center">
+            <p class="text-4xl tracking-wider text-[#b0761f]">★★★★★</p>
+            <p class="mt-2 text-xs font-bold text-[#8f5d14]">1～5 星評分</p>
+          </div>
+
+          <div v-else-if="builderType === 'LIKERT_5' || builderType === 'LIKERT_7'" class="mt-6 border-t border-[#f0e6d2] pt-4">
+            <div class="grid gap-2" :style="{ gridTemplateColumns: `repeat(${builderType === 'LIKERT_7' ? 7 : 5}, minmax(0, 1fr))` }"><span v-for="point in builderType === 'LIKERT_7' ? 7 : 5" :key="point" class="grid aspect-square place-items-center rounded-full border border-[#e0c9a0] bg-white text-xs font-black text-[#8f5d14]">{{ point }}</span></div>
+            <div class="mt-2 flex justify-between gap-4 text-xs font-bold text-[#8f5d14]"><span>{{ scaleMinLabel || '最低' }}</span><span class="text-right">{{ scaleMaxLabel || '最高' }}</span></div>
+          </div>
+
+          <div v-else-if="builderType === 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-4">
+            <div class="flex items-end justify-between"><span class="text-sm font-bold text-[#6d6861]">你的選擇</span><strong class="text-2xl font-black text-[#b0761f]">50<small class="ml-1 text-xs text-[#77716a]">/ 100</small></strong></div>
+            <input type="range" min="0" max="100" value="50" class="mt-4 w-full accent-[#b0761f]" disabled />
+          </div>
+
+          <div v-else-if="builderType === 'SHORT_ANSWER'" class="mt-6 border-t border-[#f0e6d2] pt-4">
+            <p v-if="prompt" class="text-sm font-bold text-[#6d6861]">{{ prompt }}</p>
+            <div class="mt-3 rounded-2xl border border-dashed border-[#c9a15e] bg-white p-3 text-sm text-[#8b857d]">輸入你的回答…</div>
+            <p class="mt-2 text-xs text-[#8f5d14]">回答公開顯示・{{ totalVotesLabel }}</p>
+          </div>
+
+          <div v-else class="mt-6 space-y-2 border-t border-[#f0e6d2] pt-4">
+            <p v-if="builderType === 'MULTI_SELECT'" class="mb-3 text-xs font-bold text-[#8f5d14]">可複選，最多 {{ maxSelections }} 項</p>
+            <div v-if="builderType === 'MATCHING'" v-for="(row, index) in filledRows" :key="index" class="flex items-center gap-2 text-sm">
+              <span class="flex-1 rounded-lg border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 font-bold">{{ row.label || '⋯' }}</span>
+              <span class="text-[#b0761f]">⇄</span>
+              <span class="flex-1 rounded-lg border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 font-bold">{{ row.match || '⋯' }}</span>
+            </div>
+            <div v-for="(row, index) in filledRows" :key="index" class="flex items-center gap-3 text-sm">
+              <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#f0e6d2] text-[10px] font-black text-[#8f5d14]">{{ index + 1 }}</span>
+              <img v-if="isImageType && row.image" :src="row.image" alt="" class="h-8 w-8 shrink-0 rounded-lg border border-[#e0c9a0] object-cover" />
+              <span class="font-medium">{{ row.label || '⋯' }}</span>
+              <span v-if="builderType === 'SPIN_WHEEL' && row.weight" class="ml-auto rounded-full bg-[#f8ecd6] px-2 py-0.5 text-[10px] font-black text-[#8f5d14]">x{{ row.weight }}</span>
+            </div>
+          </div>
+
+          <p class="mt-7 border-t border-[#f0e6d2] pt-4 text-xs text-[#8f5d14]">立即開票 · {{ durationLabel }} · 投完即見分佈</p>
         </div>
       </aside>
     </div>
@@ -99,25 +135,18 @@
 </template>
 
 <script setup lang="ts">
-import type { Category, Topic } from '~/types/topic';
+import type { Topic, TopicAudience, TopicVisibility } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
-import { applyCategoryRules, getCategoryMeta } from '~/utils/topic';
 import type { CapabilitySummary } from '~/stores/auth';
+import { BUILDER_RULES, isImageBuilder, questionPayload, seedRows, type BuilderRow, type BuilderType } from '~/utils/questionBuilder';
 
 definePageMeta({ middleware: 'auth' });
-
-type QuickType = 'BINARY' | 'MULTIPLE';
 
 const route = useRoute();
 const api = useApi();
 const auth = useAuthStore();
 useSeoMeta({ title: '發起快問｜輿論測風向' });
 
-const categories = ref<Array<{ key: string }>>([]);
-const topicTypes: { value: QuickType; label: string; description: string }[] = [
-  { value: 'BINARY', label: '二選一', description: '兩個明確選項，最快集票' },
-  { value: 'MULTIPLE', label: '多選項', description: '2 到 4 個方向' },
-];
 const durationOptions = [
   { value: 6, label: '6 小時' },
   { value: 12, label: '12 小時' },
@@ -126,36 +155,73 @@ const durationOptions = [
 ];
 
 const title = ref('');
-const category = ref('');
-const topicType = ref<QuickType>('BINARY');
-const options = ref(['選 A', '選 B']);
+const builderType = ref<BuilderType>('OPTION');
+const rows = ref<BuilderRow[]>(seedRows('OPTION'));
+const prompt = ref('');
+const scaleMinLabel = ref('');
+const scaleMaxLabel = ref('');
+const maxSelections = ref(1);
 const voteDurationHours = ref(24);
-const agreed = ref(false);
+const visibility = ref<TopicVisibility>('PUBLIC');
+const audience = ref<TopicAudience>('MEMBER_ONLY');
+const copied = ref(false);
 const loading = ref(true);
 const submitting = ref(false);
 const formError = ref('');
 const fieldErrors = reactive<Record<string, string>>({});
 const savedTopic = ref<Topic | null>(null);
+const lightboxSrc = ref<string | null>(null);
+const builderRef = ref<{ validate: () => { firstField: string | null; formError: string } } | null>(null);
 const eligibility = computed(() => auth.capabilitySummary?.seniorEligibility);
 const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const durationLabel = computed(() => durationOptions.find((item) => item.value === voteDurationHours.value)?.label ?? `${voteDurationHours.value} 小時`);
-const visibleOptions = computed(() => options.value.filter((option) => option.trim()));
+const settingHint = computed(() => {
+  const visibilityHint = visibilityOptions.find((item) => item.value === visibility.value)?.description ?? '';
+  const audienceHint = audienceOptions.find((item) => item.value === audience.value)?.description ?? '';
+  return [visibilityHint, audienceHint].filter(Boolean).join('　');
+});
+const advancedSummary = computed(() => {
+  const visibilityLabel = visibilityOptions.find((item) => item.value === visibility.value)?.label ?? '';
+  const audienceLabel = audienceOptions.find((item) => item.value === audience.value)?.label ?? '';
+  return [durationLabel.value, visibilityLabel, audienceLabel].filter(Boolean).join('・');
+});
+const currentBuilder = computed(() => BUILDER_RULES[builderType.value]);
+const isImageType = computed(() => isImageBuilder(builderType.value));
+const filledRows = computed(() => rows.value.filter((row) => row.label.trim() || (isImageType.value && row.image)));
+const totalVotesLabel = '投完即見';
+const visibilityOptions = [
+  { value: 'PUBLIC' as const, label: '公開刊登', description: '會出現在首頁、搜尋與你的公開頁面。' },
+  { value: 'PRIVATE_LINK' as const, label: '私密連結', description: '不公開刊登，登入且取得連結的人才能查看。' },
+];
+const audienceOptions = [
+  { value: 'MEMBER_ONLY' as const, label: '所有會員', description: '取得查看權限的登入會員都能參與。' },
+  { value: 'FOLLOWERS_ONLY' as const, label: '僅限追蹤者', description: '只有目前追蹤你頻道的會員能查看與互動。' },
+];
 
-function setTopicType(type: QuickType) {
-  topicType.value = type;
-  if (type === 'BINARY') options.value = ['選 A', '選 B'];
-  else if (options.value.length < 2) options.value = ['選項一', '選項二'];
+async function copySharePath(path: string) {
+  await navigator.clipboard.writeText(new URL(path, window.location.origin).toString());
+  copied.value = true;
 }
 
 function validateForm() {
   for (const key of Object.keys(fieldErrors)) delete fieldErrors[key];
-  if (title.value.length < 5) fieldErrors.title = '快問標題至少需要 5 個字';
-  if (!category.value) formError.value = '請選擇一個分類。';
-  options.value.forEach((option, index) => {
-    if (!option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}`;
-  });
-  if (new Set(options.value.map((item) => item.trim())).size !== options.value.length) formError.value = '投票選項不可重複。';
-  return Object.keys(fieldErrors)[0];
+  formError.value = '';
+  let valid = true;
+  let builderFirstField: string | null = null;
+  if (title.value.length < 5) {
+    fieldErrors.title = '標題至少需要 5 個字';
+    valid = false;
+  }
+  const builderResult = builderRef.value?.validate() ?? { firstField: null, formError: '' };
+  if (builderResult.firstField) {
+    builderFirstField = builderResult.firstField;
+    valid = false;
+  }
+  if (builderResult.formError) {
+    formError.value = builderResult.formError;
+    valid = false;
+  }
+  return valid ? null : Object.keys(fieldErrors)[0] || builderFirstField;
 }
 
 async function submit() {
@@ -170,13 +236,21 @@ async function submit() {
   }
   submitting.value = true;
   try {
-    savedTopic.value = await api.post<Topic>('/topics/quick', {
+    const payload: Record<string, unknown> = {
       title: title.value,
-      category: category.value,
-      topicType: topicType.value,
-      options: options.value,
       voteDurationHours: voteDurationHours.value,
-    });
+      visibility: visibility.value,
+      audience: audience.value,
+      ...questionPayload({
+        type: builderType.value,
+        rows: rows.value,
+        prompt: prompt.value,
+        scaleMinLabel: scaleMinLabel.value,
+        scaleMaxLabel: scaleMaxLabel.value,
+        maxSelections: maxSelections.value,
+      }),
+    };
+    savedTopic.value = await api.post<Topic>('/topics/quick', payload);
   } catch (error) {
     formError.value = errorMessage(error);
   } finally {
@@ -186,14 +260,8 @@ async function submit() {
 
 onMounted(async () => {
   try {
-    const [summary, categoryItems] = await Promise.all([
-      api.get<CapabilitySummary>('/me/capabilities'),
-      api.get<Category[]>('/categories'),
-    ]);
+    const summary = await api.get<CapabilitySummary>('/me/capabilities');
     auth.setCapabilities(summary);
-    categories.value = categoryItems.filter((item) => item.isActive);
-    applyCategoryRules(categoryItems);
-    if (categories.value[0]) category.value = categories.value[0].key;
   } catch (error) {
     formError.value = errorMessage(error);
   } finally {

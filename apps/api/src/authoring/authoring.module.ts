@@ -6,9 +6,10 @@ import { AuthoringService } from './authoring.service';
 import { OpenAiCompatibleClient } from './openai-compatible.client';
 import { IdentityModule } from '../identity/identity.module';
 import { CategoriesModule } from '../categories/categories.module';
+import { TopicAccessModule } from '../topics/topic-access.module';
 
 @Module({
-  imports: [RedisModule, IdentityModule, CategoriesModule],
+  imports: [RedisModule, IdentityModule, CategoriesModule, TopicAccessModule],
   controllers: [AuthoringController],
   providers: [AuthoringService, AuthoringRateLimitService, OpenAiCompatibleClient],
 })

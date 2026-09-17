@@ -11,6 +11,7 @@ export interface JwtPayload {
   typ?: 'dev-assumption';
   profile?: string;
   aud?: string;
+  exp?: number;
 }
 
 @Injectable()

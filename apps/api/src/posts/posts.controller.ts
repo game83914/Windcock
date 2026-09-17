@@ -5,6 +5,7 @@ import { ParsedIdPipe } from '../common/parsed-id.pipe';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { PostsService } from './posts.service';
 import { CreateCommentDto, CreatePostDto, LikeDto, PaginationQuery } from './dto/posts.dto';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 
 @ApiTags('posts')
 @Controller()
@@ -12,14 +13,16 @@ export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
   @Get('topics/:id/posts')
-  listPosts(@Param('id', ParsedIdPipe) id: bigint, @Query() q: PaginationQuery) {
+  @UseGuards(OptionalJwtAuthGuard)
+  listPosts(@Param('id', ParsedIdPipe) id: bigint, @Query() q: PaginationQuery, @CurrentUser() user?: AuthUser) {
     const stanceId = q.stanceId && /^\d+$/.test(q.stanceId) ? BigInt(q.stanceId) : null;
-    return this.postsService.listPosts(id, stanceId, q.page || 1, q.limit || 20);
+    return this.postsService.listPosts(id, stanceId, q.page || 1, q.limit || 20, user?.userId ?? null);
   }
 
   @Get('posts/:id/comments')
-  listComments(@Param('id', ParsedIdPipe) id: bigint, @Query() q: PaginationQuery) {
-    return this.postsService.listComments(id, q.page || 1, q.limit || 50);
+  @UseGuards(OptionalJwtAuthGuard)
+  listComments(@Param('id', ParsedIdPipe) id: bigint, @Query() q: PaginationQuery, @CurrentUser() user?: AuthUser) {
+    return this.postsService.listComments(id, q.page || 1, q.limit || 50, user?.userId ?? null);
   }
 
   @Get('posts/activity/recent-comments')

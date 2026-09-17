@@ -10,7 +10,7 @@
     "postinstall": "npm run prisma:generate",
     "dev:api": "./scripts/ensure-port-free.sh 3001 API http://localhost:3001/api/v1/health windcock-api && npm run dev -w apps/api || [ $? -eq 3 ]",
     "predev:api": "./scripts/devdb.sh start",
-    "dev:web": "./scripts/ensure-port-free.sh 3000 Web http://localhost:3000 && npm run dev -w apps/web || [ $? -eq 3 ]",
+    "dev:web": "./scripts/ensure-port-free.sh 3000 Web http://localhost:3000 && npm run dev -w apps/web -- --host 0.0.0.0 || [ $? -eq 3 ]",
     "dev": "npm-run-all --parallel dev:api dev:web",
     "build": "npm run build -w apps/api && npm run build -w apps/web",
     "prisma:generate": "npm run prisma:generate -w apps/api",
