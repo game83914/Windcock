@@ -5,18 +5,17 @@
         <p class="eyebrow-modern text-[#d84a36]">Member Center</p>
         <h2 class="mt-1 text-3xl font-black tracking-[-0.04em]">{{ dashboard ? `${dashboard.member.nickname}，你好` : '會員總覽' }}</h2>
       </div>
-      <UiButton :to="'/topics/create'" variant="action">＋ 發起新議題</UiButton>
     </div>
 
-    <div v-if="!dashboard" class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <div v-for="item in 4" :key="item" class="h-24 animate-pulse rounded-2xl bg-[#e5e0d6]" />
+    <div v-if="!dashboard" class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div v-for="item in 5" :key="item" class="h-24 animate-pulse rounded-2xl bg-[#e5e0d6]" />
     </div>
     <template v-else>
-      <section class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div v-for="stat in stats" :key="stat.label" class="surface-card p-4 sm:p-5">
+      <section class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <NuxtLink v-for="stat in stats" :key="stat.label" :to="stat.to" class="surface-card focus-ring p-4 sm:p-5">
           <strong class="block text-2xl font-black tabular-nums sm:text-3xl" :class="{ 'text-[#3f7a58]': stat.label === '可用點數', 'text-[#d84a36]': stat.label === '未讀通知' }">{{ stat.value }}</strong>
           <span class="mt-1 block text-xs text-[#6d6861]">{{ stat.label }}</span>
-        </div>
+        </NuxtLink>
       </section>
 
       <section v-if="attentionItems.length" class="surface-quick mt-6 p-5">
@@ -50,16 +49,20 @@
 
 <script setup lang="ts">
 import type { MemberDashboard } from '~/types/member';
+import type { ChannelProfile } from '~/types/member';
 
 definePageMeta({ middleware: 'auth' });
 useSeoMeta({ title: '會員中心｜輿論測風向' });
 
 const dashboard = useState<MemberDashboard | null>('member-dashboard', () => null);
+const api = useApi();
+const channel = ref<ChannelProfile | null>(null);
 const stats = computed(() => dashboard.value ? [
-  { label: '可用點數', value: dashboard.value.member.points },
-  { label: '累積投票', value: dashboard.value.counts.votes },
-  { label: '我的議題', value: dashboard.value.counts.topics },
-  { label: '未讀通知', value: dashboard.value.counts.unreadNotifications },
+  { label: '可用點數', value: dashboard.value.member.points, to: '/me/points' },
+  { label: '追蹤者', value: channel.value?.followerCount ?? '—', to: '/me/channel' },
+  { label: '累積投票', value: dashboard.value.counts.votes, to: '/me/votes' },
+  { label: '我的議題', value: dashboard.value.counts.topics, to: '/me/topics' },
+  { label: '未讀通知', value: dashboard.value.counts.unreadNotifications, to: '/me/notifications' },
 ] : []);
 const attentionItems = computed(() => {
   if (!dashboard.value) return [];
@@ -80,4 +83,12 @@ function topicStatus(topic: MemberDashboard['recentTopics'][number]) {
   if (topic.moderationStatus === 'REJECTED') return '未通過複核';
   return topic.status === 'OPEN' ? '投票進行中' : '已停止投票';
 }
+
+onMounted(async () => {
+  try {
+    channel.value = await api.get<ChannelProfile>('/me/channel');
+  } catch {
+    channel.value = null;
+  }
+});
 </script>

@@ -25,6 +25,7 @@ describe('TopicsService importEditorial', () => {
     {} as never,
     policy as never,
     categories as never,
+    {} as never,
   );
 
   const base = {

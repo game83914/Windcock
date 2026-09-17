@@ -3,7 +3,7 @@ import type { Topic } from '~/types/topic';
 import { optionPercentage } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
-const votedOptionId = computed(() => props.topic.options.find((option) => option.label === props.topic.myVote?.choice)?.id ?? null);
+const votedOptionId = computed(() => props.topic.myVote?.optionId ?? null);
 </script>
 
 <template>

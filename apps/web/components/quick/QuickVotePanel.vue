@@ -148,6 +148,60 @@
       <UiQuickMiniResults v-if="topic.hasVoted" :topic="topic" class="mt-5" />
     </template>
 
+    <template v-else-if="isRating">
+      <template v-if="!showResults && isVotingOpen">
+        <p class="mb-4 text-sm font-bold text-[#6d6861]">{{ topic.topicType === 'STAR_RATING' ? '點選星數評分' : '選擇最符合你的刻度' }}</p>
+        <div v-if="topic.topicType === 'STAR_RATING'" class="flex flex-wrap justify-center gap-1 sm:gap-2" role="radiogroup" aria-label="五星評分">
+          <button v-for="(o, index) in topic.options" :key="o.id" type="button" role="radio" class="focus-ring p-1 text-4xl leading-none transition hover:scale-110" :class="optionValue(o, index) <= selectedRatingValue ? 'text-[#b0761f]' : 'text-[#d7d1c6]'" :aria-checked="myVoteOptionId === o.id" :aria-label="`${optionValue(o, index)} 星`" :disabled="voting || isInteractionLocked" @mouseenter="ratingHoverValue = optionValue(o, index)" @mouseleave="ratingHoverValue = null" @click="submitQuickVote(o.id)">★</button>
+        </div>
+        <div v-else>
+          <div class="grid gap-2" :style="{ gridTemplateColumns: `repeat(${ratingScaleSize(topic.topicType)}, minmax(0, 1fr))` }" role="radiogroup" :aria-label="`${ratingScaleSize(topic.topicType)} 點量表`">
+            <button v-for="(o, index) in topic.options" :key="o.id" type="button" role="radio" class="focus-ring grid aspect-square min-h-10 place-items-center rounded-xl border-2 bg-white text-sm font-black transition hover:border-[#b0761f]" :class="myVoteOptionId === o.id ? 'border-[#b0761f] text-[#8f5d14]' : 'border-[#ded7cb]'" :aria-checked="myVoteOptionId === o.id" :disabled="voting || isInteractionLocked" @click="submitQuickVote(o.id)">{{ optionValue(o, index) }}</button>
+          </div>
+          <div class="mt-2 flex justify-between gap-4 text-xs font-bold text-[#77716a]"><span>{{ topic.scaleMinLabel }}</span><span class="text-right">{{ topic.scaleMaxLabel }}</span></div>
+        </div>
+      </template>
+      <template v-else>
+        <div class="rounded-2xl bg-[#fff8ec] p-4 text-center">
+          <p class="text-xs font-bold text-[#8f5d14]">平均評分</p>
+          <strong class="mt-1 block text-4xl font-black tabular-nums text-[#b0761f]">{{ ratingAverage.toFixed(1) }}<small class="ml-1 text-sm text-[#77716a]">/ {{ ratingScaleSize(topic.topicType) }}</small></strong>
+          <p v-if="topic.topicType === 'STAR_RATING'" class="mt-1 text-xl tracking-wider text-[#b0761f]">★★★★★</p>
+          <div v-else class="mt-2 flex justify-between gap-4 text-xs font-bold text-[#77716a]"><span>{{ topic.scaleMinLabel }}</span><span class="text-right">{{ topic.scaleMaxLabel }}</span></div>
+        </div>
+        <div class="mt-4 space-y-3">
+          <button v-for="(o, index) in topic.options" :key="o.id" type="button" class="focus-ring block w-full text-left disabled:cursor-default" :disabled="voting || !isVotingOpen || !auth.canVote" @click="changeQuickVote(o.id)">
+            <span class="mb-1 flex items-center justify-between gap-3 text-xs font-bold"><span :class="myVoteOptionId === o.id ? 'text-[#8f5d14]' : ''"><span v-if="myVoteOptionId === o.id" aria-hidden="true">✓ </span>{{ topic.topicType === 'STAR_RATING' ? `${optionValue(o, index)} 星` : `${optionValue(o, index)} 分` }}</span><span class="tabular-nums">{{ optionPercentage(o, topic) }}% · {{ o.voteCount }} 票</span></span>
+            <span class="block h-2 rounded-full bg-[#dfdad0]"><span class="block h-full rounded-full bg-[#b0761f]" :style="{ width: `${optionPercentage(o, topic)}%` }" /></span>
+          </button>
+        </div>
+      </template>
+    </template>
+
+    <template v-else-if="isMultiSelect">
+      <template v-if="isVotingOpen && (!showResults || auth.canVote)">
+        <p class="mb-3 text-sm font-bold text-[#6d6861]">可選 1～{{ multiSelectLimit }} 項，選好後確認送出。</p>
+        <div class="space-y-2.5">
+          <label v-for="o in visibleOptions" :key="o.id" class="focus-within:ring-2 focus-within:ring-[#b0761f] flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3 font-bold transition" :class="selectedOptionIds.includes(o.id) ? 'border-[#b0761f] bg-[#fff8ec] text-[#8f5d14]' : 'border-[#ded7cb] bg-white'">
+            <input type="checkbox" class="size-5 accent-[#b0761f]" :checked="selectedOptionIds.includes(o.id)" :disabled="voting || isInteractionLocked" @change="toggleMultiSelection(o.id)" />
+            <span class="flex-1">{{ o.label }}</span>
+            <span v-if="showResults" class="text-xs tabular-nums">{{ multiSelectPercentage(o, topic) }}%</span>
+          </label>
+        </div>
+        <button v-if="optionsCollapsed" type="button" class="focus-ring mt-3 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${topic.options.length}）` }}</button>
+        <UiButton v-if="!isInteractionLocked" variant="quick" block class="mt-4" :disabled="voting || !multiSelectionValid || multiSelectionUnchanged" @click="submitMultiSelectVote">{{ voting ? '送出中…' : topic.hasVoted ? '更新我的選擇' : `確認選擇（${selectedOptionIds.length}）` }}</UiButton>
+        <p v-if="showResults" class="mt-4 text-xs text-[#77716a]">選取率以作答人數計算，每人可複選，因此百分比加總可能超過 100%。</p>
+      </template>
+      <template v-else>
+        <div class="space-y-4">
+          <div v-for="o in visibleOptions" :key="o.id">
+            <div class="mb-1 flex items-center justify-between gap-3 text-sm font-bold"><span :class="myVoteOptionIds.includes(o.id) ? 'text-[#8f5d14]' : ''"><span v-if="myVoteOptionIds.includes(o.id)" aria-hidden="true">✓ </span>{{ o.label }}</span><span class="shrink-0 tabular-nums">{{ multiSelectPercentage(o, topic) }}% · {{ o.voteCount }} 次</span></div>
+            <div class="h-2 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5]" :style="{ width: `${Math.min(multiSelectPercentage(o, topic), 100)}%` }" /></div>
+          </div>
+        </div>
+        <p class="mt-4 text-xs text-[#77716a]">選取率以作答人數計算，每人可複選，因此百分比加總可能超過 100%。</p>
+      </template>
+    </template>
+
     <template v-else-if="!showResults && isVotingOpen && isOptionPick">
       <div class="space-y-2.5">
         <button
@@ -293,7 +347,7 @@
           <strong class="text-4xl font-black tabular-nums text-[#3157d5]">{{ Math.round(Number(topic.spectrumMedian || 0)) }}<small class="ml-1 text-sm text-[#77716a]">/ 100</small></strong>
         </div>
         <div class="relative mt-5 h-3 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5]" :style="{ width: `${Number(topic.spectrumMedian || 0)}%` }" /></div>
-        <p v-if="topic.myVote" class="mt-4 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+        <p v-if="topic.myVote" class="mt-4 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ votedChoice }}</p>
       </template>
       <template v-else-if="isImageOption">
         <div class="grid grid-cols-2 gap-3">
@@ -313,7 +367,7 @@
             </span>
           </div>
         </div>
-        <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+        <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ votedChoice }}</p>
       </template>
       <template v-else>
         <div class="space-y-5">
@@ -322,7 +376,7 @@
             <div class="h-2 rounded-full bg-[#dfdad0]"><div class="h-full rounded-full bg-[#3157d5] transition-[width] duration-500" :style="{ width: `${optionPercentage(o, topic)}%` }" /></div>
           </div>
         </div>
-        <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ topic.myVote.choice }}</p>
+        <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ votedChoice }}</p>
         <button v-if="optionsCollapsed" type="button" class="focus-ring mt-4 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${topic.options.length}）` }}</button>
       </template>
     </template>
@@ -331,7 +385,7 @@
 
 <script setup lang="ts">
 import type { Topic, TopicOption } from '~/types/topic';
-import { isImageOptionType, isImageRankType, isOptionPickType, optionPercentage } from '~/utils/topic';
+import { isImageOptionType, isImageRankType, isOptionPickType, isRatingType, multiSelectPercentage, optionPercentage, optionValue, ratingScaleSize, weightedOptionAverage } from '~/utils/topic';
 import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
@@ -350,6 +404,8 @@ const showResults = computed(() => props.topic.hasVoted || !isVotingOpen.value |
 const isOptionPick = computed(() => isOptionPickType(props.topic.topicType));
 const isImageOption = computed(() => isImageOptionType(props.topic.topicType));
 const isImageRank = computed(() => isImageRankType(props.topic.topicType));
+const isRating = computed(() => isRatingType(props.topic.topicType));
+const isMultiSelect = computed(() => props.topic.topicType === 'MULTI_SELECT');
 const isInteractionLocked = computed(() => !auth.isAuthed);
 function emitRefreshed() { emit('refreshed'); }
 
@@ -357,10 +413,22 @@ const voting = ref(false);
 const votingTargetId = ref<string | null>(null);
 const spectrumValue = ref(50);
 const shortAnswerText = ref('');
-const myVoteOptionId = computed(() => props.topic.options.find((option) => option.label === props.topic.myVote?.choice)?.id ?? null);
+const ratingHoverValue = ref<number | null>(null);
+const votedOptionIndex = computed(() => props.topic.options.findIndex((option) => option.id === props.topic.myVote?.optionId));
+const myVoteOptionId = computed(() => props.topic.myVote?.optionId ?? (votedOptionIndex.value >= 0 ? props.topic.options[votedOptionIndex.value]?.id ?? null : null));
 const votedOptionId = computed(() => myVoteOptionId.value);
-const votedChoice = computed(() => props.topic.myVote?.choice ?? '');
-const votedOptionIndex = computed(() => props.topic.options.findIndex((option) => option.label === props.topic.myVote?.choice));
+const votedChoice = computed(() => props.topic.myVote?.choice || (votedOptionIndex.value >= 0 ? `選項 ${votedOptionIndex.value + 1}` : ''));
+const myVoteOptionIds = computed(() => props.topic.myVote?.optionIds ?? (myVoteOptionId.value ? [myVoteOptionId.value] : []));
+const selectedOptionIds = ref<string[]>([...myVoteOptionIds.value]);
+const multiSelectLimit = computed(() => Math.max(1, Math.min(props.topic.maxSelections ?? props.topic.options.length, props.topic.options.length)));
+const multiSelectionValid = computed(() => selectedOptionIds.value.length >= 1 && selectedOptionIds.value.length <= multiSelectLimit.value);
+const multiSelectionUnchanged = computed(() => selectedOptionIds.value.length === myVoteOptionIds.value.length && selectedOptionIds.value.every((id) => myVoteOptionIds.value.includes(id)));
+const ratingAverage = computed(() => weightedOptionAverage(props.topic));
+const selectedRatingValue = computed(() => {
+  if (ratingHoverValue.value !== null) return ratingHoverValue.value;
+  const option = props.topic.options[votedOptionIndex.value];
+  return option ? optionValue(option, votedOptionIndex.value) : 0;
+});
 const hasVotedGame = computed(() => !!props.topic.hasVoted);
 const redoMode = ref(false);
 const mySpectrumValue = computed(() => {
@@ -406,6 +474,18 @@ const optionsCollapsed = computed(() => !showAllOptions.value && props.topic.opt
 const visibleOptions = computed(() => optionsCollapsed.value ? props.topic.options.slice(0, OPTION_COLLAPSE_LIMIT) : props.topic.options);
 function toggleOptions() {
   showAllOptions.value = !showAllOptions.value;
+}
+
+function toggleMultiSelection(optionId: string) {
+  if (selectedOptionIds.value.includes(optionId)) {
+    selectedOptionIds.value = selectedOptionIds.value.filter((id) => id !== optionId);
+    return;
+  }
+  if (selectedOptionIds.value.length >= multiSelectLimit.value) {
+    toastError(`最多只能選 ${multiSelectLimit.value} 項`);
+    return;
+  }
+  selectedOptionIds.value = [...selectedOptionIds.value, optionId];
 }
 
 function formatTime(iso: string) {
@@ -477,6 +557,22 @@ async function changeQuickVote(optionId: string) {
     emit('refreshed');
   } catch (e) {
     votingTargetId.value = null;
+    toastError(errorMessage(e));
+  } finally {
+    voting.value = false;
+  }
+}
+
+async function submitMultiSelectVote() {
+  if (voting.value || !auth.isAuthed || !multiSelectionValid.value || multiSelectionUnchanged.value) return;
+  voting.value = true;
+  try {
+    const request = props.topic.hasVoted ? api.patch.bind(api) : api.post.bind(api);
+    const res = await request<{ newBalance: string; rewardPoints: number }>(`/topics/${props.topic.id}/vote`, { optionIds: selectedOptionIds.value });
+    auth.updatePoints(res.newBalance);
+    toastSuccess(props.topic.hasVoted ? '已更新選擇' : '已送出選擇');
+    emit('refreshed');
+  } catch (e) {
     toastError(errorMessage(e));
   } finally {
     voting.value = false;
@@ -698,6 +794,9 @@ function shakeLottery() {
 watch(() => props.topic.myVote?.spectrumValue, (value) => {
   if (value != null) spectrumValue.value = Number(value);
 });
+watch(() => props.topic.myVote?.optionIds, (optionIds) => {
+  selectedOptionIds.value = [...(optionIds ?? [])];
+});
 watch(() => props.topic.id, (nextId, previousId) => {
   if (nextId === previousId) return;
   redoMode.value = false;
@@ -708,6 +807,8 @@ watch(() => props.topic.id, (nextId, previousId) => {
   lotteryState.value = 'idle';
   lotteryResultId.value = null;
   wheelHitIndex.value = null;
+  ratingHoverValue.value = null;
+  selectedOptionIds.value = [...(props.topic.myVote?.optionIds ?? [])];
   for (const key of Object.keys(puzzleProgress)) delete puzzleProgress[key];
   for (const key of Object.keys(scratchProgress)) scratchProgress[key] = 0;
   preparePuzzle();

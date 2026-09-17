@@ -15,6 +15,7 @@ import { HealthController } from './health.controller';
 import { AuthoringModule } from './authoring/authoring.module';
 import { IdentityModule } from './identity/identity.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ChannelsModule } from './channels/channels.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { CategoriesModule } from './categories/categories.module';
     AuthoringModule,
     IdentityModule,
     CategoriesModule,
+    ChannelsModule,
   ],
   controllers: [HealthController],
 })

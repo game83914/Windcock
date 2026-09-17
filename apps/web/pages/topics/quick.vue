@@ -2,9 +2,8 @@
   <div class="mx-auto max-w-6xl pb-12">
     <UiImageLightbox v-model:src="lightboxSrc" />
     <div class="mb-8 border-b border-[#ded7cb] pb-6">
-      <p class="eyebrow-modern text-[#b0761f]">UGC 微投票 · 立即開票</p>
-      <h1 class="mt-1 text-3xl font-black tracking-[-0.04em] sm:text-4xl">發起今天快問</h1>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-[#6d6861]">資深會員可發起輕量微投票，立即開票、即時看風向。選項題、光譜題到連連看、刮刮樂、轉盤、搖獎，今天就想知道答案的生活問題都能玩。</p>
+      <h1 class="mt-1 text-3xl font-black tracking-[-0.04em] sm:text-4xl">發起快問</h1>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-[#6d6861]">任何小事都能問問</p>
     </div>
 
     <div v-if="savedTopic" class="surface-card p-8 text-center sm:p-12">
@@ -12,6 +11,7 @@
       <h2 class="mt-3 text-2xl font-black">你的快問上線了</h2>
       <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6d6861]">投票時間 {{ savedTopic.voteDurationHours }} 小時，結束後會依集票情況結算。現在就可以到詳情頁玩第一票。</p>
       <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+        <UiButton v-if="savedTopic.sharePath" variant="primary" @click="copySharePath(savedTopic.sharePath)">{{ copied ? '已複製連結' : '複製私密連結' }}</UiButton>
         <UiButton :to="`/topic/${savedTopic.id}`" variant="quick">前往快問詳情</UiButton>
         <UiButton :to="'/me/quick'" variant="outline">查看我的快問</UiButton>
       </div>
@@ -29,77 +29,56 @@
     <div v-else class="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
       <form class="space-y-6" novalidate @submit.prevent="submit">
         <section class="surface-card p-5 sm:p-7">
-          <p class="eyebrow-modern text-[#b0761f]">01 / 投票問題</p>
-          <label class="mt-6 block">
-            <span class="mb-2 flex justify-between text-sm font-bold"><span>快問標題</span><span class="font-normal text-[#8b857d]">{{ title.length }} / 100</span></span>
+          <label class="block">
+            <span class="mb-2 flex justify-between text-sm font-bold"><span>標題</span><span class="font-normal text-[#8b857d]">{{ title.length }} / 100</span></span>
             <input v-model.trim="title" data-field="title" maxlength="100" minlength="5" placeholder="例如：你今天中午打算吃什麼？" class="field-input" :class="{ 'field-input-error': fieldErrors.title }" />
             <p v-if="fieldErrors.title" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors.title }}</p>
           </label>
+
+          <div class="mt-6">
+            <TopicsTopicQuestionBuilder
+              ref="builderRef"
+              v-model:type="builderType"
+              v-model:rows="rows"
+              v-model:prompt="prompt"
+              v-model:scale-min-label="scaleMinLabel"
+              v-model:scale-max-label="scaleMaxLabel"
+              v-model:max-selections="maxSelections"
+            />
+          </div>
+
+          <details class="group mt-6 border-t border-[#f0e6d2] pt-5">
+            <summary class="focus-ring flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-1 py-1 text-sm font-bold text-[#8f5d14] marker:hidden">
+              <span>進階設定</span>
+              <span class="flex min-w-0 items-center gap-2 text-xs font-bold text-[#8f5d14]">
+                <span class="truncate">{{ advancedSummary }}</span>
+                <span class="shrink-0 transition-transform group-open:rotate-180" aria-hidden="true">⌄</span>
+              </span>
+            </summary>
+            <div class="mt-4 grid gap-5 sm:grid-cols-3">
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">投票時間</span>
+                <select v-model="voteDurationHours" class="field-input w-full font-bold"><option v-for="item in durationOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">曝光方式</span>
+                <select v-model="visibility" class="field-input w-full font-bold"><option v-for="item in visibilityOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-bold">查看與參與資格</span>
+                <select v-model="audience" class="field-input w-full font-bold"><option v-for="item in audienceOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
+              </label>
+              <p class="text-xs leading-5 text-[#77716a] sm:col-span-3">{{ settingHint }}</p>
+            </div>
+          </details>
         </section>
-
-        <section class="surface-card p-5 sm:p-7">
-          <p class="eyebrow-modern text-[#b0761f]">02 / 投票設定</p>
-          <div class="mt-6 grid gap-2 sm:grid-cols-2">
-            <button v-for="item in builderTypes" :key="item.value" type="button" class="focus-ring rounded-2xl border-2 p-4 text-left transition" :class="builderType === item.value ? 'border-[#b0761f] bg-[#f8ecd6]' : 'border-[#ded7cb] bg-white hover:border-[#b0761f]'" @click="setBuilderType(item.value)">
-              <strong class="block text-sm">{{ item.label }}</strong>
-              <span class="mt-1 block text-xs leading-5 text-[#77716a]">{{ item.description }}</span>
-            </button>
-          </div>
-
-          <div v-if="usesRows" class="mt-6 border-t border-[#f0e6d2] pt-5">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-bold">{{ rowHeading }}</span>
-              <span class="text-xs font-bold text-[#8f5d14]">{{ filledLabels.length }} / {{ rowLimitLabel }}</span>
-            </div>
-            <div class="mt-3 space-y-3">
-              <div v-for="(row, index) in rows" :key="index" class="flex items-center gap-3">
-                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f0e6d2] text-xs font-black text-[#8f5d14]">{{ index + 1 }}</span>
-                <input v-model.trim="rows[index].label" :data-field="`option-${index}`" maxlength="50" :placeholder="rowPlaceholder" class="field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
-                <input v-if="builderType === 'MATCHING'" v-model.trim="rows[index].match" :data-field="`match-${index}`" maxlength="50" placeholder="右側配對" class="field-input" :class="{ 'field-input-error': fieldErrors[`match-${index}`] }" />
-                <input v-if="builderType === 'SPIN_WHEEL'" v-model.trim="rows[index].weight" :data-field="`weight-${index}`" maxlength="4" inputmode="numeric" placeholder="權重" class="field-input w-20" :class="{ 'field-input-error': fieldErrors[`weight-${index}`] }" />
-                <TopicsOptionImageInput v-if="builderType === 'IMAGE_OPTION' || builderType === 'IMAGE_RANK'" v-model="rows[index].image" @preview="lightboxSrc = $event" />
-                <button v-if="rows.length > minRows" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除項目" @click="rows.splice(index, 1)">&times;</button>
-              </div>
-            </div>
-            <button v-if="rows.length < maxRows" type="button" class="focus-ring mt-3 rounded-full text-xs font-bold text-[#b0761f] hover:underline" @click="rows.push({ label: '', match: '', weight: '', image: null })">＋ 新增{{ builderType === 'MATCHING' ? '配對' : '項目' }}</button>
-            <p v-if="builderType === 'SPIN_WHEEL'" class="mt-2 text-xs leading-5 text-[#77716a]">權重為選填的轉盤機率（正整數）：數字愈大愈容易被轉到；留空則每格機率相同。</p>
-          </div>
-
-          <div v-if="builderType === 'SHORT_ANSWER'" class="mt-6 border-t border-[#f0e6d2] pt-5">
-            <span class="mb-2 block text-sm font-bold">作答提示（選填）</span>
-            <textarea v-model.trim="prompt" maxlength="200" rows="2" placeholder="例如：用一句話描述你最理想的生活城市" class="field-input w-full" />
-            <p class="mt-2 text-xs leading-5 text-[#77716a]">回答會公開顯示並統計回覆數，最多 500 字。</p>
-          </div>
-
-          <div v-if="builderType === 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-5">
-            <span class="mb-2 block text-sm font-bold">光譜軸向</span>
-            <div class="rounded-2xl bg-[#f8ecd6] p-4">
-              <input type="range" min="0" max="100" value="50" class="w-full accent-[#b0761f]" disabled />
-              <div class="mt-1 flex justify-between text-xs font-bold text-[#8f5d14]"><span>0</span><span>50</span><span>100</span></div>
-              <p class="mt-3 text-xs leading-5 text-[#77716a]">成員用 0~100 滑桿表態，即時看中間值風向。無需設定選項。</p>
-            </div>
-          </div>
-
-          <div class="mt-6 border-t border-[#f0e6d2] pt-5">
-            <span class="mb-2 block text-sm font-bold">投票時間</span>
-            <div class="flex flex-wrap gap-2">
-              <button v-for="item in durationOptions" :key="item.value" type="button" class="focus-ring rounded-full border px-4 py-2.5 text-sm font-bold transition" :class="voteDurationHours === item.value ? 'border-[#b0761f] bg-[#b0761f] text-white' : 'border-[#cfc8bc] bg-white hover:border-[#b0761f]'" @click="voteDurationHours = item.value">{{ item.label }}</button>
-            </div>
-          </div>
-        </section>
-
-        <label class="flex cursor-pointer items-start gap-3 surface-quick p-5 text-sm leading-6">
-          <input v-model="agreed" type="checkbox" class="mt-1 h-4 w-4 accent-[#b0761f]" />
-          <span>我確認內容為善意生活觀察，未涉及誹謗、個人資料、違法內容或未經證實的指控，並同意平台即時公開開票。</span>
-        </label>
 
         <p v-if="formError" class="rounded-2xl border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm text-[#a63222]">{{ formError }}</p>
 
         <div class="flex flex-col items-center gap-2">
-          <UiButton type="submit" variant="quick" block size="lg" :disabled="submitting || !agreed">
+          <UiButton type="submit" variant="quick" block size="lg" :disabled="submitting">
             {{ submitting ? '開票中…' : '發起快問並開票' }}
           </UiButton>
-          <p class="text-xs text-[#77716a]">資深會員每天最多發起 3 則快問。</p>
         </div>
       </form>
 
@@ -112,7 +91,17 @@
           </div>
           <h2 class="mt-6 text-2xl font-black leading-snug">{{ title || '你的快問會顯示在這裡' }}</h2>
 
-          <div v-if="builderType === 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-4">
+          <div v-if="builderType === 'STAR_RATING'" class="mt-6 border-t border-[#f0e6d2] pt-4 text-center">
+            <p class="text-4xl tracking-wider text-[#b0761f]">★★★★★</p>
+            <p class="mt-2 text-xs font-bold text-[#8f5d14]">1～5 星評分</p>
+          </div>
+
+          <div v-else-if="builderType === 'LIKERT_5' || builderType === 'LIKERT_7'" class="mt-6 border-t border-[#f0e6d2] pt-4">
+            <div class="grid gap-2" :style="{ gridTemplateColumns: `repeat(${builderType === 'LIKERT_7' ? 7 : 5}, minmax(0, 1fr))` }"><span v-for="point in builderType === 'LIKERT_7' ? 7 : 5" :key="point" class="grid aspect-square place-items-center rounded-full border border-[#e0c9a0] bg-white text-xs font-black text-[#8f5d14]">{{ point }}</span></div>
+            <div class="mt-2 flex justify-between gap-4 text-xs font-bold text-[#8f5d14]"><span>{{ scaleMinLabel || '最低' }}</span><span class="text-right">{{ scaleMaxLabel || '最高' }}</span></div>
+          </div>
+
+          <div v-else-if="builderType === 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-4">
             <div class="flex items-end justify-between"><span class="text-sm font-bold text-[#6d6861]">你的選擇</span><strong class="text-2xl font-black text-[#b0761f]">50<small class="ml-1 text-xs text-[#77716a]">/ 100</small></strong></div>
             <input type="range" min="0" max="100" value="50" class="mt-4 w-full accent-[#b0761f]" disabled />
           </div>
@@ -124,6 +113,7 @@
           </div>
 
           <div v-else class="mt-6 space-y-2 border-t border-[#f0e6d2] pt-4">
+            <p v-if="builderType === 'MULTI_SELECT'" class="mb-3 text-xs font-bold text-[#8f5d14]">可複選，最多 {{ maxSelections }} 項</p>
             <div v-if="builderType === 'MATCHING'" v-for="(row, index) in filledRows" :key="index" class="flex items-center gap-2 text-sm">
               <span class="flex-1 rounded-lg border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 font-bold">{{ row.label || '⋯' }}</span>
               <span class="text-[#b0761f]">⇄</span>
@@ -131,7 +121,7 @@
             </div>
             <div v-for="(row, index) in filledRows" :key="index" class="flex items-center gap-3 text-sm">
               <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#f0e6d2] text-[10px] font-black text-[#8f5d14]">{{ index + 1 }}</span>
-              <img v-if="(builderType === 'IMAGE_OPTION' || builderType === 'IMAGE_RANK') && row.image" :src="row.image" alt="" class="h-8 w-8 shrink-0 rounded-lg border border-[#e0c9a0] object-cover" />
+              <img v-if="isImageType && row.image" :src="row.image" alt="" class="h-8 w-8 shrink-0 rounded-lg border border-[#e0c9a0] object-cover" />
               <span class="font-medium">{{ row.label || '⋯' }}</span>
               <span v-if="builderType === 'SPIN_WHEEL' && row.weight" class="ml-auto rounded-full bg-[#f8ecd6] px-2 py-0.5 text-[10px] font-black text-[#8f5d14]">x{{ row.weight }}</span>
             </div>
@@ -145,35 +135,18 @@
 </template>
 
 <script setup lang="ts">
-import type { Topic } from '~/types/topic';
-import type { QuickTopicType } from '~/types/topic';
+import type { Topic, TopicAudience, TopicVisibility } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
 import type { CapabilitySummary } from '~/stores/auth';
+import { BUILDER_RULES, isImageBuilder, questionPayload, seedRows, type BuilderRow, type BuilderType } from '~/utils/questionBuilder';
 
 definePageMeta({ middleware: 'auth' });
-
-type BuilderType = 'OPTION' | 'IMAGE_OPTION' | 'IMAGE_RANK' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
-interface BuilderRow { label: string; match: string; weight: string; image: string | null }
 
 const route = useRoute();
 const api = useApi();
 const auth = useAuthStore();
 useSeoMeta({ title: '發起快問｜輿論測風向' });
 
-const BUILDER_RULES: Record<BuilderType, { label: string; description: string; min: number; max: number; needs: 'LIST' | 'MATCH' | 'WEIGHT' | 'NONE' }> = {
-  OPTION: { label: '選項題', description: '二選一或 2~10 個選項，一鍵看分佈', min: 2, max: 10, needs: 'LIST' },
-  IMAGE_OPTION: { label: '圖片選項題', description: '上傳圖片為選項，點圖即投', min: 2, max: 10, needs: 'LIST' },
-  IMAGE_RANK: { label: '二選一排名賽', description: '4~50 張圖片，逐對二選一排出完整名次', min: 4, max: 50, needs: 'LIST' },
-  SPECTRUM: { label: '光譜題', description: '0~100 滑桿測立場，即時看風向', min: 0, max: 0, needs: 'NONE' },
-  SHORT_ANSWER: { label: '簡答題', description: '收集文字回應，公開顯示解讀民意', min: 0, max: 0, needs: 'NONE' },
-  MATCHING: { label: '連連看', description: '左右配對，配對完成即選定', min: 2, max: 6, needs: 'MATCH' },
-  PUZZLE: { label: '拼圖題', description: '重排拼字，拼完揭曉你的選擇', min: 2, max: 4, needs: 'LIST' },
-  SCRATCH: { label: '刮刮樂', description: '刮開卡片揭曉你的選擇', min: 1, max: 9, needs: 'LIST' },
-  SPIN_WHEEL: { label: '轉盤抽獎', description: '轉動轉盤，指到的即你的選擇', min: 2, max: 8, needs: 'WEIGHT' },
-  LOTTERY: { label: '日式搖獎', description: '搖箱抽球，抽中的即你的選擇', min: 2, max: 10, needs: 'LIST' },
-};
-const DEFAULT_COUNT: Record<BuilderType, number> = { OPTION: 2, IMAGE_OPTION: 3, IMAGE_RANK: 8, SPECTRUM: 0, SHORT_ANSWER: 0, MATCHING: 3, PUZZLE: 3, SCRATCH: 4, SPIN_WHEEL: 4, LOTTERY: 5 };
-const builderTypes = Object.entries(BUILDER_RULES).map(([value, rule]) => ({ value: value as BuilderType, label: rule.label, description: rule.description }));
 const durationOptions = [
   { value: 6, label: '6 小時' },
   { value: 12, label: '12 小時' },
@@ -185,114 +158,70 @@ const title = ref('');
 const builderType = ref<BuilderType>('OPTION');
 const rows = ref<BuilderRow[]>(seedRows('OPTION'));
 const prompt = ref('');
+const scaleMinLabel = ref('');
+const scaleMaxLabel = ref('');
+const maxSelections = ref(1);
 const voteDurationHours = ref(24);
-const agreed = ref(false);
+const visibility = ref<TopicVisibility>('PUBLIC');
+const audience = ref<TopicAudience>('MEMBER_ONLY');
+const copied = ref(false);
 const loading = ref(true);
 const submitting = ref(false);
 const formError = ref('');
 const fieldErrors = reactive<Record<string, string>>({});
 const savedTopic = ref<Topic | null>(null);
 const lightboxSrc = ref<string | null>(null);
+const builderRef = ref<{ validate: () => { firstField: string | null; formError: string } } | null>(null);
 const eligibility = computed(() => auth.capabilitySummary?.seniorEligibility);
 const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const durationLabel = computed(() => durationOptions.find((item) => item.value === voteDurationHours.value)?.label ?? `${voteDurationHours.value} 小時`);
+const settingHint = computed(() => {
+  const visibilityHint = visibilityOptions.find((item) => item.value === visibility.value)?.description ?? '';
+  const audienceHint = audienceOptions.find((item) => item.value === audience.value)?.description ?? '';
+  return [visibilityHint, audienceHint].filter(Boolean).join('　');
+});
+const advancedSummary = computed(() => {
+  const visibilityLabel = visibilityOptions.find((item) => item.value === visibility.value)?.label ?? '';
+  const audienceLabel = audienceOptions.find((item) => item.value === audience.value)?.label ?? '';
+  return [durationLabel.value, visibilityLabel, audienceLabel].filter(Boolean).join('・');
+});
 const currentBuilder = computed(() => BUILDER_RULES[builderType.value]);
-const usesRows = computed(() => currentBuilder.value.needs !== 'NONE');
-const minRows = computed(() => currentBuilder.value.min);
-const maxRows = computed(() => currentBuilder.value.max);
-const rowLimitLabel = computed(() => `${minRows.value}~${maxRows.value}`);
-const rowHeading = computed(() => ({
-  OPTION: '選項',
-  IMAGE_OPTION: '圖片選項',
-  IMAGE_RANK: '排名賽圖片',
-  SPECTRUM: '光譜軸向',
-  SHORT_ANSWER: '作答提示',
-  MATCHING: '配對內容',
-  PUZZLE: '拼圖提示',
-  SCRATCH: '卡片內容',
-  SPIN_WHEEL: '轉盤選項',
-  LOTTERY: '搖獎球選項',
-}[builderType.value] ?? '項目'));
-const rowPlaceholder = computed(() => builderType.value === 'IMAGE_OPTION' || builderType.value === 'IMAGE_RANK' ? '圖片說明（必填、不可重複）' : builderType.value === 'MATCHING' ? '左側項目' : builderType.value === 'PUZZLE' ? '拼圖提示（如「支持」）' : '選項內容');
-const filledLabels = computed(() => rows.value.map((row) => row.label.trim()).filter(Boolean));
-const filledRows = computed(() => rows.value.filter((row) => row.label.trim()));
+const isImageType = computed(() => isImageBuilder(builderType.value));
+const filledRows = computed(() => rows.value.filter((row) => row.label.trim() || (isImageType.value && row.image)));
 const totalVotesLabel = '投完即見';
+const visibilityOptions = [
+  { value: 'PUBLIC' as const, label: '公開刊登', description: '會出現在首頁、搜尋與你的公開頁面。' },
+  { value: 'PRIVATE_LINK' as const, label: '私密連結', description: '不公開刊登，登入且取得連結的人才能查看。' },
+];
+const audienceOptions = [
+  { value: 'MEMBER_ONLY' as const, label: '所有會員', description: '取得查看權限的登入會員都能參與。' },
+  { value: 'FOLLOWERS_ONLY' as const, label: '僅限追蹤者', description: '只有目前追蹤你頻道的會員能查看與互動。' },
+];
 
-function seedRows(type: BuilderType): BuilderRow[] {
-  return Array.from({ length: DEFAULT_COUNT[type] }, () => ({ label: '', match: '', weight: '', image: null }));
-}
-
-function setBuilderType(type: BuilderType) {
-  if (type === builderType.value) return;
-  builderType.value = type;
-  rows.value = seedRows(type);
-}
-
-function backendTopicType(): QuickTopicType {
-  if (builderType.value === 'OPTION') return filledLabels.value.length === 2 ? 'BINARY' : 'MULTIPLE';
-  if (builderType.value === 'IMAGE_OPTION') return 'IMAGE_MULTIPLE';
-  return builderType.value;
+async function copySharePath(path: string) {
+  await navigator.clipboard.writeText(new URL(path, window.location.origin).toString());
+  copied.value = true;
 }
 
 function validateForm() {
   for (const key of Object.keys(fieldErrors)) delete fieldErrors[key];
   formError.value = '';
   let valid = true;
+  let builderFirstField: string | null = null;
   if (title.value.length < 5) {
-    fieldErrors.title = '快問標題至少需要 5 個字';
+    fieldErrors.title = '標題至少需要 5 個字';
     valid = false;
   }
-  if (usesRows.value) {
-    rows.value.forEach((row, index) => {
-      if (!row.label.trim()) {
-        fieldErrors[`option-${index}`] = '請填寫此欄';
-        valid = false;
-      }
-      if (builderType.value === 'MATCHING' && !row.match.trim()) {
-        fieldErrors[`match-${index}`] = '請填寫右側配對';
-        valid = false;
-      }
-      if (builderType.value === 'IMAGE_OPTION' || builderType.value === 'IMAGE_RANK') {
-        if (!row.image) {
-          fieldErrors[`option-${index}`] = '請為此選項上傳圖片';
-          valid = false;
-        }
-      }
-    });
-    const labels = filledLabels.value;
-    if (labels.length < minRows.value || labels.length > maxRows.value) {
-      formError.value = `${currentBuilder.value.label}需要 ${rowLimitLabel.value} 個項目（目前 ${labels.length} 個）。`;
-      valid = false;
-    }
-    if (labels.length && new Set(labels).size !== labels.length) {
-      formError.value = '項目內容不可重複。';
-      valid = false;
-    }
-    if (builderType.value === 'MATCHING') {
-      const matches = rows.value.map((row) => row.match.trim()).filter(Boolean);
-      if (matches.length !== rows.value.length) {
-        formError.value = '每一列都需填寫右側配對。';
-        valid = false;
-      } else if (new Set(matches).size !== matches.length) {
-        formError.value = '右側配對不可重複。';
-        valid = false;
-      }
-    }
-    if (builderType.value === 'SPIN_WHEEL') {
-      const filledWeights = rows.value.filter((row) => row.weight.trim());
-      if (filledWeights.length) {
-        const badRow = rows.value.findIndex((row) => {
-          const value = Number(row.weight.trim());
-          return !row.weight.trim() || !Number.isInteger(value) || value < 1;
-        });
-        if (badRow >= 0) {
-          fieldErrors[`weight-${badRow}`] = '權重需為正整數';
-          valid = false;
-        }
-      }
-    }
+  const builderResult = builderRef.value?.validate() ?? { firstField: null, formError: '' };
+  if (builderResult.firstField) {
+    builderFirstField = builderResult.firstField;
+    valid = false;
   }
-  return valid ? null : Object.keys(fieldErrors)[0] || null;
+  if (builderResult.formError) {
+    formError.value = builderResult.formError;
+    valid = false;
+  }
+  return valid ? null : Object.keys(fieldErrors)[0] || builderFirstField;
 }
 
 async function submit() {
@@ -309,19 +238,18 @@ async function submit() {
   try {
     const payload: Record<string, unknown> = {
       title: title.value,
-      topicType: backendTopicType(),
       voteDurationHours: voteDurationHours.value,
+      visibility: visibility.value,
+      audience: audience.value,
+      ...questionPayload({
+        type: builderType.value,
+        rows: rows.value,
+        prompt: prompt.value,
+        scaleMinLabel: scaleMinLabel.value,
+        scaleMaxLabel: scaleMaxLabel.value,
+        maxSelections: maxSelections.value,
+      }),
     };
-    if (usesRows.value) payload.options = rows.value.map((row) => row.label.trim());
-    if (builderType.value === 'IMAGE_OPTION' || builderType.value === 'IMAGE_RANK') {
-      payload.optionImages = rows.value.map((row) => row.image || null);
-    }
-    if (builderType.value === 'MATCHING') payload.matches = rows.value.map((row) => row.match.trim());
-    if (builderType.value === 'SPIN_WHEEL') {
-      const weights = rows.value.map((row) => Number(row.weight.trim()));
-      if (weights.every(Number.isInteger)) payload.weights = weights;
-    }
-    if (builderType.value === 'SHORT_ANSWER') payload.prompt = prompt.value.trim() || undefined;
     savedTopic.value = await api.post<Topic>('/topics/quick', payload);
   } catch (error) {
     formError.value = errorMessage(error);

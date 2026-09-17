@@ -42,4 +42,12 @@ export class RealtimeService {
   broadcastCommentActivity(activity: CommentActivity) {
     this.gateway.server.emit('comment:activity', activity);
   }
+
+  evictTopic(topicId: bigint, exceptUserId?: bigint) {
+    return this.gateway.evictTopic(topicId, exceptUserId);
+  }
+
+  evictUserFromTopics(userId: bigint, topicIds: bigint[]) {
+    return this.gateway.evictUserFromTopics(userId, topicIds);
+  }
 }

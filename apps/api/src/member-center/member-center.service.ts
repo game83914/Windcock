@@ -50,8 +50,8 @@ export class MemberCenterService {
 
     const [voteCount, topicCount, pendingTopicCount, unreadCount, collectedMemeCount, createdMemeCount, pendingMemeCount, recentVotes, recentTopics] = await Promise.all([
       this.prisma.vote.count({ where: { userId } }),
-      this.prisma.topic.count({ where: { creatorId: userId } }),
-      this.prisma.topic.count({ where: { creatorId: userId, moderationStatus: 'PENDING_REVIEW' } }),
+      this.prisma.topic.count({ where: { creatorId: userId, kind: 'FORMAL' } }),
+      this.prisma.topic.count({ where: { creatorId: userId, kind: 'FORMAL', moderationStatus: 'PENDING_REVIEW' } }),
       this.prisma.notification.count({ where: { userId, readAt: null } }),
       this.prisma.memeCollection.count({ where: { userId, meme: { status: 'APPROVED' } } }),
       this.prisma.meme.count({ where: { creatorId: userId } }),
@@ -62,6 +62,7 @@ export class MemberCenterService {
         take: 5,
         include: {
           option: { select: { label: true } },
+          selections: { orderBy: { optionId: 'asc' }, select: { option: { select: { label: true } } } },
           topic: {
             select: {
               id: true,
@@ -72,7 +73,7 @@ export class MemberCenterService {
         },
       }),
       this.prisma.topic.findMany({
-        where: { creatorId: userId },
+        where: { creatorId: userId, kind: 'FORMAL' },
         orderBy: { updatedAt: 'desc' },
         take: 3,
         select: { id: true, title: true, status: true, moderationStatus: true, updatedAt: true },
@@ -130,7 +131,9 @@ export class MemberCenterService {
         topicId: vote.topic.id.toString(),
         topicTitle: vote.topic.title,
         topicStatus: vote.topic.status,
-        selection: vote.option?.label ?? (vote.spectrumValue !== null ? String(vote.spectrumValue) : null),
+        selection: vote.selections.length
+          ? vote.selections.map((selection) => selection.option.label).join('、')
+          : vote.option?.label ?? (vote.spectrumValue !== null ? String(vote.spectrumValue) : null),
         votedAt: vote.createdAt,
       })),
       recentTopics: recentTopics.map((topic) => ({ ...topic, id: topic.id.toString() })),
@@ -152,6 +155,7 @@ export class MemberCenterService {
         take: limit,
         include: {
           option: { select: { label: true } },
+          selections: { orderBy: { optionId: 'asc' }, select: { option: { select: { label: true } } } },
           topic: {
             select: {
               id: true,
@@ -179,7 +183,9 @@ export class MemberCenterService {
         category: vote.topic.category,
         topicStatus: vote.topic.status,
         moderationStatus: vote.topic.moderationStatus,
-        selection: vote.option?.label ?? null,
+        selection: vote.selections.length
+          ? vote.selections.map((selection) => selection.option.label).join('、')
+          : vote.option?.label ?? null,
         spectrumValue: vote.spectrumValue,
         rewardPoints: rewardByTopic.get(vote.topic.id.toString()) || '0',
         votedAt: vote.createdAt,

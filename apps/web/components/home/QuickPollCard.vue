@@ -8,6 +8,10 @@
     <NuxtLink :to="`/topic/${poll.id}`" class="focus-ring mt-3 text-[15px] font-black leading-snug text-[#171717] transition hover:text-[#b0761f]" @click.stop>
       {{ poll.title }}
     </NuxtLink>
+    <NuxtLink v-if="poll.creator.type === 'MEMBER' && poll.creator.id" :to="`/members/${poll.creator.id}`" class="focus-ring mt-2 inline-flex w-fit items-center gap-2 text-xs font-bold text-[#77716a] hover:text-[#171717]" @click.stop @keydown.enter.stop>
+      <UserAvatar :nickname="poll.creator.nickname" :avatar-url="poll.creator.avatarUrl" size="sm" />
+      {{ poll.creator.nickname }}
+    </NuxtLink>
 
     <UiImageLightbox v-model:src="lightboxSrc" />
 
@@ -169,10 +173,11 @@ const lightboxSrc = ref<string | null>(null);
 function openLightbox(src: string) { lightboxSrc.value = src; }
 
 const isOpen = computed(() => poll.value.status === 'OPEN' && !!poll.value.voteEndAt && new Date(poll.value.voteEndAt).getTime() > Date.now());
-const isOptionPick = computed(() => isOptionPickType(poll.value.topicType) && poll.value.topicType !== 'SHORT_ANSWER');
+const panelOnlyTypes = new Set(['STAR_RATING', 'LIKERT_5', 'LIKERT_7', 'MULTI_SELECT']);
+const isOptionPick = computed(() => isOptionPickType(poll.value.topicType) && !panelOnlyTypes.has(poll.value.topicType));
 const isImagePick = computed(() => isImageOptionType(poll.value.topicType));
 const isRankPick = computed(() => isImageRankType(poll.value.topicType));
-const myVoteOptionId = computed(() => poll.value.options.find((option) => option.label === poll.value.myVote?.choice)?.id ?? null);
+const myVoteOptionId = computed(() => poll.value.myVote?.optionId ?? null);
 const optionsCollapsed = computed(() => !showAllOptions.value && poll.value.options.length > OPTION_COLLAPSE_LIMIT);
 const visibleOptions = computed(() => optionsCollapsed.value ? poll.value.options.slice(0, OPTION_COLLAPSE_LIMIT) : poll.value.options);
 

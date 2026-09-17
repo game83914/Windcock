@@ -8,26 +8,34 @@ import { CapabilityGuard } from '../identity/capability.guard';
 import { RequiresCapability } from '../identity/capability.decorator';
 import { Capability } from '../identity/policy.service';
 import { TopicsService } from './topics.service';
-import { CreateTopicDto, CreateQuickTopicDto, FeaturedCandidatesQuery, FeaturedTopicsDto, ListTopicsQuery } from './dto/topic.dto';
+import { CreateTopicDto, CreateQuickTopicDto, CreateSurveyDto, FeaturedCandidatesQuery, FeaturedTopicsDto, ListTopicsQuery } from './dto/topic.dto';
 import { VoteDto } from './dto/vote.dto';
 import { SaveRankDto } from './dto/rank.dto';
 import { TopicAnalyticsService } from './topic-analytics.service';
 import { TopicDemographicAnalyticsQuery } from './dto/topic-analytics.dto';
+import { TopicAccessService } from './topic-access.service';
+import { RedeemTopicShareDto } from './dto/topic-share.dto';
 
 @ApiTags('topics')
 @Controller('topics')
 export class TopicsController {
-  constructor(private readonly topicsService: TopicsService, private readonly analytics: TopicAnalyticsService) {}
+  constructor(
+    private readonly topicsService: TopicsService,
+    private readonly analytics: TopicAnalyticsService,
+    private readonly access: TopicAccessService,
+  ) {}
 
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
   list(@Query() query: ListTopicsQuery, @CurrentUser() user?: AuthUser) {
     return this.topicsService.list(user?.userId ?? null, {
       category: query.category,
+      creatorId: query.creatorId ? BigInt(query.creatorId) : undefined,
       search: query.search,
       sort: query.sort,
       kind: query.kind,
       participation: query.participation,
+      status: query.status,
       page: query.page || 1,
       limit: query.limit || 20,
     });
@@ -35,8 +43,8 @@ export class TopicsController {
 
   @Get('quick')
   @UseGuards(OptionalJwtAuthGuard)
-  listQuick() {
-    return this.topicsService.listQuick();
+  listQuick(@CurrentUser() user?: AuthUser) {
+    return this.topicsService.listQuick(user?.userId ?? null);
   }
 
   @Get('me/quick')
@@ -51,6 +59,20 @@ export class TopicsController {
   @ApiBearerAuth()
   createQuick(@CurrentUser() user: AuthUser, @Body() dto: CreateQuickTopicDto) {
     return this.topicsService.createQuick(user.userId, dto);
+  }
+
+  @Get('me/surveys')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  listSurveysMine(@CurrentUser() user: AuthUser, @Query() query: ListTopicsQuery) {
+    return this.topicsService.listSurveysMine(user.userId, query.page || 1, query.limit || 20);
+  }
+
+  @Post('surveys')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  createSurvey(@CurrentUser() user: AuthUser, @Body() dto: CreateSurveyDto) {
+    return this.topicsService.createSurvey(user.userId, dto);
   }
 
   @Get('following/mine')
@@ -68,8 +90,15 @@ export class TopicsController {
 
   @Get('featured')
   @UseGuards(OptionalJwtAuthGuard)
-  featured() {
-    return this.topicsService.featured();
+  featured(@CurrentUser() user?: AuthUser) {
+    return this.topicsService.featured(user?.userId ?? null);
+  }
+
+  @Post('share-links/redeem')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  redeemShareLink(@CurrentUser() user: AuthUser, @Body() dto: RedeemTopicShareDto) {
+    return this.access.redeem(dto.token, user.userId);
   }
 
   @Get('featured/candidates')
@@ -146,6 +175,27 @@ export class TopicsController {
     return this.topicsService.unfollow(id, user.userId);
   }
 
+  @Post(':id/share-link')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  rotateShareLink(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user: AuthUser) {
+    return this.access.rotateShareLink(id, user.userId);
+  }
+
+  @Get(':id/share-link/status')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  shareLinkStatus(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user: AuthUser) {
+    return this.access.shareLinkStatus(id, user.userId);
+  }
+
+  @Delete(':id/share-link')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  disableShareLink(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user: AuthUser) {
+    return this.access.disableShareLink(id, user.userId);
+  }
+
   @Put(':id')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
@@ -191,7 +241,8 @@ export class TopicsController {
   }
 
   @Get(':id/rankings')
-  communityRanking(@Param('id', ParsedIdPipe) id: bigint) {
-    return this.topicsService.communityRanking(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  communityRanking(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user?: AuthUser) {
+    return this.topicsService.communityRanking(id, user?.userId ?? null);
   }
 }

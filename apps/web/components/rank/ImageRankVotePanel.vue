@@ -57,7 +57,7 @@
               <li v-for="(option, index) in rankedOptions" :key="option.id" class="flex items-center gap-3 rounded-xl border border-[#ded7cb] bg-white p-2.5">
                 <span class="grid size-8 shrink-0 place-items-center rounded-full text-xs font-black" :class="rankBadgeClass(index)">{{ index + 1 }}</span>
                 <img :src="option.data?.imageUrl" :alt="option.label" class="size-11 shrink-0 rounded-lg border border-[#e0c9a0] object-cover" />
-                <span class="min-w-0 flex-1 truncate text-sm font-bold">{{ option.label }}</span>
+                <span class="min-w-0 flex-1 truncate text-sm font-bold">{{ optionLabel(option) }}</span>
               </li>
             </ol>
           </section>
@@ -72,7 +72,7 @@
               <div v-else v-for="(entry, index) in community.ranking" :key="entry.optionId" class="flex items-center gap-3 rounded-xl border border-[#ded7cb] bg-white p-2.5">
                 <span class="grid size-8 shrink-0 place-items-center rounded-full text-xs font-black" :class="rankBadgeClass(index)">{{ index + 1 }}</span>
                 <img :src="communityOption(entry.optionId)?.data?.imageUrl" :alt="communityOption(entry.optionId)?.label" class="size-11 shrink-0 rounded-lg border border-[#e0c9a0] object-cover" />
-                <span class="min-w-0 flex-1 truncate text-sm font-bold">{{ communityOption(entry.optionId)?.label ?? entry.optionId }}</span>
+                <span class="min-w-0 flex-1 truncate text-sm font-bold">{{ communityOption(entry.optionId)?.label || '圖片' }}</span>
                 <span class="shrink-0 text-xs tabular-nums text-[#8b857d]">平均 {{ entry.rank.toFixed(1) }} 名</span>
               </div>
             </div>
@@ -123,6 +123,11 @@ const progressPercent = computed(() => {
 });
 const rankedOptions = computed(() => submittedRanking.value.map((id) => props.topic.options.find((option) => option.id === id)!).filter(Boolean));
 const communityOption = (optionId: string) => props.topic.options.find((option) => option.id === optionId);
+function optionLabel(option: TopicOption) {
+  if (option.label) return option.label;
+  const index = props.topic.options.findIndex((item) => item.id === option.id);
+  return index >= 0 ? `圖片 ${index + 1}` : '圖片';
+}
 
 let activeRun = 0;
 let pendingChoose: ((side: 'left' | 'right') => void) | null = null;

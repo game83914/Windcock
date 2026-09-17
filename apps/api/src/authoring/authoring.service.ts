@@ -8,10 +8,12 @@ import { OpenAiCompatibleClient } from './openai-compatible.client';
 import { AuthoringRateLimitService } from './authoring-rate-limit.service';
 import { PolicyService } from '../identity/policy.service';
 import { CategoriesService } from '../categories/categories.service';
+import { TopicAccessService } from '../topics/topic-access.service';
 
 interface Session {
   userId: string;
   target: AuthoringTarget;
+  topicId?: string;
   brief: string;
   context: Record<string, unknown>;
   questions: AuthoringQuestion[];
@@ -29,6 +31,7 @@ export class AuthoringService {
     private readonly rateLimit: AuthoringRateLimitService,
     private readonly policy: PolicyService,
     private readonly categories: CategoriesService,
+    private readonly topicAccess: TopicAccessService,
   ) {
     if (process.env.AI_AUTHORING_ENABLED === 'true' && (!Number.isInteger(this.sessionTtl) || this.sessionTtl < 60)) {
       throw new Error('AI authoring session TTL configuration is invalid');
@@ -39,7 +42,7 @@ export class AuthoringService {
     this.client.assertAvailable();
     if (dto.target === 'STANCE') await this.policy.assertCanSubmitStanceApplication(userId);
     const brief = dto.brief.trim();
-    const context = await this.buildContext(dto);
+    const context = await this.buildContext(userId, dto);
     if (JSON.stringify(dto.form ?? {}).length > 10000) throw new BadRequestException('表單內容過長');
     await this.rateLimit.consume(userId, ip);
     const output = await this.client.complete([
@@ -48,7 +51,7 @@ export class AuthoringService {
     ], 'authoring_questions', questionsJsonSchema);
     const questions = validateQuestionPrompts(output).map((prompt) => ({ id: randomUUID(), prompt, required: true as const, maxLength: 1000 as const }));
     const sessionId = randomUUID();
-    const session: Session = { userId: userId.toString(), target: dto.target, brief, context, questions };
+    const session: Session = { userId: userId.toString(), target: dto.target, topicId: dto.topicId, brief, context, questions };
     await this.redis.set(this.key(sessionId), JSON.stringify(session), this.sessionTtl);
     return { sessionId, target: dto.target, questions, expiresAt: new Date(Date.now() + this.sessionTtl * 1000).toISOString() };
   }
@@ -57,6 +60,14 @@ export class AuthoringService {
     this.client.assertAvailable();
     const session = await this.getSession(sessionId, userId);
     if (session.target === 'STANCE') await this.policy.assertCanSubmitStanceApplication(userId);
+    if (session.target === 'STANCE' && session.topicId) {
+      const topic = await this.prisma.topic.findUnique({
+        where: { id: BigInt(session.topicId) },
+        select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true },
+      });
+      if (!topic) throw new NotFoundException('議題不存在或未開放');
+      await this.topicAccess.assertCanInteract(topic, userId);
+    }
     if (session.drafts) return { sessionId, target: session.target, drafts: session.drafts };
     const expected = new Set(session.questions.map((question) => question.id));
     const received = new Set(dto.answers.map((answer) => answer.questionId));
@@ -89,7 +100,7 @@ export class AuthoringService {
     const title = dto.title?.trim() || '';
     const rationale = dto.rationale?.trim() || '';
     if (`${title}${rationale}`.length < 2) throw new BadRequestException('請先輸入想整理的立場內容');
-    const context = await this.buildStanceContext(dto.topicId, dto.parentId);
+    const context = await this.buildStanceContext(userId, dto.topicId, dto.parentId);
     await this.rateLimit.consume(userId, ip);
     const output = await this.client.complete([
       {
@@ -102,19 +113,31 @@ export class AuthoringService {
     return { target: 'STANCE' as const, drafts };
   }
 
-  private async buildContext(dto: CreateAuthoringSessionDto): Promise<Record<string, unknown>> {
+  private async buildContext(userId: bigint, dto: CreateAuthoringSessionDto): Promise<Record<string, unknown>> {
     if (dto.target === 'TOPIC') return {};
     if (!dto.topicId) throw new BadRequestException('立場草稿需要議題 ID');
-    return this.buildStanceContext(dto.topicId, dto.parentId);
+    return this.buildStanceContext(userId, dto.topicId, dto.parentId);
   }
 
-  private async buildStanceContext(topicIdInput: string, parentId?: string): Promise<Record<string, unknown>> {
+  private async buildStanceContext(userId: bigint, topicIdInput: string, parentId?: string): Promise<Record<string, unknown>> {
     const topicId = BigInt(topicIdInput);
     const topic = await this.prisma.topic.findUnique({
       where: { id: topicId },
-      select: { title: true, description: true, status: true, moderationStatus: true, options: { select: { label: true }, orderBy: { id: 'asc' } } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        moderationStatus: true,
+        kind: true,
+        visibility: true,
+        audience: true,
+        audienceOwnerId: true,
+        options: { select: { label: true }, orderBy: { id: 'asc' } },
+      },
     });
     if (!topic || topic.status !== 'OPEN' || topic.moderationStatus !== 'APPROVED') throw new NotFoundException('議題不存在或未開放');
+    await this.topicAccess.assertCanInteract(topic, userId);
     let parent: { title: string; rationale: string | null } | null = null;
     if (parentId) {
       parent = await this.prisma.topicStance.findFirst({ where: { id: BigInt(parentId), topicId, status: 'ACTIVE' }, select: { title: true, rationale: true } });

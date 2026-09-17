@@ -14,7 +14,7 @@
     <div v-else-if="notifications.length" class="mt-5 space-y-3">
       <NuxtLink v-for="item in notifications" :key="item.id" :to="item.topicId ? `/topic/${item.topicId}` : '/me'" class="focus-ring block rounded-2xl border px-5 py-4 transition" :class="item.readAt ? 'border-[#ded7cb] bg-[#faf8f3]' : 'border-[#b7c6ee] bg-[#eef1fb]'" @click="markRead(item)">
         <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0"><div class="flex items-center gap-2"><span v-if="!item.readAt" class="size-2 shrink-0 rounded-full bg-[#d84a36]" /><h3 class="font-black">{{ item.title }}</h3></div><p class="mt-2 text-sm leading-6 text-[#6d6861]">{{ item.message }}</p></div>
+          <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span v-if="!item.readAt" class="size-2 shrink-0 rounded-full bg-[#d84a36]" /><span v-if="item.type === 'CHANNEL_NEW_TOPIC'" class="rounded-full bg-[#fff0d7] px-2 py-0.5 text-[10px] font-black text-[#8f5d14]">頻道更新</span><h3 class="font-black">{{ item.title }}</h3></div><p class="mt-2 text-sm leading-6 text-[#6d6861]">{{ item.message }}</p></div>
           <time class="shrink-0 text-xs text-[#8b857d]">{{ formatTime(item.createdAt) }}</time>
         </div>
       </NuxtLink>

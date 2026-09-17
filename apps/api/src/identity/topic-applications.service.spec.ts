@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { TopicApplicationsService } from './topic-applications.service';
 
 const dto = {
@@ -42,5 +42,30 @@ describe('TopicApplicationsService authorization', () => {
     expect(prisma.topicApplication.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ submitterId: BigInt(1), organizationId: BigInt(9) }),
     }));
+  });
+
+  it('does not allow an organization application to switch to follower-only', async () => {
+    const updatedAt = new Date('2026-09-16T00:00:00Z');
+    const tx = {
+      $queryRaw: jest.fn(),
+      topicApplication: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 3n,
+          submitterId: 1n,
+          applicantType: 'ORGANIZATION',
+          status: 'PENDING',
+          audience: 'MEMBER_ONLY',
+          updatedAt,
+        }),
+      },
+    };
+    const prisma = { $transaction: jest.fn((callback) => callback(tx)) };
+    const service = new TopicApplicationsService(prisma as never, {} as never);
+
+    await expect(service.updateMine(1n, 3n, {
+      ...dto,
+      audience: 'FOLLOWERS_ONLY',
+      expectedUpdatedAt: updatedAt.toISOString(),
+    } as never)).rejects.toBeInstanceOf(BadRequestException);
   });
 });

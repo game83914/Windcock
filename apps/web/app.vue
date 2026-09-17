@@ -35,6 +35,13 @@
                 class="focus-ring block px-3 py-2.5 text-sm font-black text-[#b0761f] hover:bg-[#fff0d7]"
                 @click="createMenuOpen = false"
               >發起快問</NuxtLink>
+              <NuxtLink
+                v-if="canCreateQuick"
+                role="menuitem"
+                to="/topics/survey"
+                class="focus-ring block px-3 py-2.5 text-sm font-black text-[#b0761f] hover:bg-[#fff0d7]"
+                @click="createMenuOpen = false"
+              >發起問卷</NuxtLink>
             </div>
           </Transition>
         </div>
@@ -56,7 +63,7 @@
                 <NuxtLink to="/me/notifications" class="focus-ring flex items-center justify-between px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">通知<span v-if="unreadCount" class="inline-grid min-w-4 place-items-center rounded-full bg-[#d84a36] px-1 text-[9px] text-white">{{ unreadCount > 9 ? '9+' : unreadCount }}</span></NuxtLink>
                 <NuxtLink to="/me/votes" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">投票紀錄</NuxtLink>
                 <NuxtLink to="/me/topics" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">我的議題</NuxtLink>
-                <NuxtLink to="/me/applications" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">我的提案</NuxtLink>
+                <NuxtLink to="/me/surveys" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">我的問卷</NuxtLink>
                 <NuxtLink to="/me/gifs" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">我的 GIF</NuxtLink>
                 <NuxtLink to="/me/profile" class="focus-ring block px-3 py-2 text-xs font-bold hover:bg-[#ebe6dc]">資料與隱私</NuxtLink>
                 <NuxtLink v-if="auth.canModerate" to="/admin/topics" class="focus-ring block border-t border-[#d7d1c6] px-3 py-2 text-xs font-bold text-[#3f7a58] hover:bg-[#ebe6dc]">最高管理</NuxtLink>

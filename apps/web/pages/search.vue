@@ -46,24 +46,39 @@
         <button type="button" class="focus-ring mt-3 border border-[#7c2f2f] px-4 py-2 font-bold" @click="refresh()">重新搜尋</button>
       </section>
 
-      <section v-else-if="topics.length" :aria-busy="status === 'pending'">
+      <section v-else-if="visibleTopics.length" :aria-busy="status === 'pending'">
         <div class="mb-5 flex items-center justify-between gap-3">
-          <h2 class="text-xl font-black tracking-[-0.035em]">搜尋「{{ searchTerm }}」</h2>
-          <label class="flex min-w-0 shrink-0 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white px-2.5 py-1.5" :title="auth.isAuthed ? '' : '登入後可篩選未投票議題'">
-            <svg class="shrink-0 text-[#77716a]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
-            <select :value="effectiveParticipation" class="bg-transparent py-0.5 text-sm font-bold outline-none disabled:cursor-not-allowed disabled:text-[#aaa49b]" :disabled="!auth.isAuthed" aria-label="參與篩選" @change="onUnvotedChange">
-              <option value="ALL">全部</option>
-              <option value="UNVOTED">未投票</option>
-            </select>
-          </label>
+          <h2 class="min-w-0 truncate text-xl font-black tracking-[-0.035em]">搜尋「{{ searchTerm }}」</h2>
+          <div class="min-w-0 max-w-[75%] shrink-0">
+            <UiTopicFilterDropdown
+              v-model:category="activeCategory"
+              v-model:sort="sort"
+              :categories="filterChips"
+              :participation="effectiveParticipation"
+              v-model:status="topicStatus"
+              :is-authed="auth.isAuthed"
+              @update:participation="onUnvotedChange"
+              @update:status="selectStatus"
+            />
+          </div>
         </div>
         <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           <component
             :is="topic.kind === 'QUICK' ? QuickPollCard : TopicCard"
-            v-for="topic in topics"
+            v-for="topic in visibleTopics"
             :key="topic.id"
             :topic="topic"
           />
+        </div>
+        <div v-if="hasMore" class="mt-8 flex justify-center">
+          <button
+            type="button"
+            class="focus-ring border border-[#171717] bg-white px-6 py-3 text-sm font-black disabled:opacity-50"
+            :disabled="loadingMore"
+            @click="loadMore"
+          >
+            {{ loadingMore ? '載入中…' : '載入更多結果' }}
+          </button>
         </div>
       </section>
 
@@ -89,13 +104,21 @@ const api = useApi();
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
+const { active: activeCategories } = useCategories();
 const initialSearch = queryText(route.query.q);
 const searchInput = ref(initialSearch);
 const searchTerm = ref(initialSearch);
-const unvoted = ref<'ALL' | 'UNVOTED'>('UNVOTED');
+const unvoted = ref<'ALL' | 'UNVOTED'>('ALL');
 const effectiveParticipation = computed<'ALL' | 'UNVOTED'>(() => auth.isAuthed ? unvoted.value : 'ALL');
+const activeCategory = ref('all');
+const sort = ref<'POPULAR' | 'NEWEST' | 'ACTIVITY'>('ACTIVITY');
+const topicStatus = ref<'ACTIVE' | 'ENDED' | 'ALL'>('ALL');
 
 const searchInputEl = ref<HTMLInputElement | null>(null);
+const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#fff0d7' };
+const surveyCategoryChip = { key: 'survey', label: '問卷', eyebrow: '多題組合', color: '#b0761f', soft: '#fff0d7' };
+const filterChips = computed(() => [surveyCategoryChip, quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
+const kindForFetch = computed<'FORMAL' | 'QUICK' | 'SURVEY' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : activeCategory.value === 'survey' ? 'SURVEY' : 'FORMAL');
 
 const [{ data, status, error, refresh }] = await Promise.all([
   useAsyncData(
@@ -105,12 +128,14 @@ const [{ data, status, error, refresh }] = await Promise.all([
           page: 1,
           limit: 9,
           search: searchTerm.value,
-          sort: 'ACTIVITY',
-          kind: 'ALL',
+          category: kindForFetch.value === 'FORMAL' ? activeCategory.value : undefined,
+          sort: sort.value,
+          kind: kindForFetch.value,
           participation: effectiveParticipation.value === 'UNVOTED' ? 'UNVOTED' : undefined,
+          status: topicStatus.value,
         })
       : Promise.resolve(emptyTopicList(9)),
-    { default: () => emptyTopicList(9), watch: [searchTerm, effectiveParticipation] },
+    { default: () => emptyTopicList(9), watch: [searchTerm, effectiveParticipation, activeCategory, sort, topicStatus] },
   ),
 ]);
 
@@ -119,7 +144,15 @@ if (import.meta.client && auth.isAuthed && nuxtApp.isHydrating) {
   nuxtApp.hooks.hookOnce('app:suspense:resolve', () => void refresh());
 }
 
-const topics = computed<Topic[]>(() => data.value.items);
+const visibleTopics = ref<Topic[]>([]);
+const page = ref(1);
+const loadingMore = ref(false);
+const total = computed(() => data.value.pagination.total);
+const hasMore = computed(() => visibleTopics.value.length < total.value);
+watch(data, (value) => {
+  visibleTopics.value = value.items;
+  page.value = 1;
+}, { immediate: true });
 const hasLoaded = ref(status.value === 'success');
 const isInitialLoading = computed(() => status.value === 'pending' && !hasLoaded.value);
 const resultsAnnouncement = computed(() => {
@@ -157,9 +190,35 @@ function clearSearch() {
   hasLoaded.value = false;
 }
 
-function onUnvotedChange(event: Event) {
-  const next = (event.target as HTMLSelectElement).value;
-  if (next === 'UNVOTED' || next === 'ALL') unvoted.value = next;
+function onUnvotedChange(value: 'ALL' | 'UNVOTED') {
+  unvoted.value = value;
+}
+
+function selectStatus(value: 'ACTIVE' | 'ENDED' | 'ALL') {
+  topicStatus.value = value;
+}
+
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
+  try {
+    const res = await api.get<TopicListResponse>('/topics', {
+      page: page.value + 1,
+      limit: 9,
+      search: searchTerm.value,
+      category: kindForFetch.value === 'FORMAL' ? activeCategory.value : undefined,
+      sort: sort.value,
+      kind: kindForFetch.value,
+      participation: effectiveParticipation.value === 'UNVOTED' ? 'UNVOTED' : undefined,
+      status: topicStatus.value,
+    });
+    visibleTopics.value.push(...res.items);
+    page.value += 1;
+  } catch {
+    // 保留現有結果，讓使用者可再按一次。
+  } finally {
+    loadingMore.value = false;
+  }
 }
 
 function emptyTopicList(limit: number): TopicListResponse {

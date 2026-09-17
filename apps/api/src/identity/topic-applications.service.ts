@@ -15,6 +15,7 @@ export class TopicApplicationsService {
       await this.policy.assertSeniorMember(userId);
     } else {
       if (!organizationId) throw new BadRequestException('組織提案必須指定組織');
+      if (dto.audience === 'FOLLOWERS_ONLY') throw new BadRequestException('組織提案不支援追蹤者限定');
       await this.policy.assertPartnerMember(userId, organizationId);
     }
     const application = await this.prisma.topicApplication.create({
@@ -29,6 +30,7 @@ export class TopicApplicationsService {
         options: dto.options ?? Prisma.JsonNull,
         blocks: dto.blocks ? JSON.parse(JSON.stringify(dto.blocks)) : Prisma.JsonNull,
         voteDurationDays: dto.voteDurationDays,
+        audience: dto.audience,
         note: dto.note?.trim() || null,
         revisions: {
           create: {
@@ -40,6 +42,7 @@ export class TopicApplicationsService {
             options: dto.options ?? Prisma.JsonNull,
             blocks: dto.blocks ? JSON.parse(JSON.stringify(dto.blocks)) : Prisma.JsonNull,
             voteDurationDays: dto.voteDurationDays,
+            audience: dto.audience,
             note: dto.note?.trim() || null,
           },
         },
@@ -104,6 +107,7 @@ export class TopicApplicationsService {
       options: dto.options ?? Prisma.JsonNull,
       blocks: dto.blocks ? JSON.parse(JSON.stringify(dto.blocks)) : Prisma.JsonNull,
       voteDurationDays: dto.voteDurationDays,
+      audience: dto.audience,
       note: dto.note?.trim() || null,
     };
     return this.prisma.$transaction(async (tx) => {
@@ -112,6 +116,10 @@ export class TopicApplicationsService {
       if (!current || current.submitterId !== userId) throw new NotFoundException('議題提案不存在');
       if (!['PENDING', 'REJECTED'].includes(current.status)) throw new ConflictException('審核中或已採用的提案無法修改');
       if (current.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictException('提案已被更新，請重新載入後再編輯');
+      content.audience = dto.audience ?? current.audience;
+      if (current.applicantType === 'ORGANIZATION' && content.audience === 'FOLLOWERS_ONLY') {
+        throw new BadRequestException('組織提案不支援追蹤者限定');
+      }
 
       if (current.status === 'REJECTED') {
         const revisionNumber = current.revisionNumber + 1;

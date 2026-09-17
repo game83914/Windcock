@@ -57,40 +57,24 @@
         class="scroll-mt-28 py-12 sm:py-16"
         :aria-busy="status === 'pending'"
       >
-        <div class="mb-6 grid gap-3 border-b border-[#171717] pb-4 sm:flex sm:items-end sm:justify-between">
-          <div class="flex flex-wrap items-baseline gap-3">
-            <h2 class="text-xl font-black tracking-[-0.035em] sm:text-2xl">{{ sectionHeading }}</h2>
+        <div class="mb-6 flex items-center justify-between gap-3 border-b border-[#171717] pb-4">
+          <div class="flex min-w-0 flex-wrap items-baseline gap-3">
+            <h2 class="truncate text-xl font-black tracking-[-0.035em] sm:text-2xl">{{ sectionHeading }}</h2>
           </div>
-          <div class="min-w-0">
-          <div class="flex items-center gap-2.5 sm:gap-3">
-            <label class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-2.5 pr-1 sm:max-w-44">
-              <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3Z" /></svg>
-              <select v-model="activeCategory" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none" aria-label="議題分類" @change="selectCategory(activeCategory)">
-                <option value="all">全部</option>
-                <option
-                  v-for="category in filterChips"
-                  :key="category.key"
-                  :value="category.key"
-                >{{ category.key === 'quick' ? '快問' : category.label }}</option>
-              </select>
-            </label>
-            <label class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-2.5 pr-1 sm:max-w-44">
-              <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
-              <select v-model="sort" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none" @change="selectSort">
-                <option value="ACTIVITY">更新時間</option>
-                <option value="POPULAR">熱門</option>
-                <option value="NEWEST">建立時間</option>
-              </select>
-            </label>
-            <label class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl border border-[#d3cbc0] bg-white py-2 pl-2.5 pr-1 sm:max-w-40" :title="auth.isAuthed ? '' : '登入後可篩選未投票議題'">
-              <svg class="shrink-0 text-[#77716a]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
-              <select :value="effectiveParticipation" class="min-w-0 flex-1 bg-transparent py-0.5 text-sm font-bold outline-none disabled:cursor-not-allowed disabled:text-[#aaa49b]" :disabled="!auth.isAuthed" aria-label="參與篩選" @change="onUnvotedChange">
-                <option value="ALL">全部</option>
-                <option value="UNVOTED">未投票</option>
-              </select>
-            </label>
+          <div class="min-w-0 max-w-[75%] shrink-0">
+            <UiTopicFilterDropdown
+              v-model:category="activeCategory"
+              v-model:sort="sort"
+              :categories="filterChips"
+              :participation="effectiveParticipation"
+              v-model:status="topicStatus"
+              :is-authed="auth.isAuthed"
+              @update:category="selectCategory"
+              @update:sort="selectSort"
+              @update:participation="onUnvotedChange"
+              @update:status="selectStatus"
+            />
           </div>
-        </div>
         </div>
         <p class="sr-only" aria-live="polite">{{ resultsAnnouncement }}</p>
         <div v-if="error" role="alert" class="border border-[#9c3b3b] bg-[#f6e7e7] px-5 py-8 text-center text-sm text-[#7c2f2f]">
@@ -153,10 +137,11 @@ const activeCategory = ref(initialCategory);
 const topicPage = ref(initialPage);
 const sort = ref<'POPULAR' | 'NEWEST' | 'ACTIVITY'>(initialSort);
 const unvoted = ref<'ALL' | 'UNVOTED'>('UNVOTED');
+const topicStatus = ref<'ACTIVE' | 'ENDED' | 'ALL'>('ACTIVE');
 const effectiveParticipation = computed<'ALL' | 'UNVOTED'>(() => auth.isAuthed ? unvoted.value : 'ALL');
 
 const { active: activeCategories, refresh: refreshCategories } = useCategories();
-const kindForFetch = computed<'FORMAL' | 'QUICK' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : 'FORMAL');
+const kindForFetch = computed<'FORMAL' | 'QUICK' | 'SURVEY' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : activeCategory.value === 'survey' ? 'SURVEY' : 'FORMAL');
 const [topicState, featuredState, commentState] = await Promise.all([
   useAsyncData(
     'homepage-topics',
@@ -167,8 +152,9 @@ const [topicState, featuredState, commentState] = await Promise.all([
       sort: sort.value,
       kind: kindForFetch.value,
       participation: effectiveParticipation.value === 'UNVOTED' ? 'UNVOTED' : undefined,
+      status: topicStatus.value,
     }),
-    { default: () => emptyTopicList(9), watch: [activeCategory, sort, effectiveParticipation] },
+    { default: () => emptyTopicList(9), watch: [activeCategory, sort, effectiveParticipation, topicStatus] },
   ),
   useAsyncData(
     'homepage-featured',
@@ -202,16 +188,22 @@ const topics = computed(() => visibleTopics.value);
 const featuredTopics = computed<Topic[]>(() => featuredData.value ?? []);
 const totalPages = computed(() => Math.max(1, data.value.pagination.pages));
 const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#fff0d7' };
-const filterChips = computed(() => [quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
+const surveyCategoryChip = { key: 'survey', label: '問卷', eyebrow: '多題組合', color: '#b0761f', soft: '#fff0d7' };
+const filterChips = computed(() => [surveyCategoryChip, quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
 const selectedCategory = computed(() => activeCategories.value.find((category) => category.key === activeCategory.value));
-const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : activeCategory.value === 'quick' ? '快問' : (selectedCategory.value?.label ?? '議題'));
-const hasActiveFilters = computed(() => activeCategory.value !== 'all' || effectiveParticipation.value === 'UNVOTED');
+const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : activeCategory.value === 'quick' ? '快問' : activeCategory.value === 'survey' ? '問卷' : (selectedCategory.value?.label ?? '議題'));
+const hasActiveFilters = computed(() => activeCategory.value !== 'all' || effectiveParticipation.value === 'UNVOTED' || topicStatus.value !== 'ACTIVE');
 const emptyMessage = computed(() => {
+  if (topicStatus.value === 'ENDED') {
+    const scope = activeCategory.value === 'all' ? '議題' : sectionHeading.value;
+    return `目前沒有已截止的${scope}，試試切換狀態或稍後再來`;
+  }
   if (effectiveParticipation.value === 'UNVOTED') {
-    const base = activeCategory.value === 'quick' ? '目前沒有新的未投票快問' : '目前沒有新的未投票議題';
+    const base = activeCategory.value === 'quick' ? '目前沒有新的未投票快問' : activeCategory.value === 'survey' ? '目前沒有新的未投票問卷' : '目前沒有新的未投票議題';
     return `${base}，試試切換到「全部」或稍後再來`;
   }
   if (activeCategory.value === 'quick') return '目前沒有進行中的快問投票';
+  if (activeCategory.value === 'survey') return '目前沒有進行中的問卷';
   return `${sectionHeading.value}目前沒有進行中的議題`;
 });
 const resultsAnnouncement = computed(() => {
@@ -243,15 +235,18 @@ watch(activeCategories, (categories) => {
     topicPage.value = 1;
   }
 });
-watch([activeCategory, topicPage, unvoted], syncRouteQuery);
+watch([activeCategory, topicPage, unvoted, topicStatus], syncRouteQuery);
 watch(() => route.query, (query) => {
   syncingFromRoute = true;
   const category = queryText(query.category) || 'all';
   const nextSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(query.sort)) ? queryText(query.sort) : 'ACTIVITY';
   const nextUnvoted = queryText(query.participation) === 'unvoted' ? 'UNVOTED' : 'ALL';
+  const statusText = queryText(query.status);
+  const nextStatus = statusText === 'ended' ? 'ENDED' : statusText === 'all' ? 'ALL' : 'ACTIVE';
   if (activeCategory.value !== category) activeCategory.value = category;
   if (sort.value !== nextSort) sort.value = nextSort as 'POPULAR' | 'NEWEST' | 'ACTIVITY';
   if (unvoted.value !== nextUnvoted) unvoted.value = nextUnvoted;
+  if (topicStatus.value !== nextStatus) topicStatus.value = nextStatus;
   nextTick(() => { syncingFromRoute = false; });
 });
 
@@ -305,14 +300,14 @@ function selectSort() {
   topicPage.value = 1;
 }
 
-function selectUnvoted() {
+function onUnvotedChange(value: 'ALL' | 'UNVOTED') {
+  unvoted.value = value;
   topicPage.value = 1;
 }
 
-function onUnvotedChange(event: Event) {
-  const next = (event.target as HTMLSelectElement).value;
-  if (next === 'UNVOTED' || next === 'ALL') unvoted.value = next;
-  selectUnvoted();
+function selectStatus(value: 'ACTIVE' | 'ENDED' | 'ALL') {
+  topicStatus.value = value;
+  topicPage.value = 1;
 }
 
 async function loadMore() {
@@ -328,6 +323,7 @@ async function loadMore() {
       sort: sort.value,
       kind: kindForFetch.value,
       participation: effectiveParticipation.value === 'UNVOTED' ? 'UNVOTED' : undefined,
+      status: topicStatus.value,
     });
     visibleTopics.value.push(...res.items);
     topicPage.value += 1;
@@ -343,7 +339,9 @@ function syncRouteQuery() {
   const currentCategory = queryText(route.query.category) || 'all';
   const currentSort = ['POPULAR', 'NEWEST', 'ACTIVITY'].includes(queryText(route.query.sort)) ? queryText(route.query.sort) : 'ACTIVITY';
   const currentUnvoted = queryText(route.query.participation) === 'unvoted' ? 'UNVOTED' : 'ALL';
-  if (currentCategory === activeCategory.value && currentSort === sort.value && currentUnvoted === unvoted.value) return;
+  const statusText = queryText(route.query.status);
+  const currentStatus = statusText === 'ended' ? 'ENDED' : statusText === 'all' ? 'ALL' : 'ACTIVE';
+  if (currentCategory === activeCategory.value && currentSort === sort.value && currentUnvoted === unvoted.value && currentStatus === topicStatus.value) return;
   const query = { ...route.query };
   if (activeCategory.value === 'all') delete query.category;
   else query.category = activeCategory.value;
@@ -352,6 +350,9 @@ function syncRouteQuery() {
   else query.sort = sort.value;
   if (unvoted.value === 'UNVOTED') query.participation = 'unvoted';
   else delete query.participation;
+  if (topicStatus.value === 'ENDED') query.status = 'ended';
+  else if (topicStatus.value === 'ALL') query.status = 'all';
+  else delete query.status;
   void router.replace({ query });
 }
 

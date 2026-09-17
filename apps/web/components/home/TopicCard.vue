@@ -1,17 +1,17 @@
 <template>
-  <NuxtLink :to="`/topic/${topic.id}`" class="group flex h-full flex-col rounded-2xl border border-[#d7d1c6] bg-[#faf8f3] p-5 transition hover:-translate-y-1 hover:border-[#171717] hover:shadow-[6px_6px_0_#d7d1c6] focus-ring sm:p-6">
+  <article role="link" tabindex="0" class="group flex h-full cursor-pointer flex-col rounded-2xl border border-[#d7d1c6] bg-[#faf8f3] p-5 transition hover:-translate-y-1 hover:border-[#171717] hover:shadow-[6px_6px_0_#d7d1c6] focus-ring sm:p-6" @click="goTopic" @keydown.enter="goTopic">
     <UiImageLightbox v-model:src="lightboxSrc" />
     <div class="mb-5 flex items-center justify-between gap-3">
       <span class="rounded-full px-2.5 py-1 text-[10px] font-black tracking-[0.12em] text-white" :style="{ backgroundColor: meta.color }">{{ meta.label }}</span>
       <div class="flex items-center gap-2">
-        <span v-if="topic.creator.type === 'MEMBER'" class="bg-[#ebe6dc] px-2 py-1 text-[11px] font-bold text-[#6d6861]">會員發起</span>
+        <NuxtLink v-if="topic.creator.type === 'MEMBER' && topic.creator.id" :to="`/members/${topic.creator.id}`" class="focus-ring bg-[#ebe6dc] px-2 py-1 text-[11px] font-bold text-[#6d6861] hover:text-[#171717]" @click.stop @keydown.enter.stop>{{ topic.creator.nickname }}</NuxtLink>
         <span v-if="topic.moderationStatus === 'PENDING_REVIEW'" class="bg-[#fff0d7] px-2 py-1 text-[11px] font-bold text-[#9a5b12]">待複核</span>
         <span v-else-if="topic.hasVoted" class="bg-[#e5f1e9] px-2 py-1 text-[11px] font-bold text-[#3f7a58]">已投票</span>
         <span v-else class="text-xs font-bold text-[#77716a]">{{ deadlineLabel(topic.voteEndAt, deadlineNow) }}</span>
       </div>
     </div>
 
-    <h3 class="text-xl font-black leading-snug tracking-[-0.025em] transition group-hover:text-[#d84a36]">{{ topic.title }}</h3>
+    <NuxtLink :to="`/topic/${topic.id}`" class="focus-ring text-xl font-black leading-snug tracking-[-0.025em] transition group-hover:text-[#d84a36]" @click.stop>{{ topic.title }}</NuxtLink>
 
     <div v-if="topic.topicType === 'SPECTRUM'" class="mt-8">
       <div class="mb-2 flex items-end justify-between">
@@ -37,9 +37,10 @@
     </div>
 
     <div class="mt-auto border-t border-[#ded8cd] pt-5 text-xs text-[#77716a]" :class="topic.topicType === 'SPECTRUM' ? 'mt-8' : 'mt-7'">
-      <span><strong class="text-[#171717]">{{ formatCompactNumber(topic.totalVotes) }}</strong> 人參與</span>
+      <span v-if="topic.kind === 'SURVEY'"><strong class="text-[#171717]">{{ topic.surveyQuestionCount ?? topic.questions?.length ?? 0 }}</strong> 題</span>
+      <span v-else><strong class="text-[#171717]">{{ formatCompactNumber(topic.totalVotes) }}</strong> 人參與</span>
     </div>
-  </NuxtLink>
+  </article>
 </template>
 
 <script setup lang="ts">
@@ -47,11 +48,15 @@ import type { Topic } from '~/types/topic';
 import { deadlineLabel, formatCompactNumber, getCategoryMeta, leadingOptions, optionPercentage } from '~/utils/topic';
 
 const props = defineProps<{ topic: Topic }>();
-const meta = computed(() => getCategoryMeta(props.topic.category));
+const router = useRouter();
+const meta = computed(() => props.topic.kind === 'SURVEY'
+  ? { key: 'survey', label: '問卷', eyebrow: '多題組合', color: '#b0761f', soft: '#fff0d7' }
+  : getCategoryMeta(props.topic.category));
 const options = computed(() => leadingOptions(props.topic, 2));
 const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
 const lightboxSrc = ref<string | null>(null);
 function openLightbox(src: string) { lightboxSrc.value = src; }
+function goTopic() { router.push(`/topic/${props.topic.id}`); }
 const spectrumValue = computed(() => props.topic.spectrumMedian === null || props.topic.spectrumMedian === undefined
   ? null
   : Number(props.topic.spectrumMedian));

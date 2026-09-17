@@ -18,12 +18,13 @@ export interface CommentActivity {
 
 export function useRealtime() {
   const config = useRuntimeConfig();
+  const auth = useAuthStore();
   const rawWsBase = config.public.wsBase as string;
   const wsBase = import.meta.client && rawWsBase.includes('localhost')
     ? rawWsBase.replace('//localhost:', `//${window.location.hostname}:`)
     : rawWsBase;
   const socket: Socket | null = import.meta.client
-    ? io(wsBase)
+    ? io(wsBase, { auth: { token: auth.token } })
     : null;
 
   function joinTopic(topicId: string) {

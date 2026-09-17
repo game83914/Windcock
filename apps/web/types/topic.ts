@@ -2,10 +2,12 @@ export interface TopicOption {
   id: string;
   label: string;
   voteCount: string;
-  data?: { match?: string; weight?: number; imageUrl?: string } | null;
+  data?: { match?: string; weight?: number; imageUrl?: string; value?: number } | null;
 }
 
-export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'IMAGE_RANK' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY';
+export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'IMAGE_RANK' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY' | 'STAR_RATING' | 'LIKERT_5' | 'LIKERT_7' | 'MULTI_SELECT';
+export type TopicVisibility = 'PUBLIC' | 'PRIVATE_LINK';
+export type TopicAudience = 'MEMBER_ONLY' | 'FOLLOWERS_ONLY';
 
 export interface TopicShortAnswer {
   id: string;
@@ -44,13 +46,17 @@ export interface Topic {
   title: string;
   description?: string | null;
   category: string;
-  kind?: 'FORMAL' | 'QUICK';
+  kind?: 'FORMAL' | 'QUICK' | 'SURVEY';
+  visibility: TopicVisibility;
+  audience: TopicAudience;
+  sharePath?: string;
   featuredOrder?: number | null;
-  topicType: QuickTopicType;
+  topicType: QuickTopicType | 'SURVEY';
   status: string;
   moderationStatus: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
   moderationNote?: string | null;
   creator: {
+    id: string | null;
     nickname: string;
     avatarUrl?: string | null;
     type: 'MEMBER' | 'OFFICIAL';
@@ -62,17 +68,23 @@ export interface Topic {
   voteDurationDays: number;
   voteDurationHours?: number | null;
   minVotes?: number | null;
+  scaleMinLabel?: string | null;
+  scaleMaxLabel?: string | null;
+  maxSelections?: number | null;
   totalVotes: string;
   voterCount: string;
   spectrumMedian?: string | null;
   spectrumStddev?: string | null;
   hasVoted: boolean;
-  myVote?: { choice: string; spectrumValue: number | null } | null;
+  myVote?: { choice: string; optionId?: string | null; optionIds?: string[]; spectrumValue: number | null } | null;
   myRanking?: string[] | null;
   myRankingComparisons?: number;
   responses?: TopicShortAnswer[];
   blocks: TopicContentBlock[];
   options: TopicOption[];
+  questions?: Topic[];
+  surveyQuestionCount?: number;
+  surveyAnsweredCount?: number;
 }
 
 export interface Category {
@@ -87,7 +99,7 @@ export interface Category {
 
 export interface UserNotification {
   id: string;
-  type: 'TOPIC_REVISION_APPROVED';
+  type: 'TOPIC_REVISION_APPROVED' | 'CHANNEL_NEW_TOPIC';
   title: string;
   message: string;
   topicId?: string | null;

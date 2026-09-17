@@ -76,7 +76,7 @@ export function optionPercentage(option: TopicOption, topic: Topic) {
 
 export const TOPIC_TYPE_LABEL: Record<string, string> = {
   BINARY: '二選一',
-  MULTIPLE: '多選項',
+  MULTIPLE: '單選題',
   IMAGE_MULTIPLE: '圖片選項題',
   IMAGE_RANK: '二選一排名賽',
   SPECTRUM: '光譜題',
@@ -86,6 +86,10 @@ export const TOPIC_TYPE_LABEL: Record<string, string> = {
   SCRATCH: '刮刮樂',
   SPIN_WHEEL: '轉盤抽獎',
   LOTTERY: '日式搖獎',
+  STAR_RATING: '五星評分',
+  LIKERT_5: '五點量表',
+  LIKERT_7: '七點量表',
+  MULTI_SELECT: '複選題',
 };
 
 export function isOptionPickType(topicType?: string) {
@@ -98,6 +102,31 @@ export function isImageOptionType(topicType?: string) {
 
 export function isImageRankType(topicType?: string) {
   return topicType === 'IMAGE_RANK';
+}
+
+export function isRatingType(topicType?: string): topicType is 'STAR_RATING' | 'LIKERT_5' | 'LIKERT_7' {
+  return !!topicType && ['STAR_RATING', 'LIKERT_5', 'LIKERT_7'].includes(topicType);
+}
+
+export function ratingScaleSize(topicType?: string) {
+  return topicType === 'LIKERT_7' ? 7 : 5;
+}
+
+export function optionValue(option: TopicOption, index: number) {
+  if (option.data?.value == null) return index + 1;
+  const value = Number(option.data.value);
+  return Number.isFinite(value) ? value : index + 1;
+}
+
+export function weightedOptionAverage(topic: Topic) {
+  const total = topic.options.reduce((sum, option) => sum + Number(option.voteCount), 0);
+  if (!total) return 0;
+  return topic.options.reduce((sum, option, index) => sum + optionValue(option, index) * Number(option.voteCount), 0) / total;
+}
+
+export function multiSelectPercentage(option: TopicOption, topic: Topic) {
+  const voters = Number(topic.voterCount);
+  return voters > 0 ? Math.round((Number(option.voteCount) / voters) * 100) : 0;
 }
 
 export function topicTypeLabel(topicType?: string) {

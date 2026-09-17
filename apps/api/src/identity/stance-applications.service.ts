@@ -4,23 +4,25 @@ import { assertClean } from '../common/sensitive';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublishStanceApplicationDto, ResolveStanceApplicationsDto, ReviewStanceApplicationDto, SubmitStanceApplicationDto, UpdateStanceApplicationDto } from './dto/stance-application.dto';
 import { Capability, PolicyService } from './policy.service';
+import { TopicAccessService } from '../topics/topic-access.service';
 
 const MAX_DEPTH = Number(process.env.STANCE_MAX_DEPTH || 4);
 
 @Injectable()
 export class StanceApplicationsService {
-  constructor(private readonly prisma: PrismaService, private readonly policy: PolicyService) {}
+  constructor(private readonly prisma: PrismaService, private readonly policy: PolicyService, private readonly topicAccess: TopicAccessService) {}
 
   async submit(userId: bigint, dto: SubmitStanceApplicationDto) {
     await this.policy.assertCanSubmitStanceApplication(userId);
     const topicId = BigInt(dto.topicId);
     const parentStanceId = dto.parentStanceId ? BigInt(dto.parentStanceId) : null;
-    await this.assertOpenTarget(topicId, parentStanceId);
     const title = dto.title.trim();
     const rationale = dto.rationale?.trim() || null;
     if (title.length < 2) throw new BadRequestException('立場名稱至少 2 個字');
     assertClean(title, '立場名稱');
     if (rationale) assertClean(rationale, '立場說明');
+    await this.topicAccess.assertCanInteract(await this.accessTopic(topicId), userId);
+    await this.assertOpenTarget(topicId, parentStanceId);
     const duplicate = await this.prisma.stanceApplication.findFirst({
       where: { submitterId: userId, topicId, parentStanceId, title: { equals: title, mode: 'insensitive' }, status: { in: ['PENDING', 'IN_REVIEW'] } },
       select: { id: true },
@@ -74,6 +76,7 @@ export class StanceApplicationsService {
       if (!current || current.submitterId !== userId) throw new NotFoundException('立場提案不存在');
       if (!['PENDING', 'REJECTED'].includes(current.status)) throw new ConflictException('審核中或已採用的提案無法修改');
       if (current.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new ConflictException('提案已被更新，請重新載入後再編輯');
+      await this.topicAccess.assertCanInteract(await this.accessTopic(current.topicId, tx), userId);
       await this.assertOpenTarget(current.topicId, current.parentStanceId, tx);
 
       if (current.status === 'REJECTED') {
@@ -297,6 +300,15 @@ export class StanceApplicationsService {
     if (!parent) throw new NotFoundException('父立場不存在或已下架');
     if (parent.depth + 1 > MAX_DEPTH) throw new BadRequestException(`立場最深只能到第 ${MAX_DEPTH} 層`);
     return parent.depth + 1;
+  }
+
+  private async accessTopic(topicId: bigint, db: Prisma.TransactionClient | PrismaService = this.prisma) {
+    const topic = await db.topic.findUnique({
+      where: { id: topicId },
+      select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true },
+    });
+    if (!topic) throw new NotFoundException('議題不存在');
+    return topic;
   }
 
   private cleanEdits(dto: { title?: string; rationale?: string; reviewNote?: string }) {

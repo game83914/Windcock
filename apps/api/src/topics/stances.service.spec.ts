@@ -2,8 +2,8 @@ import { StancesService } from './stances.service';
 
 describe('StancesService signals', () => {
   it('does not let the proposer delete an editorially published stance', async () => {
-    const prisma = { topicStance: { findFirst: jest.fn().mockResolvedValue({ creatorId: 2n, applicationResults: [{ applicationId: 3n }], _count: { children: 0, posts: 0, signals: 0, pendingApplications: 0 } }), delete: jest.fn() } };
-    const service = new StancesService(prisma as never, { assertPublicAction: jest.fn() } as never);
+    const prisma = { topic: { findUnique: jest.fn().mockResolvedValue({ id: 1n }) }, topicStance: { findFirst: jest.fn().mockResolvedValue({ creatorId: 2n, applicationResults: [{ applicationId: 3n }], _count: { children: 0, posts: 0, signals: 0, pendingApplications: 0 } }), delete: jest.fn() } };
+    const service = new StancesService(prisma as never, { assertPublicAction: jest.fn() } as never, { assertCanInteract: jest.fn() } as never);
 
     await expect(service.remove(1n, 2n, 2n)).rejects.toThrow('只能透過內容管理流程處理');
     expect(prisma.topicStance.delete).not.toHaveBeenCalled();
@@ -37,6 +37,7 @@ describe('StancesService signals', () => {
     };
     const updateStance = jest.fn(({ data }) => { counters = data; return Promise.resolve({}); });
     const prisma = {
+      topic: { findUnique: jest.fn().mockResolvedValue({ id: 1n }) },
       topicStance: {
         findFirst: jest.fn(() => Promise.resolve({ id: BigInt(10), topic: { status: 'OPEN', moderationStatus: 'APPROVED' } })),
         update: updateStance,
@@ -44,7 +45,7 @@ describe('StancesService signals', () => {
       topicStanceSignal: signalStore,
       $transaction: jest.fn((callback) => callback({ topicStanceSignal: signalStore, topicStance: { update: updateStance } })),
     };
-    const service = new StancesService(prisma as never, { assertPublicAction: jest.fn() } as never);
+    const service = new StancesService(prisma as never, { assertPublicAction: jest.fn() } as never, { assertCanInteract: jest.fn() } as never);
 
     await expect(service.toggleSignal(BigInt(1), BigInt(10), BigInt(20), 'DISAGREE')).resolves.toEqual({ active: true, signal: 'DISAGREE' });
     expect(signals.map((item) => item.signal)).toEqual(['DISAGREE']);

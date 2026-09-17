@@ -71,12 +71,12 @@
               <span class="text-sm font-bold">{{ topicType === 'IMAGE_MULTIPLE' ? '圖片選項' : '投票選項' }}</span>
               <button v-if="topicType !== 'BINARY' && options.length < 6" type="button" class="focus-ring rounded-full text-xs font-bold text-[#d84a36] hover:underline" @click="addOption">＋ 新增{{ topicType === 'IMAGE_MULTIPLE' ? '圖片' : '選項' }}</button>
             </div>
-            <div class="mt-3 space-y-3">
-              <div v-for="(_, index) in options" :key="index">
+            <div ref="optionsEl" class="mt-3 space-y-3">
+              <div v-for="(_, index) in options" :key="optionIds[index]">
                 <div class="flex items-center gap-3">
-                  <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f8e3de] text-xs font-black text-[#a63222]">{{ index + 1 }}</span>
+                  <span data-drag-handle class="grid h-8 w-8 shrink-0 cursor-grab place-items-center rounded-full bg-[#f8e3de] text-xs font-black text-[#a63222] active:cursor-grabbing" title="拖曳以排序" aria-label="拖曳以排序">{{ index + 1 }}</span>
                   <TopicsOptionImageInput v-if="topicType === 'IMAGE_MULTIPLE'" v-model="optionImages[index]" @preview="lightboxSrc = $event" />
-                  <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="topicType === 'IMAGE_MULTIPLE' ? `圖片 ${index + 1} 的說明` : `選項 ${index + 1}`" class="flex-1 field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
+                  <input v-model.trim="options[index]" :data-field="`option-${index}`" maxlength="50" :placeholder="topicType === 'IMAGE_MULTIPLE' ? `圖片 ${index + 1} 的說明（選填）` : `選項 ${index + 1}`" class="flex-1 field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
                   <button v-if="topicType !== 'BINARY' && options.length > 2" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除選項" @click="removeOption(index)">&times;</button>
                 </div>
                 <p v-if="fieldErrors[`option-${index}`]" class="mt-2 pl-11 text-xs font-bold text-[#a63222]">{{ fieldErrors[`option-${index}`] }}</p>
@@ -88,6 +88,14 @@
             <div class="flex flex-wrap gap-2">
               <button v-for="days in durations" :key="days" type="button" class="focus-ring rounded-full border px-4 py-2.5 text-sm font-bold transition" :class="voteDurationDays === days ? 'border-[#3157d5] bg-[#3157d5] text-white' : 'border-[#cfc8bc] bg-white hover:border-[#3157d5]'" @click="voteDurationDays = days">{{ days }} 天</button>
             </div>
+          </div>
+          <div class="mt-6 border-t border-[#f0e6d2] pt-5">
+            <span class="mb-2 block text-sm font-bold">查看與參與資格</span>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <button type="button" class="focus-ring rounded-xl border p-3 text-left" :class="audience === 'MEMBER_ONLY' ? 'border-[#3157d5] bg-[#eef1fb]' : 'border-[#cfc8bc] bg-white'" @click="audience = 'MEMBER_ONLY'"><strong class="block text-sm">所有會員</strong><span class="mt-1 block text-xs text-[#77716a]">內容公開，登入會員可參與。</span></button>
+              <button type="button" class="focus-ring rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-40" :disabled="!canUseFollowersAudience" :class="audience === 'FOLLOWERS_ONLY' ? 'border-[#3157d5] bg-[#eef1fb]' : 'border-[#cfc8bc] bg-white'" @click="audience = 'FOLLOWERS_ONLY'"><strong class="block text-sm">僅限追蹤者</strong><span class="mt-1 block text-xs text-[#77716a]">只有目前追蹤你頻道的會員能查看與互動。</span></button>
+            </div>
+            <p v-if="!canUseFollowersAudience" class="mt-2 text-xs text-[#77716a]">組織或議題小組發布的內容沒有個人頻道追蹤者，因此只能選所有會員。</p>
           </div>
         </section>
 
@@ -162,11 +170,6 @@
           </div>
         </section>
 
-        <label class="flex cursor-pointer items-start gap-3 surface-card p-5 text-sm leading-6">
-          <input v-model="agreed" type="checkbox" class="mt-1 h-4 w-4 accent-[#d84a36]" />
-          <span>我確認內容為善意公共討論，未涉及誹謗、個人資料、違法內容或未經證實的指控，並同意平台在核准後公開。</span>
-        </label>
-
         <p v-if="formError" class="rounded-2xl border-l-4 border-[#d84a36] bg-[#fbe9e5] p-4 text-sm text-[#a63222]">{{ formError }}</p>
         <AiAuthoringWizard
           target="TOPIC"
@@ -192,16 +195,16 @@
             <p class="mt-3 text-xs text-[#8b857d]">立場直接沿用上方 JSON 內容；如需調整請回到生成器重新匯入。</p>
           </div>
           <div class="grid gap-3 sm:grid-cols-2">
-            <UiButton type="button" variant="data" block size="lg" :disabled="submitting || !agreed" @click="submitImport(false)">
+            <UiButton type="button" variant="data" block size="lg" :disabled="submitting" @click="submitImport(false)">
               {{ submitting ? '儲存中…' : '建立草稿（含立場）' }}
             </UiButton>
-            <UiButton type="button" variant="action" block size="lg" :disabled="submitting || !agreed" @click="submitImport(true)">
+            <UiButton type="button" variant="action" block size="lg" :disabled="submitting" @click="submitImport(true)">
               {{ submitting ? '儲存中…' : '建立並公開（含立場）' }}
             </UiButton>
           </div>
           <p class="text-center text-xs text-[#77716a]">建立草稿後可再由「直接公開」發布；建立並公開會立刻開票。</p>
         </template>
-        <UiButton v-else type="submit" variant="action" block size="lg" :disabled="submitting || !agreed">
+        <UiButton v-else type="submit" variant="action" block size="lg" :disabled="submitting">
           {{ submitting ? '儲存中…' : editingId ? '儲存內容' : auth.canAuthorTopics ? '直接公開議題' : '送出議題提案' }}
         </UiButton>
       </form>
@@ -224,7 +227,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Category, Topic, TopicContentBlockType, TopicImportPayload, TopicImportStance } from '~/types/topic';
+import type { Category, Topic, TopicAudience, TopicContentBlockType, TopicImportPayload, TopicImportStance } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
 import { applyCategoryRules, getCategoryMeta } from '~/utils/topic';
 import type { StanceAuthoringForm, TopicAuthoringForm } from '~/types/authoring';
@@ -297,12 +300,16 @@ const title = ref('');
 const description = ref('');
 const category = ref('');
 const topicType = ref<TopicType>('BINARY');
+let optionSeq = 0;
+const nextOptionId = () => `opt-${optionSeq++}`;
 const options = ref(['支持', '反對']);
+const optionIds = ref([nextOptionId(), nextOptionId()]);
 const optionImages = ref<(string | null)[]>([null, null]);
+const optionsEl = ref<HTMLElement | null>(null);
 const lightboxSrc = ref<string | null>(null);
 const blocks = ref<DraftBlock[]>([]);
 const voteDurationDays = ref(7);
-const agreed = ref(false);
+const audience = ref<TopicAudience>('MEMBER_ONLY');
 const loading = ref(true);
 const submitting = ref(false);
 const formError = ref('');
@@ -316,7 +323,10 @@ const eligibility = computed(() => auth.capabilitySummary?.seniorEligibility);
 const partnerOrganizations = computed(() => auth.capabilitySummary?.partnerOrganizations ?? []);
 const canSubmit = computed(() => auth.canAuthorTopics || auth.canSubmitTopicApplication);
 const importMode = computed(() => Boolean(appliedImport.value && !editingId.value && auth.canAuthorTopics));
+const canUseFollowersAudience = computed(() => !auth.canAuthorTopics && !selectedOrganizationId.value);
 let nextBlockKey = 1;
+
+watch(canUseFollowersAudience, (allowed) => { if (!allowed) audience.value = 'MEMBER_ONLY'; });
 
 watch(topicType, (type, previous) => {
   if (type === 'SPECTRUM') {
@@ -326,23 +336,43 @@ watch(topicType, (type, previous) => {
     options.value = ['支持', '反對'];
     optionImages.value = [null, null];
   } else if (type === 'IMAGE_MULTIPLE') {
-    options.value = ['圖片一', '圖片二', '圖片三'];
-    optionImages.value = [null, null, null];
+    options.value = ['', ''];
+    optionImages.value = [null, null];
   } else if (previous === 'SPECTRUM') {
     options.value = ['選項一', '選項二', '其他'];
     optionImages.value = [null, null, null];
   }
+  optionIds.value = options.value.map(() => nextOptionId());
 });
+
+function moveItem<T>(list: T[], from: number, to: number) {
+  const [item] = list.splice(from, 1);
+  if (item === undefined) return;
+  list.splice(to, 0, item);
+}
 
 function removeOption(index: number) {
   options.value.splice(index, 1);
   optionImages.value.splice(index, 1);
+  optionIds.value.splice(index, 1);
 }
 
 function addOption() {
   options.value.push('');
   optionImages.value.push(null);
+  optionIds.value.push(nextOptionId());
 }
+
+function reorderOptions(from: number, to: number) {
+  moveItem(options.value, from, to);
+  moveItem(optionImages.value, from, to);
+  moveItem(optionIds.value, from, to);
+  for (const key of Object.keys(fieldErrors)) {
+    if (/^option-\d+$/.test(key)) delete fieldErrors[key];
+  }
+}
+
+useDragSort(optionsEl, reorderOptions);
 
 function blockMeta(type: TopicContentBlockType) {
   return blockDefinitions.find((item) => item.type === type)!;
@@ -369,6 +399,7 @@ async function onApplyImport(payload: TopicImportPayload) {
   await nextTick();
   options.value = [...(payload.options ?? [])];
   optionImages.value = (payload.options ?? []).map(() => null);
+  optionIds.value = options.value.map(() => nextOptionId());
   voteDurationDays.value = payload.voteDurationDays;
   blocks.value = (payload.blocks ?? []).map((item) => ({
     key: nextBlockKey++,
@@ -395,6 +426,7 @@ async function applyAiTopicDraft(form: TopicAuthoringForm | StanceAuthoringForm)
   await nextTick();
   options.value = [...form.options];
   optionImages.value = form.options.map(() => null);
+  optionIds.value = options.value.map(() => nextOptionId());
   voteDurationDays.value = form.voteDurationDays;
   blocks.value = form.blocks.map((item) => ({
     key: nextBlockKey++, type: item.type, title: item.title, content: item.content,
@@ -407,12 +439,13 @@ function validateForm() {
   if (title.value.length < 10) fieldErrors.title = '議題標題至少需要 10 個字';
   if (description.value && description.value.length < 20) fieldErrors.description = '若填寫說明，至少需要 20 個字；也可以留空';
   if (topicType.value !== 'SPECTRUM') {
+    const isImageMultiple = topicType.value === 'IMAGE_MULTIPLE';
     options.value.forEach((option, index) => {
-      if (!option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}${topicType.value === 'IMAGE_MULTIPLE' ? '的說明' : ''}`;
-      if (topicType.value === 'IMAGE_MULTIPLE' && !optionImages.value[index]) fieldErrors[`option-${index}`] = `請為選項 ${index + 1} 上傳圖片`;
+      if (!isImageMultiple && !option.trim()) fieldErrors[`option-${index}`] = `請填寫選項 ${index + 1}`;
+      if (isImageMultiple && !optionImages.value[index]) fieldErrors[`option-${index}`] = `請為選項 ${index + 1} 上傳圖片`;
     });
-    if (new Set(options.value.map((item) => item.trim())).size !== options.value.length) formError.value = '投票選項不可重複。';
-    if (topicType.value === 'IMAGE_MULTIPLE' && options.value.length < 2) formError.value = '圖片選項題至少需要 2 個選項。';
+    if (!isImageMultiple && new Set(options.value.map((item) => item.trim())).size !== options.value.length) formError.value = '投票選項不可重複。';
+    if (isImageMultiple && options.value.length < 2) formError.value = '圖片選項題至少需要 2 個選項。';
   }
   blocks.value.forEach((item, index) => {
     if (item.title.length < 3) fieldErrors[`block-${index}-title`] = '模組標題至少需要 3 個字';
@@ -439,6 +472,7 @@ function payload() {
     options: topicType.value === 'SPECTRUM' ? undefined : options.value,
     optionImages: topicType.value === 'IMAGE_MULTIPLE' ? optionImages.value : undefined,
     voteDurationDays: voteDurationDays.value,
+    audience: audience.value,
     blocks: blocks.value.map(({ key, expanded, ...item }) => ({
       ...item,
       sourceLabel: item.sourceLabel || undefined,
@@ -526,7 +560,9 @@ onMounted(async () => {
     await nextTick();
     options.value = topic.options.map((item) => item.label);
     optionImages.value = topic.options.map((item) => item.data?.imageUrl ?? null);
+    optionIds.value = options.value.map(() => nextOptionId());
     voteDurationDays.value = topic.voteDurationDays;
+    audience.value = topic.audience;
     blocks.value = topic.blocks.map((item) => ({
       key: nextBlockKey++,
       type: item.type,

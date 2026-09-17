@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class VoteDto {
   @ApiPropertyOptional({ description: '二元/多元題要選的選項 ID' })
@@ -7,6 +7,15 @@ export class VoteDto {
   @IsInt()
   @Min(1)
   optionId?: number;
+
+  @ApiPropertyOptional({ type: [Number], description: '複選題要選的選項 ID（1~10 個）' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  optionIds?: number[];
 
   @ApiPropertyOptional({ description: '光譜題的分數（0~100）' })
   @IsOptional()
