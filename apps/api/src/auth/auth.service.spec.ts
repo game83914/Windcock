@@ -6,17 +6,27 @@ describe('AuthService', () => {
   const originalTurnstileSecret = process.env.TURNSTILE_SECRET;
   const originalFetch = global.fetch;
   const originalAllowedPhones = process.env.ALLOWED_LOGIN_PHONES;
+  const originalOtpMaxPerHour = process.env.OTP_MAX_PER_HOUR;
+  const originalOtpMaxPerDay = process.env.OTP_MAX_PER_DAY;
+  const originalOtpMaxPerIpDay = process.env.OTP_MAX_PER_IP_DAY;
 
   afterEach(() => {
     process.env.NODE_ENV = originalEnvironment;
     process.env.TURNSTILE_SECRET = originalTurnstileSecret;
     process.env.ALLOWED_LOGIN_PHONES = originalAllowedPhones;
+    process.env.OTP_MAX_PER_HOUR = originalOtpMaxPerHour;
+    process.env.OTP_MAX_PER_DAY = originalOtpMaxPerDay;
+    process.env.OTP_MAX_PER_IP_DAY = originalOtpMaxPerIpDay;
     global.fetch = originalFetch;
     jest.restoreAllMocks();
   });
 
   function setup(overrides: { increments?: number[]; storedCode?: string | null; consumed?: boolean } = {}) {
     process.env.ALLOWED_LOGIN_PHONES = '0912345678';
+    // Pin rate limits: the local .env (and any ambient env) must not change test behavior.
+    process.env.OTP_MAX_PER_HOUR = '3';
+    process.env.OTP_MAX_PER_DAY = '5';
+    process.env.OTP_MAX_PER_IP_DAY = '20';
     const increments = [...(overrides.increments ?? [1, 1, 1])];
     const prisma = {
       user: {
