@@ -1,5 +1,7 @@
 # 部署
 
+群暉 NAS 自託管走 `docs/nas.md`（GHCR 預建映像檔＋Container Manager）；以下為 Zeabur／通用流程。
+
 ## 建議架構（Zeabur，免費免綁卡）
 
 | 元件 | 服務 | 說明 |
