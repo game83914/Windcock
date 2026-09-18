@@ -23,6 +23,7 @@ COPY apps/api/prisma ./apps/api/prisma
 # --ignore-scripts：prisma CLI 屬 devDeps 已被移除，client 改由 build 階段複製現成產物
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
