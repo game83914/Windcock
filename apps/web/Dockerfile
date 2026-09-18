@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
-RUN npm ci
+# Web 不需要 Prisma client；跳過 postinstall（prisma generate 需要 schema，此處無需它）
+RUN npm ci --ignore-scripts
 COPY apps/web ./apps/web
 RUN npm run build -w apps/web
 
