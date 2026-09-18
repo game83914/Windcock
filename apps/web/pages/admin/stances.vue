@@ -17,7 +17,7 @@
           <span class="text-xs text-[#77716a]">議題 #{{ item.topicId }}</span>
           <span class="bg-[#fbe9e5] px-2 py-0.5 text-[11px] font-black text-[#a63222]">{{ reasonLabel(item.reason) }}</span>
         </div>
-        <p class="mt-2 text-sm text-[#5f5a53]">{{ item.reporter }} 檢舉 · {{ formatTime(item.createdAt) }}<span v-if="item.detail">：{{ item.detail }}</span></p>
+        <p class="mt-2 text-sm text-[#5f5a53]">{{ item.reporter }} 檢舉 · {{ formatDateTime(item.createdAt) }}<span v-if="item.detail">：{{ item.detail }}</span></p>
         <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
           <input v-model.trim="reason" class="focus-ring min-w-0 flex-1 border border-[#bfb8ad] bg-white px-4 py-2 text-sm" placeholder="下架原因（5 字以上）" />
           <button class="focus-ring shrink-0 bg-[#d84a36] px-5 py-2 text-sm font-black text-white disabled:opacity-50" :disabled="working || reason.length < 5 || item.stanceId === lastTakedownId" @click="takedown(item.stanceId)">下架此立場</button>
@@ -31,6 +31,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: ['auth', 'admin'] });
 useSeoMeta({ title: '立場檢舉管理｜輿論測風向' });
+import { formatDateTime } from '~/utils/format';
 
 interface StanceReport {
   id: string;
@@ -59,10 +60,6 @@ function reasonLabel(reason: string) {
     FALSE_INFO: '不實資訊',
     OTHER: '其他',
   }[reason] ?? reason;
-}
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 async function load() {

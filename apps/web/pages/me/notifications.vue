@@ -15,7 +15,7 @@
       <NuxtLink v-for="item in notifications" :key="item.id" :to="item.topicId ? `/topic/${item.topicId}` : '/me'" class="focus-ring block rounded-2xl border px-5 py-4 transition" :class="item.readAt ? 'border-[#ded7cb] bg-[#faf8f3]' : 'border-[#b7c6ee] bg-[#eef1fb]'" @click="markRead(item)">
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span v-if="!item.readAt" class="size-2 shrink-0 rounded-full bg-[#d84a36]" /><span v-if="item.type === 'CHANNEL_NEW_TOPIC'" class="rounded-full bg-[#fff0d7] px-2 py-0.5 text-[10px] font-black text-[#8f5d14]">頻道更新</span><h3 class="font-black">{{ item.title }}</h3></div><p class="mt-2 text-sm leading-6 text-[#6d6861]">{{ item.message }}</p></div>
-          <time class="shrink-0 text-xs text-[#8b857d]">{{ formatTime(item.createdAt) }}</time>
+          <time class="shrink-0 text-xs text-[#8b857d]">{{ formatDateTime(item.createdAt) }}</time>
         </div>
       </NuxtLink>
     </div>
@@ -28,6 +28,7 @@
 <script setup lang="ts">
 import type { UserNotification } from '~/types/topic';
 import type { MemberDashboard } from '~/types/member';
+import { formatDateTime } from '~/utils/format';
 
 definePageMeta({ middleware: 'auth' });
 useSeoMeta({ title: '通知中心｜會員中心' });
@@ -77,10 +78,6 @@ async function readAll() {
 function syncUnread() {
   if (dashboard.value) dashboard.value.counts.unreadNotifications = unreadCount.value;
   window.dispatchEvent(new CustomEvent('notifications-read', { detail: unreadCount.value }));
-}
-
-function formatTime(value: string) {
-  return new Date(value).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 onMounted(load);

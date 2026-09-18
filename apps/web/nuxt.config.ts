@@ -27,6 +27,7 @@ export default defineNuxtConfig({
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3001/api/v1',
       wsBase: process.env.NUXT_PUBLIC_WS_BASE || 'http://localhost:3001',
+      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY || '',
     },
   },
 

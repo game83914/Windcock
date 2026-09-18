@@ -12,9 +12,10 @@
     <div class="max-w-3xl">
       <button type="button" class="focus-ring text-sm font-bold text-[#6d6861] hover:text-[#d84a36]" @click="goBack">&larr; 返回</button>
       <div class="mt-4 flex flex-wrap items-center gap-2">
-        <span v-if="topic.kind !== 'QUICK' && topic.kind !== 'SURVEY'" class="border border-[#171717] px-2 py-1 text-xs font-bold">{{ getCategoryMeta(topic.category).label }}</span>
+        <span v-if="topic.kind !== 'QUICK' && topic.kind !== 'SURVEY' && topic.kind !== 'STAGED'" class="border border-[#171717] px-2 py-1 text-xs font-bold">{{ getCategoryMeta(topic.category).label }}</span>
         <span v-if="topic.kind === 'QUICK'" class="bg-[#b0761f] px-2 py-1 text-xs font-black text-white">快問</span>
         <span v-if="topic.kind === 'SURVEY'" class="bg-[#b0761f] px-2 py-1 text-xs font-black text-white">問卷</span>
+        <span v-if="topic.kind === 'STAGED'" class="bg-[#b0761f] px-2 py-1 text-xs font-black text-white">回合制</span>
         <NuxtLink v-if="topic.creator.type === 'MEMBER' && topic.creator.id" :to="`/members/${topic.creator.id}`" class="focus-ring bg-[#171717] px-2 py-1 text-xs font-black text-white hover:bg-[#d84a36]">{{ topic.creator.nickname }}發布</NuxtLink>
         <span v-else class="bg-[#171717] px-2 py-1 text-xs font-black text-white">議題小組發布</span>
         <span v-if="topic.proposedBy?.length" class="text-xs text-[#6d6861]">提案參與者：{{ topic.proposedBy.map((person) => person.label).join('、') }}</span>
@@ -24,7 +25,7 @@
       </div>
       <h1 class="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] sm:text-4xl">{{ topic.title }}</h1>
       <p v-if="topic.description" class="mt-3 text-sm leading-6 text-[#5f5a53]">{{ topic.description }}</p>
-      <p class="mt-3 text-sm font-bold text-[#77716a]">{{ isSurvey ? `${topic.surveyQuestionCount ?? topic.questions?.length ?? 0} 題` : `${totalVotes} 票` }} · {{ topic.voteEndAt ? `截止 ${formatTime(topic.voteEndAt)}` : '尚未開放投票' }}</p>
+      <p class="mt-3 text-sm font-bold text-[#77716a]">{{ isSurvey ? `${topic.surveyQuestionCount ?? topic.questions?.length ?? 0} 題` : isStaged ? `第 ${stagedCurrent}／${stagedTotal} 輪 · ${topic.status === 'OPEN' ? '進行中' : topic.status === 'LOCKED' ? '歷史版本' : '已結算'}` : `${totalVotes} 票` }} · {{ topic.voteEndAt ? `截止 ${formatDateTime(topic.voteEndAt)}` : '尚未開放投票' }}</p>
     </div>
 
     <nav v-if="sections.length > 1" class="sticky top-16 z-20 -mx-4 flex gap-1 overflow-x-auto border-y border-[#171717] bg-[#f4f1ea]/95 px-4 py-2 backdrop-blur sm:mx-0" aria-label="議題內容分區">
@@ -43,12 +44,53 @@
 
     <section v-show="activeSection === 'vote'" class="max-w-3xl overflow-hidden rounded-2xl border border-[#ded7cb] bg-[#faf8f3] shadow-[0_8px_28px_rgba(23,23,23,0.08)]">
       <header class="border-b border-[#ded7cb] px-5 py-4 sm:px-6">
-        <p class="eyebrow-modern text-[#d84a36]">{{ isSurvey ? '問卷' : showResults ? '投票結果' : '你的選擇' }}</p>
-        <h2 class="mt-1 text-xl font-black">{{ isSurvey ? '逐題完成即可看結果' : showResults ? '目前風向' : '請選擇你的立場' }}</h2>
+        <h2 v-if="isQuick" class="text-xl font-black">{{ showResults ? '快問結果' : '你的選擇' }}</h2>
+        <template v-else>
+          <p class="eyebrow-modern text-[#d84a36]">{{ isSurvey ? '問卷' : isStaged ? '回合制' : showResults ? '投票結果' : '你的選擇' }}</p>
+          <h2 class="mt-1 text-xl font-black">{{ isSurvey ? '逐題完成即可看結果' : isStaged ? `第 ${stagedCurrent}／${stagedTotal} 輪` : showResults ? '目前風向' : '請選擇你的立場' }}</h2>
+        </template>
       </header>
 
       <div class="p-5 sm:p-6">
-        <SurveyPanel v-if="isSurvey" :topic="topic" @refreshed="load" />
+        <template v-if="isStaged">
+          <div class="mb-5 flex flex-wrap items-center gap-3">
+            <p class="text-sm font-black">第 {{ stagedCurrent }}／{{ stagedTotal }} 輪 · {{ topic.status === 'OPEN' ? '進行中' : topic.status === 'LOCKED' ? '歷史版本' : '已結算' }}</p>
+            <div class="h-2 min-w-32 flex-1 overflow-hidden rounded-full bg-[#ebe6dc]">
+              <div class="h-full rounded-full bg-[#b0761f] transition-all" :style="{ width: `${stagedProgress}%` }" />
+            </div>
+          </div>
+
+          <section v-if="currentRoundTopic" class="overflow-hidden rounded-2xl border border-[#ded7cb] bg-white">
+            <header class="border-b border-[#ded7cb] px-5 py-4">
+              <p class="eyebrow-modern text-[#b0761f]">第 {{ currentRoundTopic.roundNumber }} 輪 · {{ topicTypeLabel(currentRoundTopic.topicType) }}</p>
+              <h3 class="mt-1 text-lg font-black leading-snug">{{ currentRoundTopic.title }}</h3>
+            </header>
+            <div class="p-5 sm:p-6">
+              <QuickVotePanel :topic="currentRoundTopic" @refreshed="load" />
+            </div>
+          </section>
+          <p v-else class="text-sm text-[#8b857d]">目前沒有進行中的回合。</p>
+
+          <div v-if="historyRounds.length" class="mt-8 space-y-4">
+            <h3 class="text-sm font-black text-[#77716a]">歷史回合與作者回饋</h3>
+            <ol class="space-y-4 border-l-2 border-[#e0c9a0] pl-4">
+              <li v-for="round in historyRounds" :key="round.id" class="rounded-2xl border border-[#ded7cb] bg-white p-5">
+                <p class="eyebrow-modern text-[#b0761f]">第 {{ round.roundNumber }} 輪 · {{ topicTypeLabel(round.topicType) }}</p>
+                <h4 class="mt-1 font-black leading-snug">{{ round.title }}</h4>
+                <div class="mt-3">
+                  <QuickVotePanel :topic="round" @refreshed="load" />
+                </div>
+                <blockquote v-if="round.roundFeedback" class="mt-4 whitespace-pre-wrap rounded-xl border-l-4 border-[#b0761f] bg-[#fff8ec] p-4 text-sm leading-6">
+                  <p class="mb-1 text-xs font-black text-[#8f5d14]">作者回饋</p>
+                  {{ round.roundFeedback }}
+                </blockquote>
+              </li>
+            </ol>
+          </div>
+
+          <StagedAuthorPanel v-if="isAuthor" :topic-id="topic.id" :topic="topic" @refreshed="load" />
+        </template>
+        <SurveyPanel v-else-if="isSurvey" :topic="topic" @refreshed="load" />
         <QuickVotePanel v-else-if="isQuick" :topic="topic" @refreshed="load" />
 
         <template v-else>
@@ -69,20 +111,19 @@
 
           <template v-else-if="!showResults && isVotingOpen && topic.topicType === 'IMAGE_MULTIPLE'">
             <div class="grid grid-cols-2 gap-3">
-              <div
+              <ImageOptionTile
                 v-for="o in topic.options"
                 :key="o.id"
-                class="focus-ring group relative aspect-square overflow-hidden rounded-2xl border-2 bg-white transition"
-                :class="selectedOptionId === o.id ? 'border-[#3157d5] ring-2 ring-[#3157d5]' : 'border-[#ded7cb] hover:border-[#171717]'"
-              >
-                <img :src="o.data?.imageUrl" :alt="o.label" class="absolute inset-0 h-full w-full object-cover" />
-                <span class="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 pb-2 pt-8 text-xs font-black text-white">{{ o.label }}</span>
-                <span v-if="selectedOptionId === o.id" class="pointer-events-none absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-[#3157d5] text-sm text-white" aria-hidden="true">✓</span>
-                <button type="button" class="focus-ring absolute inset-0" :disabled="voting || isInteractionLocked" :aria-label="`選擇 ${o.label}`" @click="onOptionTap(o.id)" />
-                <button type="button" class="focus-ring absolute left-1.5 top-1.5 z-10 grid size-7 place-items-center rounded-full bg-black/45 text-white transition hover:bg-black/70" :disabled="voting || isInteractionLocked" aria-label="放大檢視圖片" @click.stop="openLightbox(o.data?.imageUrl ?? '')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                </button>
-              </div>
+                :src="o.data?.imageUrl"
+                :label="o.label"
+                :selected="selectedOptionId === o.id"
+                :disabled="voting || isInteractionLocked"
+                selected-class="border-[#3157d5] ring-2 ring-[#3157d5]"
+                unselected-class="border-[#ded7cb] hover:border-[#171717]"
+                badge-class="right-1.5 top-1.5 size-6 bg-[#3157d5] text-sm"
+                @vote="onOptionTap(o.id)"
+                @zoom="openLightbox(o.data?.imageUrl ?? '')"
+              />
             </div>
             <div v-if="confirmingOptionId" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
               <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedOption?.label }}」？送出後無法修改。</p>
@@ -113,7 +154,7 @@
                 </span>
               </button>
             </div>
-            <button v-if="optionsCollapsed" type="button" class="focus-ring mt-3 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${topic.options.length}）` }}</button>
+            <button v-if="optionsCollapsed" type="button" class="focus-ring mt-3 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${hiddenCount}）` }}</button>
 
             <div v-if="confirmingOptionId" class="mt-4 flex flex-col gap-3 rounded-xl border-2 border-[#3157d5] bg-[#e7ecff] p-4 sm:flex-row sm:items-center sm:justify-between">
               <p class="text-sm font-bold text-[#2746b4]">確定送出「{{ selectedOption?.label }}」？送出後無法修改。</p>
@@ -138,7 +179,7 @@
                 <ul v-if="topic.responses?.length" class="space-y-2.5">
                   <li v-for="(response, index) in topic.responses" :key="index" class="rounded-xl border border-[#ded7cb] bg-white p-4">
                     <p class="whitespace-pre-wrap text-sm leading-6">{{ response.answerText }}</p>
-                    <p class="mt-2 text-xs text-[#8b857d]">{{ response.nickname }} · {{ formatTime(response.createdAt) }}</p>
+                    <p class="mt-2 text-xs text-[#8b857d]">{{ response.nickname }} · {{ formatDateTime(response.createdAt) }}</p>
                   </li>
                 </ul>
                 <p v-else class="text-sm text-[#8b857d]">還沒有公開回答。</p>
@@ -180,12 +221,12 @@
                 </div>
               </div>
               <p v-if="topic.myVote" class="mt-5 rounded-xl border-l-4 border-[#3f7a58] bg-[#e5f1e9] p-3 text-sm font-bold">你的選擇：{{ myChoiceLabel }}</p>
-              <button v-if="optionsCollapsed" type="button" class="focus-ring mt-4 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${topic.options.length}）` }}</button>
+              <button v-if="optionsCollapsed" type="button" class="focus-ring mt-4 w-full rounded-xl border border-[#e0c9a0] bg-[#fffaf0] px-3 py-2 text-xs font-bold text-[#8f5d14] transition hover:border-[#b0761f]" @click="toggleOptions">{{ showAllOptions ? '收合選項' : `＋ 顯示全部（${hiddenCount}）` }}</button>
             </template>
           </template>
         </template>
 
-        <p v-if="!isQuick && !showResults && isVotingOpen" class="mt-4 border-t border-[#ded7cb] pt-4 text-xs leading-5 text-[#77716a]">送出後無法修改。投票後可立即查看即時風向。</p>
+        <p v-if="!isQuick && !isSurvey && !isStaged && !showResults && isVotingOpen" class="mt-4 border-t border-[#ded7cb] pt-4 text-xs leading-5 text-[#77716a]">送出後無法修改。投票後可立即查看即時風向。</p>
       </div>
     </section>
 
@@ -230,8 +271,11 @@
 
 <script setup lang="ts">
 import type { Topic } from '~/types/topic';
-import { getCategoryMeta, optionPercentage } from '~/utils/topic';
-import { OPTION_COLLAPSE_LIMIT, VOTE_IDENTITY_NOTICE } from '~/utils/topic';
+import { getCategoryMeta, optionPercentage, topicTypeLabel } from '~/utils/topic';
+import { VOTE_IDENTITY_NOTICE } from '~/utils/topic';
+import { formatDateTime } from '~/utils/format';
+// 明確 import：自動註冊名為 VoteImageOptionTile，模板短名需靠顯式引入解析
+import ImageOptionTile from '~/components/vote/ImageOptionTile.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -250,9 +294,7 @@ const initialSection = validSections.includes(route.query.section as TopicSectio
 const activeSection = ref<TopicSection>(initialSection);
 const selectedStance = ref<string | null>(typeof route.query.stance === 'string' ? route.query.stance : null);
 const selectedStanceTab = computed(() => route.query.tab === 'discussion' ? 'DISCUSSION' as const : 'DETAIL' as const);
-const isVotingOpen = computed(() => topic.value?.status === 'OPEN' && !!topic.value.voteEndAt && new Date(topic.value.voteEndAt).getTime() > Date.now());
-const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabilitySummary?.participation));
-const showResults = computed(() => !!topic.value && (topic.value.hasVoted || !isVotingOpen.value || (auth.isAuthed && participationReady.value && !auth.canVote)));
+const { isVotingOpen, participationReady, showResults } = useVotingGate(topic);
 const totalVotes = ref('0');
 const voting = ref(false);
 const votingTargetId = ref<string | null>(null);
@@ -270,21 +312,27 @@ const confirmingOptionId = ref<string | null>(null);
 const confirmingSpectrum = ref(false);
 const isQuick = computed(() => topic.value?.kind === 'QUICK');
 const isSurvey = computed(() => topic.value?.kind === 'SURVEY');
+const isStaged = computed(() => topic.value?.kind === 'STAGED');
+const isAuthor = computed(() => !!auth.isAuthed && !!auth.id && !!topic.value?.creator?.id && topic.value.creator.id === auth.id);
+const sortedRounds = computed(() => [...(topic.value?.rounds ?? [])].sort((a, b) => a.roundNumber - b.roundNumber));
+const stagedTotal = computed(() => topic.value?.totalRounds ?? sortedRounds.value.length);
+const stagedCurrent = computed(() => topic.value?.currentRound ?? sortedRounds.value.length);
+const stagedProgress = computed(() => stagedTotal.value > 0 ? Math.round((stagedCurrent.value / stagedTotal.value) * 100) : 0);
+const currentRoundTopic = computed(() => sortedRounds.value.find((round) => round.roundNumber === stagedCurrent.value) ?? sortedRounds.value[sortedRounds.value.length - 1] ?? null);
+const historyRounds = computed(() => {
+  const current = currentRoundTopic.value?.roundNumber ?? stagedCurrent.value;
+  return sortedRounds.value.filter((round) => round.roundNumber < current || (topic.value?.status !== 'OPEN' && round.roundNumber !== current));
+});
 const isInteractionLocked = computed(() => !auth.isAuthed);
 
-const lightboxSrc = ref<string | null>(null);
-function openLightbox(src: string) { lightboxSrc.value = src; }
+const { src: lightboxSrc, open: openLightbox } = useLightbox();
 
-const showAllOptions = ref(false);
-const optionsCollapsed = computed(() => !showAllOptions.value && (topic.value?.options.length ?? 0) > OPTION_COLLAPSE_LIMIT);
-const visibleOptions = computed(() => (optionsCollapsed.value ? topic.value?.options.slice(0, OPTION_COLLAPSE_LIMIT) : topic.value?.options) ?? []);
-function toggleOptions() {
-  showAllOptions.value = !showAllOptions.value;
-}
+const { showAllOptions, optionsCollapsed, visibleOptions, hiddenCount, toggleOptions } = useCollapsedOptions(() => topic.value?.options ?? []);
 
 const sections = computed<Array<{ value: TopicSection; label: string; count: number | null }>>(() => {
   if (isQuick.value) return [{ value: 'vote', label: '即時結果', count: null }];
   if (isSurvey.value) return [{ value: 'vote', label: '問卷', count: null }];
+  if (isStaged.value) return [{ value: 'vote', label: '回合制', count: null }];
   return [
     { value: 'vote', label: showResults.value ? '投票結果' : '我的選擇', count: null },
     ...((topic.value?.blocks.length ?? 0) ? [{ value: 'context' as const, label: '議題脈絡', count: topic.value!.blocks.length }] : []),
@@ -295,10 +343,6 @@ const sections = computed<Array<{ value: TopicSection; label: string; count: num
 
 const { joinTopic, leaveTopic, onVoteUpdate, cleanup: cleanupRealtime } = useRealtime();
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 function formatCaseDate(iso: string) {
   return new Date(iso).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });

@@ -42,6 +42,13 @@
                 class="focus-ring block px-3 py-2.5 text-sm font-black text-[#b0761f] hover:bg-[#fff0d7]"
                 @click="createMenuOpen = false"
               >發起問卷</NuxtLink>
+              <NuxtLink
+                v-if="canCreateQuick"
+                role="menuitem"
+                to="/topics/staged"
+                class="focus-ring block px-3 py-2.5 text-sm font-black text-[#b0761f] hover:bg-[#fff0d7]"
+                @click="createMenuOpen = false"
+              >發起回合制</NuxtLink>
             </div>
           </Transition>
         </div>

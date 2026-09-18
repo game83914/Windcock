@@ -66,6 +66,7 @@ enum TopicKind {
   FORMAL
   QUICK
   SURVEY
+  STAGED
 }
 
 enum TopicVisibility {
@@ -82,6 +83,7 @@ enum TopicType {
   BINARY
   MULTIPLE
   STAR_RATING
+  LIKERT
   LIKERT_5
   LIKERT_7
   MULTI_SELECT
@@ -95,6 +97,7 @@ enum TopicType {
   SPIN_WHEEL
   LOTTERY
   SURVEY
+  STAGED
 }
 
 enum TopicStatus {
@@ -408,7 +411,10 @@ enum TopicStanceReportStatus {
 
 model User {
   id              BigInt         @id @default(autoincrement())
-  phoneNumber     String         @unique @map("phone_number")
+  email           String?        @unique @map("email")
+  passwordHash    String?        @map("password_hash")
+  passwordUpdatedAt DateTime?    @map("password_updated_at")
+  phoneNumber     String?        @unique @map("phone_number")
   nickname        String
   avatarUrl       String?        @map("avatar_url")
   channelBio      String?        @map("channel_bio")
@@ -504,8 +510,11 @@ model Topic {
   voteDurationHours Int?                  @map("vote_duration_hours")
   voteEndAt         DateTime?             @map("vote_end_at")
   minVotes          Int?                  @map("min_votes")
+  totalRounds       Int?                  @map("total_rounds")
+  roundFeedback     String?               @map("round_feedback")
   scaleMinLabel     String?               @map("scale_min_label")
   scaleMaxLabel     String?               @map("scale_max_label")
+  scalePoints       Int?                  @map("scale_points")
   maxSelections     Int?                  @map("max_selections")
   totalVotes        BigInt                @default(0) @map("total_votes")
   voterCount        BigInt                @default(0) @map("voter_count")

@@ -75,6 +75,8 @@ export function optionPercentage(option: TopicOption, topic: Topic) {
 }
 
 export const TOPIC_TYPE_LABEL: Record<string, string> = {
+  SURVEY: '問卷',
+  STAGED: '回合制',
   BINARY: '二選一',
   MULTIPLE: '單選題',
   IMAGE_MULTIPLE: '圖片選項題',
@@ -87,8 +89,7 @@ export const TOPIC_TYPE_LABEL: Record<string, string> = {
   SPIN_WHEEL: '轉盤抽獎',
   LOTTERY: '日式搖獎',
   STAR_RATING: '五星評分',
-  LIKERT_5: '五點量表',
-  LIKERT_7: '七點量表',
+  LIKERT: '量表題',
   MULTI_SELECT: '複選題',
 };
 
@@ -104,12 +105,20 @@ export function isImageRankType(topicType?: string) {
   return topicType === 'IMAGE_RANK';
 }
 
-export function isRatingType(topicType?: string): topicType is 'STAR_RATING' | 'LIKERT_5' | 'LIKERT_7' {
-  return !!topicType && ['STAR_RATING', 'LIKERT_5', 'LIKERT_7'].includes(topicType);
+export function isRatingType(topicType?: string): topicType is 'STAR_RATING' | 'LIKERT' {
+  return !!topicType && ['STAR_RATING', 'LIKERT'].includes(topicType);
 }
 
-export function ratingScaleSize(topicType?: string) {
-  return topicType === 'LIKERT_7' ? 7 : 5;
+export function ratingScaleSize(topic?: Topic | null) {
+  if (!topic) return 5;
+  if (topic.topicType === 'STAR_RATING') return 5;
+  if (topic.topicType === 'LIKERT') {
+    const points = Number(topic.scalePoints);
+    if (Number.isInteger(points) && points >= 3 && points <= 10) return points;
+    if (topic.options.length >= 3 && topic.options.length <= 10) return topic.options.length;
+    return 5;
+  }
+  return 5;
 }
 
 export function optionValue(option: TopicOption, index: number) {
@@ -140,6 +149,5 @@ export function leadingOptions(topic: Topic, limit = 2) {
 }
 
 export const VOTE_IDENTITY_NOTICE = '此身份僅供查閱，不能投票。';
-export const VOTE_LOGIN_LABEL = '門號登入投票';
 
 export const OPTION_COLLAPSE_LIMIT = 4;

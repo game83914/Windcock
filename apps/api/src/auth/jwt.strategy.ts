@@ -6,7 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 export interface JwtPayload {
   sub: string;
-  phone: string;
+  phone?: string;
+  email?: string;
   act?: string;
   typ?: 'dev-assumption';
   profile?: string;
@@ -36,15 +37,15 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       where: { id: BigInt(payload.sub) },
       select: {
         id: true,
+        email: true,
         nickname: true,
         role: true,
         status: true,
-        isPhoneVerified: true,
       },
     });
 
-    if (!user || !user.isPhoneVerified) {
-      throw new UnauthorizedException('帳號不存在或尚未完成門號驗證');
+    if (!user) {
+      throw new UnauthorizedException('帳號不存在');
     }
     if (user.status !== 'ACTIVE') {
       throw new ForbiddenException('帳號目前無法使用此功能');
@@ -56,9 +57,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         throw new UnauthorizedException('測試身份已停用');
       }
       actorUserId = BigInt(payload.act);
-      const actor = await this.prisma.user.findUnique({ where: { id: actorUserId }, select: { phoneNumber: true, role: true, status: true, isPhoneVerified: true } });
+      const actor = await this.prisma.user.findUnique({ where: { id: actorUserId }, select: { phoneNumber: true, role: true, status: true } });
       const allowedPhone = process.env.DEV_IDENTITY_OPERATOR_PHONE || '0911111111';
-      if (!actor || actor.phoneNumber !== allowedPhone || actor.role !== 'ADMIN' || actor.status !== 'ACTIVE' || !actor.isPhoneVerified) {
+      if (!actor || actor.phoneNumber !== allowedPhone || actor.role !== 'ADMIN' || actor.status !== 'ACTIVE') {
         throw new UnauthorizedException('測試身份管理員已失效');
       }
     }
@@ -68,6 +69,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       actorUserId,
       assumptionProfile: payload.profile,
       phone: payload.phone,
+      email: payload.email ?? user.email,
       nickname: user.nickname,
       role: payload.typ === 'dev-assumption' ? 'USER' : user.role,
     };

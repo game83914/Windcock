@@ -4,6 +4,13 @@ on:
   push:
     branches: [master]
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -17,7 +24,11 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+      - run: git diff --check
       - run: npm ci
+      - name: Prisma validate
+        run: npx prisma validate --schema prisma/schema.prisma
+        working-directory: apps/api
       - name: Prisma generate
         run: npm run prisma:generate
         working-directory: apps/api
@@ -25,5 +36,11 @@ jobs:
         run: npm run build -w apps/api
       - name: Test API
         run: npm run test -w apps/api
+      - name: Typecheck Web
+        run: npm run typecheck -w apps/web
       - name: Build Web
         run: npm run build -w apps/web
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t windcock-api:ci .
+      - name: Build Web image
+        run: docker build -f apps/web/Dockerfile -t windcock-web:ci .

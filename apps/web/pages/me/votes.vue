@@ -17,7 +17,7 @@
           <NuxtLink :to="`/topic/${vote.topicId}`" class="focus-ring mt-2 block text-lg font-black leading-snug hover:text-[#3157d5]">{{ vote.topicTitle }}</NuxtLink>
           <p class="mt-2 text-sm text-[#6d6861]">我的選擇：<strong class="text-[#171717]">{{ vote.selection || vote.spectrumValue }}</strong><span v-if="Number(vote.rewardPoints)" class="ml-3 text-[#3f7a58]">+{{ vote.rewardPoints }} 點</span></p>
         </div>
-        <div class="text-left sm:text-right"><time class="block text-xs text-[#77716a]">{{ formatTime(vote.votedAt) }}</time></div>
+        <div class="text-left sm:text-right"><time class="block text-xs text-[#77716a]">{{ formatDateTimeWithYear(vote.votedAt) }}</time></div>
       </article>
     </div>
     <p v-else class="mt-5 border border-[#d7d1c6] bg-[#faf8f3] px-6 py-16 text-center text-sm text-[#77716a]">此分類目前沒有投票紀錄。</p>
@@ -29,6 +29,7 @@
 <script setup lang="ts">
 import type { MemberVote, MemberVotesResponse } from '~/types/member';
 import { getCategoryMeta } from '~/utils/topic';
+import { formatDateTimeWithYear } from '~/utils/format';
 
 definePageMeta({ middleware: 'auth' });
 useSeoMeta({ title: '投票紀錄｜會員中心' });
@@ -58,10 +59,6 @@ async function load() {
 
 function statusLabel(status: string) {
   return status === 'OPEN' ? '投票進行中' : status === 'LOCKED' ? '歷史版本' : '已結束';
-}
-
-function formatTime(value: string) {
-  return new Date(value).toLocaleString('zh-TW', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 onMounted(load);

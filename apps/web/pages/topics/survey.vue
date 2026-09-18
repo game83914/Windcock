@@ -8,7 +8,7 @@
     <div v-if="savedTopic" class="surface-card p-8 text-center sm:p-12">
       <p class="eyebrow-modern text-[#b0761f]">問卷已上線</p>
       <h2 class="mt-3 text-2xl font-black">你的問卷可以開始作答了</h2>
-      <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6d6861]">共 {{ savedTopic.questionCount ?? questions.length }} 題，開放 {{ savedTopic.voteDurationHours }} 小時。作答完成可獲得一次投票獎勵。</p>
+      <p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#6d6861]">共 {{ savedTopic.questionCount ?? questions.length }} 題，開放 {{ savedTopic.voteDurationHours }} 小時。</p>
       <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
         <UiButton v-if="savedTopic.sharePath" variant="primary" @click="copySharePath(savedTopic.sharePath)">{{ copied ? '已複製連結' : '複製私密連結' }}</UiButton>
         <UiButton :to="`/topic/${savedTopic.id}`" variant="quick">前往問卷詳情</UiButton>
@@ -67,7 +67,9 @@
                 v-model:question-title="question.questionTitle"
                 v-model:scale-min-label="question.scaleMinLabel"
                 v-model:scale-max-label="question.scaleMaxLabel"
+                v-model:points="question.points"
                 v-model:max-selections="question.maxSelections"
+                v-model:scratch-card="question.scratchCard"
               />
             </div>
           </article>
@@ -125,7 +127,7 @@
               <span class="min-w-0">
                 <span class="block truncate font-bold">{{ question.questionTitle || '未命名題目' }}</span>
                  <span class="text-xs text-[#8f5d14]">{{ BUILDER_RULES[question.type].label }}</span>
-                 <span v-if="question.type === 'LIKERT_5' || question.type === 'LIKERT_7'" class="block truncate text-[11px] text-[#77716a]">{{ question.scaleMinLabel || '最低' }} ～ {{ question.scaleMaxLabel || '最高' }}</span>
+                 <span v-if="question.type === 'LIKERT'" class="block truncate text-[11px] text-[#77716a]">{{ normalizeLikertPoints(question.points) }} 點：{{ question.scaleMinLabel || '最低' }} ～ {{ question.scaleMaxLabel || '最高' }}</span>
                  <span v-else-if="question.type === 'MULTI_SELECT'" class="block text-[11px] text-[#77716a]">最多選 {{ question.maxSelections }} 項</span>
               </span>
             </li>
@@ -141,7 +143,7 @@
 import type { Topic, TopicAudience, TopicVisibility } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
 import type { CapabilitySummary } from '~/stores/auth';
-import { BUILDER_RULES, questionPayload, seedRows, type BuilderRow, type BuilderType } from '~/utils/questionBuilder';
+import { BUILDER_RULES, createScratchCardDraft, normalizeLikertPoints, questionPayload, seedRows, type BuilderRow, type BuilderType, type ScratchCardDraft } from '~/utils/questionBuilder';
 
 definePageMeta({ middleware: 'auth' });
 
@@ -151,9 +153,11 @@ interface SurveyQuestionDraft {
   type: BuilderType;
   rows: BuilderRow[];
   prompt: string;
+  points: number;
   scaleMinLabel: string;
   scaleMaxLabel: string;
   maxSelections: number;
+  scratchCard: ScratchCardDraft;
   expanded: boolean;
 }
 
@@ -168,7 +172,7 @@ useSeoMeta({ title: '發起問卷｜輿論測風向' });
 const maxQuestions = 20;
 let questionSeq = 0;
 function newQuestion(): SurveyQuestionDraft {
-  return { id: `q-${questionSeq++}`, questionTitle: '', type: 'OPTION', rows: seedRows('OPTION'), prompt: '', scaleMinLabel: '', scaleMaxLabel: '', maxSelections: 1, expanded: true };
+  return { id: `q-${questionSeq++}`, questionTitle: '', type: 'OPTION', rows: seedRows('OPTION'), prompt: '', points: 5, scaleMinLabel: '', scaleMaxLabel: '', maxSelections: 1, scratchCard: createScratchCardDraft(), expanded: true };
 }
 
 const durationOptions = [
@@ -229,7 +233,8 @@ function questionSummary(question: SurveyQuestionDraft) {
   if (question.type === 'SPECTRUM') return '0～100 光譜，無需設定選項';
   if (question.type === 'SHORT_ANSWER') return question.prompt.trim() ? '已設定作答提示' : '文字回答';
   if (question.type === 'STAR_RATING') return '1～5 星評分';
-  if (question.type === 'LIKERT_5' || question.type === 'LIKERT_7') return `${question.type === 'LIKERT_7' ? 7 : 5} 點：${question.scaleMinLabel || '最低'} ～ ${question.scaleMaxLabel || '最高'}`;
+  if (question.type === 'LIKERT') return `${normalizeLikertPoints(question.points)} 點：${question.scaleMinLabel || '最低'} ～ ${question.scaleMaxLabel || '最高'}`;
+  if (question.type === 'SCRATCH') return `${question.rows.filter((row) => row.label.trim()).length} 種隨機結果`;
   const completed = question.type === 'IMAGE_OPTION' || question.type === 'IMAGE_RANK'
     ? question.rows.filter((row) => row.image).length
     : question.rows.filter((row) => row.label.trim()).length;
@@ -310,9 +315,11 @@ async function submit() {
           type: question.type,
           rows: question.rows,
           prompt: question.prompt,
+          points: question.points,
           scaleMinLabel: question.scaleMinLabel,
           scaleMaxLabel: question.scaleMaxLabel,
           maxSelections: question.maxSelections,
+          scratchCard: question.scratchCard,
         }),
       })),
     };

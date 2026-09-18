@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { TopicKind, TopicType } from '@prisma/client';
 import { TopicsService } from './topics.service';
 
@@ -84,14 +84,30 @@ describe('TopicsService createSurvey', () => {
     await service.createSurvey(1n, dto({
       title: '量表與複選問卷',
       questions: [
-        { title: '服務滿意度如何', topicType: TopicType.LIKERT_5, scaleMinLabel: '不滿意', scaleMaxLabel: '滿意' },
+        { title: '服務滿意度如何', topicType: TopicType.LIKERT, scaleMinLabel: '不滿意', scaleMaxLabel: '滿意', scalePoints: 5 },
         { title: '可接受的交通方式', topicType: TopicType.MULTI_SELECT, options: ['火車', '汽車', '單車'], maxSelections: 2 },
       ],
     }) as never);
 
-    expect(create.mock.calls[1][0].data).toMatchObject({ scaleMinLabel: '不滿意', scaleMaxLabel: '滿意' });
+    expect(create.mock.calls[1][0].data).toMatchObject({ scaleMinLabel: '不滿意', scaleMaxLabel: '滿意', scalePoints: 5 });
     expect(create.mock.calls[1][0].data.options.create).toHaveLength(5);
     expect(create.mock.calls[2][0].data.maxSelections).toBe(2);
+  });
+
+  it('rejects LIKERT child questions with missing or out-of-range scalePoints', async () => {
+    const { service, create } = createService();
+    create.mockResolvedValueOnce({ id: 10n, title: '量表問卷' }).mockResolvedValue({ id: 11n });
+
+    for (const scalePoints of [undefined, 2, 11]) {
+      await expect(service.createSurvey(1n, dto({
+        title: '量表問卷',
+        questions: [
+          { title: '服務滿意度如何', topicType: TopicType.LIKERT, scaleMinLabel: '不滿意', scaleMaxLabel: '滿意', ...(scalePoints === undefined ? {} : { scalePoints }) },
+          { title: '可接受的交通方式', topicType: TopicType.MULTI_SELECT, options: ['火車', '汽車', '單車'], maxSelections: 2 },
+        ],
+      }) as never)).rejects.toBeInstanceOf(BadRequestException);
+    }
+    expect(create).not.toHaveBeenCalled();
   });
 });
 
@@ -110,7 +126,10 @@ describe('TopicsService isSurveyComplete', () => {
 
   function tx(questions: Array<{ id: bigint; topicType: string }>, voteCount: number, rankCount: number) {
     return {
-      topic: { findMany: jest.fn().mockResolvedValue(questions) },
+      topic: {
+        findUnique: jest.fn().mockResolvedValue({ kind: TopicKind.SURVEY }),
+        findMany: jest.fn().mockResolvedValue(questions),
+      },
       vote: { count: jest.fn().mockResolvedValue(voteCount) },
       topicRankResult: { count: jest.fn().mockResolvedValue(rankCount) },
     };
@@ -138,6 +157,15 @@ describe('TopicsService isSurveyComplete', () => {
 
     await expect(instance.isSurveyComplete(client as never, 9n, 1n)).resolves.toBe(false);
     expect(client.vote.count).not.toHaveBeenCalled();
+  });
+
+  it('does not create completion state for staged rounds', async () => {
+    const instance = service();
+    const client = tx([{ id: 1n, topicType: 'BINARY' }], 1, 0);
+    client.topic.findUnique.mockResolvedValue({ kind: TopicKind.STAGED });
+
+    await expect(instance.isSurveyComplete(client as never, 9n, 1n)).resolves.toBe(false);
+    expect(client.topic.findMany).not.toHaveBeenCalled();
   });
 
   it('records survey completion as an empty parent Vote once', async () => {

@@ -9,7 +9,7 @@
         <div class="border-b border-[#f0e6d2] p-5">
           <UserAvatar :nickname="dashboard?.member.nickname || auth.nickname" :avatar-url="dashboard?.member.avatarUrl || auth.avatarUrl" size="lg" />
           <strong class="mt-4 block text-lg">{{ dashboard?.member.nickname || auth.nickname }}</strong>
-          <span class="mt-1 block text-xs text-[#6d6861]">{{ dashboard?.member.maskedPhone || '已驗證會員' }}</span>
+          <span class="mt-1 block text-xs text-[#6d6861]">{{ dashboard?.member.maskedPhone || '未綁定／選填' }}</span>
           <div class="mt-4 flex items-end justify-between border-t border-[#f0e6d2] pt-3">
             <span class="text-xs text-[#6d6861]">可用點數</span>
             <strong class="text-xl tabular-nums">{{ dashboard?.member.points || auth.points || '0' }}</strong>
@@ -129,7 +129,10 @@ const navGroups: NavGroup[] = [
   },
   {
     label: '帳戶與設定',
-    items: [{ label: '資料與隱私', to: '/me/profile' }],
+    items: [
+      { label: '資料與隱私', to: '/me/profile' },
+      { label: '修改密碼', to: '/me/password' },
+    ],
   },
 ];
 const openGroups = useState<string[]>('me-open-groups', () => ['我的內容']);

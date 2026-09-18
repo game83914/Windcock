@@ -34,19 +34,17 @@
         </div>
 
         <div v-else class="mt-9 max-w-2xl space-y-4">
-          <div v-for="(option, index) in options" :key="option.id">
-            <div class="mb-1.5 flex items-center justify-between text-sm">
-              <span class="font-semibold">{{ option.label }}</span>
-              <span class="font-bold tabular-nums">{{ optionPercentage(option, topic) }}%</span>
-            </div>
-            <div class="h-2 bg-white/15">
-              <div
-                class="h-full transition-[width] duration-500"
-                :class="index === 0 ? 'bg-[#e85a43]' : 'bg-[#5274e8]'"
-                :style="{ width: `${optionPercentage(option, topic)}%` }"
-              />
-            </div>
-          </div>
+          <VoteResultBar
+            v-for="(option, index) in options"
+            :key="option.id"
+            :label="option.label"
+            :percentage="optionPercentage(option, topic)"
+            row-class="mb-1.5 flex items-center justify-between text-sm"
+            label-class="font-semibold"
+            value-class="font-bold tabular-nums"
+            track-class="h-2 bg-white/15"
+            :bar-class="index === 0 ? 'h-full bg-[#e85a43] transition-[width] duration-500' : 'h-full bg-[#5274e8] transition-[width] duration-500'"
+          />
         </div>
       </div>
 
@@ -78,7 +76,7 @@ import { contrastTextColor, deadlineLabel, formatCompactNumber, getCategoryMeta,
 const props = defineProps<{ topic: Topic }>();
 const options = computed(() => leadingOptions(props.topic, 2));
 const categoryMeta = computed(() => getCategoryMeta(props.topic.category));
-const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
+const deadlineNow = useDeadlineNow();
 const spectrumValue = computed(() => props.topic.spectrumMedian === null || props.topic.spectrumMedian === undefined
   ? null
   : Number(props.topic.spectrumMedian));

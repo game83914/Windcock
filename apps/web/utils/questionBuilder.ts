@@ -12,8 +12,7 @@ export type BuilderType =
   | 'SPIN_WHEEL'
   | 'LOTTERY'
   | 'STAR_RATING'
-  | 'LIKERT_5'
-  | 'LIKERT_7'
+  | 'LIKERT'
   | 'MULTI_SELECT';
 
 export interface BuilderRow {
@@ -24,13 +23,34 @@ export interface BuilderRow {
   image: string | null;
 }
 
+export type ScratchRevealMode = 'SHARED' | 'PER_RESULT';
+
+export interface ScratchCardDraft {
+  coverImageUrl: string | null;
+  revealMode: ScratchRevealMode;
+  sharedRevealImageUrl: string | null;
+  showText: boolean;
+}
+
 export interface QuestionDraft {
   type: BuilderType;
   rows: BuilderRow[];
   prompt: string;
+  points?: number;
   scaleMinLabel?: string;
   scaleMaxLabel?: string;
   maxSelections?: number;
+  scratchCard?: ScratchCardDraft;
+}
+
+export const LIKERT_POINTS_MIN = 3;
+export const LIKERT_POINTS_MAX = 10;
+export const LIKERT_POINTS_DEFAULT = 5;
+
+export function normalizeLikertPoints(points?: number): number {
+  const value = Number(points);
+  if (Number.isInteger(value) && value >= LIKERT_POINTS_MIN && value <= LIKERT_POINTS_MAX) return value;
+  return LIKERT_POINTS_DEFAULT;
 }
 
 export const BUILDER_RULES: Record<BuilderType, { label: string; description: string; min: number; max: number; needs: 'LIST' | 'MATCH' | 'WEIGHT' | 'NONE' }> = {
@@ -41,12 +61,11 @@ export const BUILDER_RULES: Record<BuilderType, { label: string; description: st
   SHORT_ANSWER: { label: '簡答題', description: '收集文字回應，公開顯示解讀民意', min: 0, max: 0, needs: 'NONE' },
   MATCHING: { label: '連連看', description: '左右配對，配對完成即選定', min: 2, max: 6, needs: 'MATCH' },
   PUZZLE: { label: '拼圖題', description: '重排拼字，拼完揭曉你的選擇', min: 2, max: 4, needs: 'LIST' },
-  SCRATCH: { label: '刮刮樂', description: '刮開卡片揭曉你的選擇', min: 1, max: 9, needs: 'LIST' },
+  SCRATCH: { label: '刮刮樂', description: '一張卡片隨機揭曉 2～9 種結果', min: 2, max: 9, needs: 'LIST' },
   SPIN_WHEEL: { label: '轉盤抽獎', description: '轉動轉盤，指到的即你的選擇', min: 2, max: 8, needs: 'WEIGHT' },
   LOTTERY: { label: '日式搖獎', description: '搖箱抽球，抽中的即你的選擇', min: 2, max: 10, needs: 'LIST' },
   STAR_RATING: { label: '五星評分', description: '以 1~5 顆星快速評分', min: 0, max: 0, needs: 'NONE' },
-  LIKERT_5: { label: '五點量表', description: '自訂兩端文字的 5 點量表', min: 0, max: 0, needs: 'NONE' },
-  LIKERT_7: { label: '七點量表', description: '自訂兩端文字的 7 點量表', min: 0, max: 0, needs: 'NONE' },
+  LIKERT: { label: '量表題', description: '自訂點數（3~10）與兩端文字的量表', min: 0, max: 0, needs: 'NONE' },
   MULTI_SELECT: { label: '複選題', description: '2~10 個選項，可設定最多選幾項', min: 2, max: 10, needs: 'LIST' },
 };
 
@@ -62,8 +81,7 @@ export const DEFAULT_COUNT: Record<BuilderType, number> = {
   SPIN_WHEEL: 4,
   LOTTERY: 5,
   STAR_RATING: 0,
-  LIKERT_5: 0,
-  LIKERT_7: 0,
+  LIKERT: 0,
   MULTI_SELECT: 3,
 };
 
@@ -75,6 +93,10 @@ export const BUILDER_TYPES = Object.entries(BUILDER_RULES).map(([value, rule]) =
 
 let rowSeq = 0;
 export const nextRowId = () => `row-${rowSeq++}`;
+
+export function createScratchCardDraft(): ScratchCardDraft {
+  return { coverImageUrl: null, revealMode: 'SHARED', sharedRevealImageUrl: null, showText: true };
+}
 
 export function seedRows(type: BuilderType): BuilderRow[] {
   return Array.from({ length: DEFAULT_COUNT[type] }, () => ({ id: nextRowId(), label: '', match: '', weight: '', image: null }));
@@ -97,8 +119,7 @@ export function builderHeading(type: BuilderType): string {
     SPIN_WHEEL: '轉盤選項',
     LOTTERY: '搖獎球選項',
     STAR_RATING: '五星評分',
-    LIKERT_5: '五點量表',
-    LIKERT_7: '七點量表',
+    LIKERT: '量表題',
     MULTI_SELECT: '複選選項',
   }[type] ?? '項目';
 }
@@ -123,7 +144,7 @@ export function questionPayload(question: QuestionDraft): Record<string, unknown
   const payload: Record<string, unknown> = {
     topicType: backendTopicType(question.type, filledLabels),
   };
-  if (rule.needs !== 'NONE') payload.options = question.rows.map((row) => row.label.trim());
+  if (rule.needs !== 'NONE' && question.type !== 'SCRATCH') payload.options = question.rows.map((row) => row.label.trim());
   if (isImage) payload.optionImages = question.rows.map((row) => row.image || null);
   if (question.type === 'MATCHING') payload.matches = question.rows.map((row) => row.match.trim());
   if (question.type === 'SPIN_WHEEL') {
@@ -131,10 +152,28 @@ export function questionPayload(question: QuestionDraft): Record<string, unknown
     if (weights.every(Number.isInteger)) payload.weights = weights;
   }
   if (question.type === 'SHORT_ANSWER') payload.prompt = question.prompt.trim() || undefined;
-  if (question.type === 'LIKERT_5' || question.type === 'LIKERT_7') {
+  if (question.type === 'LIKERT') {
+    payload.scalePoints = normalizeLikertPoints(question.points);
     payload.scaleMinLabel = question.scaleMinLabel?.trim();
     payload.scaleMaxLabel = question.scaleMaxLabel?.trim();
   }
   if (question.type === 'MULTI_SELECT') payload.maxSelections = question.maxSelections;
+  if (question.type === 'SCRATCH') {
+    const scratchCard = question.scratchCard ?? createScratchCardDraft();
+    payload.scratchCard = {
+      ...(scratchCard.coverImageUrl ? { coverImageUrl: scratchCard.coverImageUrl } : {}),
+      revealMode: scratchCard.revealMode,
+      ...(scratchCard.revealMode === 'SHARED' && scratchCard.sharedRevealImageUrl ? { sharedRevealImageUrl: scratchCard.sharedRevealImageUrl } : {}),
+      showText: scratchCard.showText,
+      results: question.rows.map((row) => {
+        const weight = Number(row.weight.trim());
+        return {
+          label: row.label.trim(),
+          ...(scratchCard.revealMode === 'PER_RESULT' && row.image ? { revealImageUrl: row.image } : {}),
+          ...(row.weight.trim() && Number.isInteger(weight) && weight > 0 ? { weight } : {}),
+        };
+      }),
+    };
+  }
   return payload;
 }

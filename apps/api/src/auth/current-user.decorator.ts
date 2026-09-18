@@ -5,7 +5,8 @@ export interface AuthUser {
   userId: bigint;
   actorUserId?: bigint;
   assumptionProfile?: string;
-  phone: string;
+  phone?: string;
+  email?: string | null;
   nickname: string;
   role: UserRole;
 }

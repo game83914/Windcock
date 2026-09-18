@@ -8,7 +8,7 @@ import { CapabilityGuard } from '../identity/capability.guard';
 import { RequiresCapability } from '../identity/capability.decorator';
 import { Capability } from '../identity/policy.service';
 import { TopicsService } from './topics.service';
-import { CreateTopicDto, CreateQuickTopicDto, CreateSurveyDto, FeaturedCandidatesQuery, FeaturedTopicsDto, ListTopicsQuery } from './dto/topic.dto';
+import { CreateTopicDto, CreateQuickTopicDto, CreateSurveyDto, CreateStagedTopicDto, PublishRoundDto, FinishStagedDto, FeaturedCandidatesQuery, FeaturedTopicsDto, ListTopicsQuery } from './dto/topic.dto';
 import { VoteDto } from './dto/vote.dto';
 import { SaveRankDto } from './dto/rank.dto';
 import { TopicAnalyticsService } from './topic-analytics.service';
@@ -73,6 +73,13 @@ export class TopicsController {
   @ApiBearerAuth()
   createSurvey(@CurrentUser() user: AuthUser, @Body() dto: CreateSurveyDto) {
     return this.topicsService.createSurvey(user.userId, dto);
+  }
+
+  @Post('staged')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  createStaged(@CurrentUser() user: AuthUser, @Body() dto: CreateStagedTopicDto) {
+    return this.topicsService.createStaged(user.userId, dto);
   }
 
   @Get('following/mine')
@@ -207,6 +214,28 @@ export class TopicsController {
     return this.topicsService.updatePending(id, user.userId, dto);
   }
 
+  @Post(':id/rounds')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  publishRound(
+    @Param('id', ParsedIdPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: PublishRoundDto,
+  ) {
+    return this.topicsService.publishRound(id, user.userId, dto);
+  }
+
+  @Post(':id/finish')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  finishStaged(
+    @Param('id', ParsedIdPipe) id: bigint,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: FinishStagedDto,
+  ) {
+    return this.topicsService.finishStaged(id, user.userId, dto);
+  }
+
   @Post(':id/vote')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
@@ -216,6 +245,13 @@ export class TopicsController {
     @Body() dto: VoteDto,
   ) {
     return this.topicsService.vote(id, user.userId, dto);
+  }
+
+  @Post(':id/scratch-draw')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  scratchDraw(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user: AuthUser) {
+    return this.topicsService.scratchDraw(id, user.userId);
   }
 
   @Patch(':id/vote')
@@ -229,6 +265,13 @@ export class TopicsController {
     return this.topicsService.revote(id, user.userId, dto);
   }
 
+  @Delete(':id/vote')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  withdrawVote(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user: AuthUser) {
+    return this.topicsService.withdrawVote(id, user.userId);
+  }
+
   @Post(':id/rank')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
@@ -238,6 +281,13 @@ export class TopicsController {
     @Body() dto: SaveRankDto,
   ) {
     return this.topicsService.saveRank(id, user.userId, dto);
+  }
+
+  @Delete(':id/rank')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  withdrawRank(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user: AuthUser) {
+    return this.topicsService.withdrawRank(id, user.userId);
   }
 
   @Get(':id/rankings')

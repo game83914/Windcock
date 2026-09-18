@@ -2,19 +2,19 @@
   <div ref="root" class="relative">
     <button
       type="button"
-      class="focus-ring grid size-9 max-w-full min-w-0 place-items-center rounded-full border border-[#d3cbc0] bg-white text-[#171717] transition hover:border-[#171717]"
+      class="focus-ring grid size-9 max-w-full min-w-0 place-items-center rounded-full text-[#171717]"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="listbox"
       aria-label="篩選與排序"
       @click="toggle"
     >
-      <svg class="shrink-0 text-[#77716a]" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3Z" /></svg>
+      <svg class="shrink-0 text-[#77716a]" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3Z" /></svg>
     </button>
 
     <div
       v-if="open"
       ref="panelEl"
-      class="absolute right-0 top-[calc(100%+6px)] z-30 max-h-[35vh] w-60 overflow-auto rounded-xl border border-[#d7d1c6] bg-white p-3 shadow-[0_12px_32px_rgba(0,0,0,0.14)]"
+      class="absolute left-0 top-[calc(100%+6px)] z-30 max-h-[35vh] w-60 overflow-auto rounded-xl border border-[#d7d1c6] bg-white p-3 shadow-[0_12px_32px_rgba(0,0,0,0.14)]"
       role="listbox"
       aria-label="篩選與排序"
     >

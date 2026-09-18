@@ -6,7 +6,7 @@
     <div v-else-if="!auth.isAuthed" class="space-y-3 rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-5 text-center">
       <p class="text-sm font-black text-[#8f5d14]">登入即可玩「二選一排名賽」</p>
       <p class="text-xs leading-5 text-[#8b857d]">逐對二選一，完成後會揭曉你的完整排名，並與社群總排名一起顯示。</p>
-      <UiButton to="/login" variant="quick" class="mt-1">門號登入開始排名</UiButton>
+      <UiButton to="/login" variant="quick" class="mt-1">登入開始排名</UiButton>
     </div>
 
     <div v-else-if="!auth.canVote" class="rounded-xl border border-[#e6cf9e] bg-[#fff8ec] p-4 text-sm font-bold text-[#8f5d14]">{{ VOTE_IDENTITY_NOTICE }}</div>
@@ -79,10 +79,12 @@
             <div v-else class="mt-3 h-24 animate-pulse rounded-xl bg-[#eee9e0]" />
           </section>
 
-          <div class="flex flex-col items-center gap-2 border-t border-[#f0e6d2] pt-4">
+          <div v-if="!isSubQuestion" class="flex flex-col items-center gap-2 border-t border-[#f0e6d2] pt-4">
             <UiButton variant="quick" :disabled="submitting" @click="replay">{{ submitting ? '送出中…' : '再玩一次（更新我的排名）' }}</UiButton>
+            <UiButton variant="outline" size="sm" :disabled="submitting || withdrawing" @click="withdraw">{{ withdrawing ? '取消中…' : '取消成績' }}</UiButton>
             <p class="text-xs text-[#8b857d]">重玩會覆蓋你上次的排名，不影響已完成的其他人。</p>
           </div>
+          <p v-else class="border-t border-[#f0e6d2] pt-4 text-center text-xs font-bold text-[#8b857d]">問卷子題送出後無法更改。</p>
         </div>
       </template>
     </template>
@@ -92,19 +94,20 @@
 <script setup lang="ts">
 import type { Topic, TopicCommunityRanking, TopicOption } from '~/types/topic';
 import { VOTE_IDENTITY_NOTICE } from '~/utils/topic';
-import { errorMessage } from '~/composables/useApi';
+import { shuffle } from '~/utils/random';
 
 const props = defineProps<{ topic: Topic }>();
 const emit = defineEmits<{ refreshed: [] }>();
 
 const api = useApi();
 const auth = useAuthStore();
-const { success: toastSuccess, error: toastError } = useToast();
+const { error: toastError } = useToast();
 
-const lightboxSrc = ref<string | null>(null);
-function openLightbox(src: string) { lightboxSrc.value = src; }
+const { src: lightboxSrc, open: openLightbox } = useLightbox();
 
-const participationReady = computed(() => !auth.isAuthed || Boolean(auth.capabilitySummary?.participation));
+const { participationReady } = useVotingGate(() => props.topic);
+const isSubQuestion = computed(() => props.topic.parentTopicId != null);
+const { voting: withdrawing, withdrawRank } = useVoteMutation(() => props.topic, () => emit('refreshed'));
 
 const done = ref(false);
 const started = ref(false);
@@ -136,15 +139,6 @@ function mergeSortMaxComparisons(n: number): number {
   if (n <= 1) return 0;
   const mid = Math.floor(n / 2);
   return mergeSortMaxComparisons(mid) + mergeSortMaxComparisons(n - mid) + (n - 1);
-}
-
-function shuffleArray<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
 }
 
 function chooseSide(side: 'left' | 'right') {
@@ -201,7 +195,6 @@ async function submitRanking(ranking: string[]) {
     });
     submittedRanking.value = ranking;
     done.value = true;
-    toastSuccess(res.isNew ? '排名已完成' : '排名已更新（覆蓋先前記錄）');
     emit('refreshed');
   } catch (e) {
     toastError(errorMessage(e));
@@ -216,7 +209,7 @@ async function play() {
   const run = ++activeRun;
   playing.value = true;
   comparisonsCount.value = 0;
-  const sorted = await mergeSort(shuffleArray([...props.topic.options]));
+  const sorted = await mergeSort(shuffle([...props.topic.options]));
   playing.value = false;
   if (run !== activeRun || !sorted.length) return;
   await submitRanking(sorted.map((option) => option.id));
@@ -229,7 +222,7 @@ function start() {
 }
 
 function replay() {
-  if (submitting.value) return;
+  if (submitting.value || isSubQuestion.value) return;
   done.value = false;
   started.value = true;
   submittedRanking.value = [];
@@ -244,6 +237,22 @@ function rankBadgeClass(index: number) {
   if (index === 1) return 'bg-[#9aa0a6] text-white';
   if (index === 2) return 'bg-[#b3541e] text-white';
   return 'bg-[#f0e6d2] text-[#8b857d]';
+}
+
+async function withdraw() {
+  if (withdrawing.value || submitting.value) return;
+  const ok = await withdrawRank();
+  if (!ok) return;
+  activeRun += 1;
+  pendingChoose = null;
+  playing.value = false;
+  done.value = false;
+  started.value = false;
+  submittedRanking.value = [];
+  comparisonsCount.value = 0;
+  community.value = null;
+  leftOption.value = null;
+  rightOption.value = null;
 }
 
 onMounted(async () => {

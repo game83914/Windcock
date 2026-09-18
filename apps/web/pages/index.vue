@@ -58,10 +58,8 @@
         :aria-busy="status === 'pending'"
       >
         <div class="mb-6 flex items-center justify-between gap-3 border-b border-[#171717] pb-4">
-          <div class="flex min-w-0 flex-wrap items-baseline gap-3">
+          <div class="flex min-w-0 flex-wrap items-center gap-1">
             <h2 class="truncate text-xl font-black tracking-[-0.035em] sm:text-2xl">{{ sectionHeading }}</h2>
-          </div>
-          <div class="min-w-0 max-w-[75%] shrink-0">
             <UiTopicFilterDropdown
               v-model:category="activeCategory"
               v-model:sort="sort"
@@ -136,12 +134,12 @@ const initialSort = (['POPULAR', 'NEWEST', 'ACTIVITY'] as const).includes(queryT
 const activeCategory = ref(initialCategory);
 const topicPage = ref(initialPage);
 const sort = ref<'POPULAR' | 'NEWEST' | 'ACTIVITY'>(initialSort);
-const unvoted = ref<'ALL' | 'UNVOTED'>('UNVOTED');
+const unvoted = ref<'ALL' | 'UNVOTED'>('ALL');
 const topicStatus = ref<'ACTIVE' | 'ENDED' | 'ALL'>('ACTIVE');
 const effectiveParticipation = computed<'ALL' | 'UNVOTED'>(() => auth.isAuthed ? unvoted.value : 'ALL');
 
 const { active: activeCategories, refresh: refreshCategories } = useCategories();
-const kindForFetch = computed<'FORMAL' | 'QUICK' | 'SURVEY' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : activeCategory.value === 'survey' ? 'SURVEY' : 'FORMAL');
+const kindForFetch = computed<'FORMAL' | 'QUICK' | 'SURVEY' | 'STAGED' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : activeCategory.value === 'survey' ? 'SURVEY' : activeCategory.value === 'staged' ? 'STAGED' : 'FORMAL');
 const [topicState, featuredState, commentState] = await Promise.all([
   useAsyncData(
     'homepage-topics',
@@ -189,21 +187,23 @@ const featuredTopics = computed<Topic[]>(() => featuredData.value ?? []);
 const totalPages = computed(() => Math.max(1, data.value.pagination.pages));
 const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#fff0d7' };
 const surveyCategoryChip = { key: 'survey', label: '問卷', eyebrow: '多題組合', color: '#b0761f', soft: '#fff0d7' };
-const filterChips = computed(() => [surveyCategoryChip, quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
+const stagedCategoryChip = { key: 'staged', label: '回合', eyebrow: '回合制快問', color: '#b0761f', soft: '#fff0d7' };
+const filterChips = computed(() => [stagedCategoryChip, surveyCategoryChip, quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
 const selectedCategory = computed(() => activeCategories.value.find((category) => category.key === activeCategory.value));
-const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : activeCategory.value === 'quick' ? '快問' : activeCategory.value === 'survey' ? '問卷' : (selectedCategory.value?.label ?? '議題'));
+const sectionHeading = computed(() => activeCategory.value === 'all' ? '全部議題' : activeCategory.value === 'quick' ? '快問' : activeCategory.value === 'survey' ? '問卷' : activeCategory.value === 'staged' ? '回合' : (selectedCategory.value?.label ?? '議題'));
 const hasActiveFilters = computed(() => activeCategory.value !== 'all' || effectiveParticipation.value === 'UNVOTED' || topicStatus.value !== 'ACTIVE');
 const emptyMessage = computed(() => {
   if (topicStatus.value === 'ENDED') {
     const scope = activeCategory.value === 'all' ? '議題' : sectionHeading.value;
     return `目前沒有已截止的${scope}，試試切換狀態或稍後再來`;
   }
-  if (effectiveParticipation.value === 'UNVOTED') {
-    const base = activeCategory.value === 'quick' ? '目前沒有新的未投票快問' : activeCategory.value === 'survey' ? '目前沒有新的未投票問卷' : '目前沒有新的未投票議題';
+    if (effectiveParticipation.value === 'UNVOTED') {
+    const base = activeCategory.value === 'quick' ? '目前沒有新的未投票快問' : activeCategory.value === 'survey' ? '目前沒有新的未投票問卷' : activeCategory.value === 'staged' ? '目前沒有新的未投票回合' : '目前沒有新的未投票議題';
     return `${base}，試試切換到「全部」或稍後再來`;
   }
   if (activeCategory.value === 'quick') return '目前沒有進行中的快問投票';
   if (activeCategory.value === 'survey') return '目前沒有進行中的問卷';
+  if (activeCategory.value === 'staged') return '目前沒有進行中的回合制';
   return `${sectionHeading.value}目前沒有進行中的議題`;
 });
 const resultsAnnouncement = computed(() => {
@@ -214,9 +214,8 @@ const resultsAnnouncement = computed(() => {
 const hasLoaded = ref(status.value === 'success');
 const isInitialLoading = computed(() => status.value === 'pending' && !hasLoaded.value);
 const fatalError = computed(() => Boolean(error.value) && !hasLoaded.value);
-const deadlineNow = useState<number>('topic-deadline-now', () => Date.now());
+const deadlineNow = useDeadlineNow({ tick: true });
 
-let deadlineTimer: ReturnType<typeof setInterval> | null = null;
 let syncingFromRoute = false;
 let intersectionObserver: IntersectionObserver | null = null;
 let observedSentinel: Element | null = null;
@@ -259,7 +258,6 @@ onMounted(() => {
   onCommentActivity((activity) => {
     commentActivities.value = [activity, ...commentActivities.value.filter((item) => item.id !== activity.id)].slice(0, 20);
   });
-  deadlineTimer = setInterval(() => { deadlineNow.value = Date.now(); }, 60_000);
   intersectionObserver = new IntersectionObserver((entries) => {
     const entry = entries[0];
     if (entry?.isIntersecting) loadMore();
@@ -280,7 +278,6 @@ onUnmounted(() => {
   intersectionObserver?.disconnect();
   intersectionObserver = null;
   observedSentinel = null;
-  if (deadlineTimer) clearInterval(deadlineTimer);
 });
 
 function emptyTopicList(limit: number): TopicListResponse {

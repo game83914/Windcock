@@ -28,7 +28,7 @@
         </div>
         <div class="mt-5 grid gap-5 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <label class="block"><span class="mb-2 block text-sm font-bold">顯示名稱</span><input v-model.trim="nickname" minlength="2" maxlength="30" class="focus-ring w-full border border-[#bfb8ad] bg-white px-4 py-3 text-sm" /></label>
-          <label class="block"><span class="mb-2 block text-sm font-bold">驗證門號</span><input :value="dashboard?.member.maskedPhone || '載入中…'" readonly class="w-full border border-[#d7d1c6] bg-[#ebe6dc] px-4 py-3 text-sm text-[#6d6861]" /></label>
+          <label class="block"><span class="mb-2 block text-sm font-bold">手機門號（選填）</span><input :value="dashboard?.member.maskedPhone || '未綁定／選填'" readonly class="w-full border border-[#d7d1c6] bg-[#ebe6dc] px-4 py-3 text-sm text-[#6d6861]" /></label>
           <button type="button" class="focus-ring bg-[#171717] px-5 py-3 text-sm font-bold text-white disabled:opacity-50" :disabled="accountSaving || nickname.length < 2" @click="saveAccount">{{ accountSaving ? '儲存中…' : '更新名稱' }}</button>
         </div>
       </section>

@@ -24,6 +24,7 @@ export interface CapabilitySummary {
 export interface SessionUser {
   id: string;
   nickname: string;
+  email: string;
   avatarUrl: string | null;
   points: string;
   role: UserRole;
@@ -35,6 +36,7 @@ interface AuthState {
   token: string | null;
   id: string | null;
   nickname: string | null;
+  email: string | null;
   avatarUrl: string | null;
   points: string | null;
   role: UserRole | null;
@@ -50,6 +52,7 @@ export const useAuthStore = defineStore('auth', {
     token: null,
     id: null,
     nickname: null,
+    email: null,
     avatarUrl: null,
     points: null,
     role: null,
@@ -81,6 +84,7 @@ export const useAuthStore = defineStore('auth', {
       this.token = localStorage.getItem('wc_token');
       this.id = localStorage.getItem('wc_id');
       this.nickname = localStorage.getItem('wc_nickname');
+      this.email = localStorage.getItem('wc_email');
       this.avatarUrl = localStorage.getItem('wc_avatar_url');
       this.points = localStorage.getItem('wc_points');
       this.role = localStorage.getItem('wc_role') as UserRole | null;
@@ -111,6 +115,7 @@ export const useAuthStore = defineStore('auth', {
     setUser(user: SessionUser, persist = true) {
       this.id = user.id;
       this.nickname = user.nickname;
+      this.email = user.email;
       this.avatarUrl = user.avatarUrl;
       this.points = user.points;
       this.role = user.role;
@@ -119,6 +124,8 @@ export const useAuthStore = defineStore('auth', {
       if (process.client && persist) {
         localStorage.setItem('wc_id', user.id);
         localStorage.setItem('wc_nickname', user.nickname);
+        if (user.email) localStorage.setItem('wc_email', user.email);
+        else localStorage.removeItem('wc_email');
         if (user.avatarUrl) localStorage.setItem('wc_avatar_url', user.avatarUrl);
         else localStorage.removeItem('wc_avatar_url');
         localStorage.setItem('wc_points', user.points);
@@ -152,7 +159,7 @@ export const useAuthStore = defineStore('auth', {
       this.restored = true;
       if (process.client) {
         sessionStorage.removeItem('wc_assumption');
-        ['wc_token', 'wc_id', 'wc_nickname', 'wc_avatar_url', 'wc_points', 'wc_role', 'wc_status', 'wc_verified']
+        ['wc_token', 'wc_id', 'wc_nickname', 'wc_email', 'wc_avatar_url', 'wc_points', 'wc_role', 'wc_status', 'wc_verified']
           .forEach((key) => localStorage.removeItem(key));
       }
     },

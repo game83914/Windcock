@@ -10,13 +10,14 @@ import { NotificationType, Prisma, TopicAudience, TopicKind, TopicModerationStat
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { RealtimeService } from '../realtime/realtime.service';
-import { CreateTopicDto, CreateQuickTopicDto, CreateSurveyDto, CreateSurveyQuestionDto, MAX_FEATURED_TOPICS } from './dto/topic.dto';
+import { CreateTopicDto, CreateQuickTopicDto, CreateSurveyDto, CreateSurveyQuestionDto, CreateStagedTopicDto, PublishRoundDto, FinishStagedDto, MAX_FEATURED_TOPICS, ScratchCardDto, ScratchRevealMode } from './dto/topic.dto';
 import { ImportTopicDto, ImportTopicStanceDto } from './dto/import-topic.dto';
 import { VoteDto } from './dto/vote.dto';
 import { SaveRankDto } from './dto/rank.dto';
 import { DemographicCryptoService, deriveDemographics } from '../profiles/demographic-crypto.service';
 import { DEMOGRAPHIC_CONSENT_VERSION } from '../profiles/demographic-profiles.service';
 import { resolveAvatarUrl } from '../avatars/avatar-url';
+import { resolveOptionImageUrl } from '../option-images/option-image-url';
 import { Capability, PolicyScope, PolicyService } from '../identity/policy.service';
 import { CategoriesService } from '../categories/categories.service';
 import { assertClean } from '../common/sensitive';
@@ -41,7 +42,9 @@ type QuickQuestionInput = {
   prompt?: string;
   scaleMinLabel?: string;
   scaleMaxLabel?: string;
+  scalePoints?: number;
   maxSelections?: number;
+  scratchCard?: ScratchCardDto;
 };
 
 @Injectable()
@@ -61,7 +64,7 @@ export class TopicsService {
     creatorId?: bigint;
     search?: string;
     sort?: 'POPULAR' | 'NEWEST' | 'ENDING_SOON' | 'ACTIVITY';
-    kind?: 'FORMAL' | 'QUICK' | 'SURVEY' | 'ALL';
+    kind?: 'FORMAL' | 'QUICK' | 'SURVEY' | 'STAGED' | 'ALL';
     participation?: 'ALL' | 'VOTED' | 'UNVOTED' | 'FOLLOWING';
     status?: 'ACTIVE' | 'ENDED' | 'ALL';
     page: number;
@@ -93,7 +96,7 @@ export class TopicsService {
     }
     this.appendAnd(where, this.access.discoveryWhere(userId));
     where.parentTopicId = null;
-    if (kind !== 'ALL') where.kind = kind === 'QUICK' ? TopicKind.QUICK : kind === 'SURVEY' ? TopicKind.SURVEY : TopicKind.FORMAL;
+    if (kind !== 'ALL') where.kind = kind === 'QUICK' ? TopicKind.QUICK : kind === 'SURVEY' ? TopicKind.SURVEY : kind === 'STAGED' ? TopicKind.STAGED : TopicKind.FORMAL;
     if (query.creatorId) {
       where.audienceOwnerId = query.creatorId;
     }
@@ -257,7 +260,7 @@ export class TopicsService {
 
     let hasVoted = false;
     let isFollowing = false;
-    let myVote: { choice: string; optionId: string | null; optionIds: string[]; spectrumValue: number | null } | null = null;
+    let myVote: { choice: string; optionId: string | null; optionIds: string[]; spectrumValue: number | null; answerText: string | null } | null = null;
     let myRanking: string[] | null = null;
     let myRankingComparisons = 0;
     if (userId) {
@@ -295,12 +298,14 @@ export class TopicsService {
           optionId: vote.optionId != null ? vote.optionId.toString() : null,
           optionIds: vote.selections.map((selection) => selection.optionId.toString()),
           spectrumValue: vote.spectrumValue,
+          answerText: vote.answerText ?? null,
         };
       }
     }
 
     let surveyQuestions: any[] | null = null;
     let surveyAnsweredCount = 0;
+    let stagedRounds: any[] | null = null;
     if (topic.kind === 'SURVEY') {
       const childTopics: any[] = (topic as any).questions || [];
       const childIds = childTopics.map((question) => question.id);
@@ -338,10 +343,59 @@ export class TopicsService {
                 optionId: vote.optionId != null ? vote.optionId.toString() : null,
                 optionIds: vote.selections.map((selection) => selection.optionId.toString()),
                 spectrumValue: vote.spectrumValue,
+                answerText: vote.answerText ?? null,
               }
             : null,
           myRanking: rank ? (rank.ranking as string[]) : null,
           myRankingComparisons: rank?.comparisons ?? 0,
+          responses: await this.loadResponses(question),
+        };
+      }));
+    }
+
+    if (topic.kind === 'STAGED') {
+      const childTopics: any[] = (topic as any).questions || [];
+      const childIds = childTopics.map((question) => question.id);
+      const [childVotes, childRanks] = userId && childIds.length
+        ? await Promise.all([
+            this.prisma.vote.findMany({
+              where: { userId, topicId: { in: childIds } },
+              select: {
+                topicId: true,
+                optionId: true,
+                spectrumValue: true,
+                answerText: true,
+                option: { select: { label: true } },
+                selections: { orderBy: { optionId: 'asc' }, select: { optionId: true, option: { select: { label: true } } } },
+              },
+            }),
+            this.prisma.topicRankResult.findMany({
+              where: { userId, topicId: { in: childIds } },
+              select: { topicId: true, ranking: true, comparisons: true },
+            }),
+          ])
+        : [[], []];
+      const voteByTopic = new Map(childVotes.map((vote) => [vote.topicId.toString(), vote]));
+      const rankByTopic = new Map(childRanks.map((rank) => [rank.topicId.toString(), rank]));
+      stagedRounds = await Promise.all(childTopics.map(async (question, index) => {
+        const vote = voteByTopic.get(question.id.toString());
+        const rank = rankByTopic.get(question.id.toString());
+        const questionHasVoted = question.topicType === 'IMAGE_RANK' ? !!rank : !!vote;
+        return {
+          ...this.serialize(question, questionHasVoted),
+          myVote: vote
+            ? {
+                choice: this.voteChoice(vote),
+                optionId: vote.optionId != null ? vote.optionId.toString() : null,
+                optionIds: vote.selections.map((selection) => selection.optionId.toString()),
+                spectrumValue: vote.spectrumValue,
+                answerText: vote.answerText ?? null,
+              }
+            : null,
+          myRanking: rank ? (rank.ranking as string[]) : null,
+          myRankingComparisons: rank?.comparisons ?? 0,
+          roundNumber: index + 1,
+          roundFeedback: question.roundFeedback ?? null,
           responses: await this.loadResponses(question),
         };
       }));
@@ -355,6 +409,9 @@ export class TopicsService {
       responses: await this.loadResponses(topic),
       ...(surveyQuestions
         ? { questions: surveyQuestions, surveyQuestionCount: surveyQuestions.length, surveyAnsweredCount }
+        : {}),
+      ...(stagedRounds
+        ? { rounds: stagedRounds, totalRounds: (topic as { totalRounds: number | null }).totalRounds, currentRound: stagedRounds.length }
         : {}),
     };
   }
@@ -490,8 +547,9 @@ export class TopicsService {
       visibility: dto.visibility ?? TopicVisibility.PUBLIC,
       voteDurationHours: dto.voteDurationHours,
       minVotes: dto.minVotes ?? null,
-      scaleMinLabel: dto.topicType === TopicType.LIKERT_5 || dto.topicType === TopicType.LIKERT_7 ? dto.scaleMinLabel!.trim() : null,
-      scaleMaxLabel: dto.topicType === TopicType.LIKERT_5 || dto.topicType === TopicType.LIKERT_7 ? dto.scaleMaxLabel!.trim() : null,
+      scaleMinLabel: dto.topicType === TopicType.LIKERT ? dto.scaleMinLabel!.trim() : null,
+      scaleMaxLabel: dto.topicType === TopicType.LIKERT ? dto.scaleMaxLabel!.trim() : null,
+      scalePoints: dto.topicType === TopicType.LIKERT ? dto.scalePoints! : null,
       maxSelections: dto.topicType === TopicType.MULTI_SELECT ? dto.maxSelections! : null,
       voteEndAt: new Date(Date.now() + dto.voteDurationHours * 3_600_000),
       options: { create: optionCreates },
@@ -518,9 +576,17 @@ export class TopicsService {
 
   private prepareQuickQuestion(dto: QuickQuestionInput): Prisma.TopicOptionUncheckedCreateWithoutTopicInput[] {
     const isImageType = dto.topicType === TopicType.IMAGE_MULTIPLE || dto.topicType === TopicType.IMAGE_RANK;
-    const scaleSize = dto.topicType === TopicType.STAR_RATING || dto.topicType === TopicType.LIKERT_5
+    if (dto.topicType === TopicType.SCRATCH) return this.prepareScratchCard(dto);
+    if (dto.scratchCard !== undefined) throw new BadRequestException('只有刮刮樂題型可以設定 scratchCard');
+    if (dto.topicType === TopicType.LIKERT) {
+      const scalePoints = dto.scalePoints;
+      if (!Number.isInteger(scalePoints) || (scalePoints as number) < 3 || (scalePoints as number) > 10) {
+        throw new BadRequestException('量表點數必須介於 3 到 10 之間');
+      }
+    }
+    const scaleSize = dto.topicType === TopicType.STAR_RATING
       ? 5
-      : dto.topicType === TopicType.LIKERT_7 ? 7 : null;
+      : dto.topicType === TopicType.LIKERT ? (dto.scalePoints as number) : null;
     const rawOptionLabels = scaleSize
       ? Array.from({ length: scaleSize }, (_, index) => String(index + 1))
       : (dto.options || []).map((label) => label.trim());
@@ -534,7 +600,7 @@ export class TopicsService {
     }
     this.assertOptionImagesLength(dto);
 
-    const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT_5, TopicType.LIKERT_7, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
+    const optionTypes: TopicType[] = [TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SPIN_WHEEL, TopicType.LOTTERY];
     const noOptionTypes: TopicType[] = [TopicType.SPECTRUM, TopicType.SHORT_ANSWER];
     if (optionTypes.includes(dto.topicType) && !optionCount) {
       throw new BadRequestException('此題型必須設定選項');
@@ -551,8 +617,7 @@ export class TopicsService {
         break;
       case TopicType.STAR_RATING:
         break;
-      case TopicType.LIKERT_5:
-      case TopicType.LIKERT_7:
+      case TopicType.LIKERT:
         const scaleMinLabel = dto.scaleMinLabel?.trim();
         const scaleMaxLabel = dto.scaleMaxLabel?.trim();
         if (!scaleMinLabel || !scaleMaxLabel) {
@@ -582,9 +647,6 @@ export class TopicsService {
       case TopicType.PUZZLE:
         if (optionCount < 2 || optionCount > 4) throw new BadRequestException('拼圖題必須設定 2 到 4 個提示');
         break;
-      case TopicType.SCRATCH:
-        if (optionCount < 1 || optionCount > 9) throw new BadRequestException('刮刮樂必須設定 1 到 9 張卡片');
-        break;
       case TopicType.SPIN_WHEEL:
         if (optionCount < 2 || optionCount > 8) throw new BadRequestException('轉盤抽獎必須設定 2 到 8 個選項');
         if (weights.length !== 0 && weights.length !== optionCount) throw new BadRequestException('轉盤權重數量需與選項相同');
@@ -609,6 +671,63 @@ export class TopicsService {
       if (imageUrl) optionData.imageUrl = imageUrl;
       return { label, ...(Object.keys(optionData).length ? { data: optionData } : {}) };
     });
+  }
+
+  private prepareScratchCard(dto: QuickQuestionInput): Prisma.TopicOptionUncheckedCreateWithoutTopicInput[] {
+    if (dto.options?.length || dto.optionImages?.some(Boolean) || dto.matches?.length || dto.weights?.length) {
+      throw new BadRequestException('刮刮樂結果只能透過 scratchCard 設定');
+    }
+    const card = dto.scratchCard;
+    if (!card || !Array.isArray(card.results) || card.results.length < 2 || card.results.length > 9) {
+      throw new BadRequestException('刮刮樂必須設定 2 到 9 個隨機結果');
+    }
+    const revealMode = card.revealMode === undefined ? ScratchRevealMode.SHARED : card.revealMode;
+    if (!Object.values(ScratchRevealMode).includes(revealMode)) throw new BadRequestException('刮刮樂揭曉模式不正確');
+    const showText = card.showText === undefined ? true : card.showText;
+    if (typeof showText !== 'boolean') throw new BadRequestException('刮刮樂 showText 必須是布林值');
+    const coverImageUrl = this.validateScratchImageUrl(card.coverImageUrl, '刮刮樂覆蓋圖片');
+    const sharedRevealImageUrl = this.validateScratchImageUrl(card.sharedRevealImageUrl, '刮刮樂共用揭曉圖片');
+    if (revealMode === ScratchRevealMode.PER_RESULT && sharedRevealImageUrl) {
+      throw new BadRequestException('PER_RESULT 模式不可設定 sharedRevealImageUrl');
+    }
+
+    const labels = card.results.map((result) => {
+      if (!result || typeof result.label !== 'string' || !result.label.trim() || result.label.trim().length > 50) {
+        throw new BadRequestException('刮刮樂結果文字必須介於 1 到 50 字');
+      }
+      const label = result.label.trim();
+      assertClean(label, '刮刮樂結果');
+      return label;
+    });
+    if (new Set(labels).size !== labels.length) throw new BadRequestException('刮刮樂結果不可重複');
+
+    return card.results.map((result, index) => {
+      const perResultImage = this.validateScratchImageUrl(result.revealImageUrl, '刮刮樂結果圖片');
+      if (revealMode === ScratchRevealMode.SHARED && perResultImage) {
+        throw new BadRequestException('SHARED 模式不可設定個別結果圖片');
+      }
+      const weight = result.weight === undefined ? 1 : result.weight;
+      if (!Number.isSafeInteger(weight) || weight <= 0) throw new BadRequestException('刮刮樂結果權重必須是正整數');
+      return {
+        label: labels[index],
+        data: {
+          scratchCoverImageUrl: coverImageUrl,
+          scratchRevealImageUrl: revealMode === ScratchRevealMode.SHARED ? sharedRevealImageUrl : perResultImage,
+          scratchShowText: showText,
+          weight,
+        },
+      };
+    });
+  }
+
+  private validateScratchImageUrl(value: unknown, label: string): string | null {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value !== 'string' || value.length > 2048) throw new BadRequestException(`${label}格式不正確`);
+    const trimmed = value.trim();
+    if (!trimmed || (!/^https?:\/\/[^\s]+$/i.test(trimmed) && !trimmed.startsWith('/api/v1/option-images/'))) {
+      throw new BadRequestException(`${label}格式不正確`);
+    }
+    return trimmed;
   }
 
   async createSurvey(userId: bigint, dto: CreateSurveyDto) {
@@ -673,8 +792,9 @@ export class TopicsService {
             visibility,
             voteDurationHours: dto.voteDurationHours,
             voteEndAt,
-            scaleMinLabel: item.question.topicType === TopicType.LIKERT_5 || item.question.topicType === TopicType.LIKERT_7 ? item.question.scaleMinLabel!.trim() : null,
-            scaleMaxLabel: item.question.topicType === TopicType.LIKERT_5 || item.question.topicType === TopicType.LIKERT_7 ? item.question.scaleMaxLabel!.trim() : null,
+            scaleMinLabel: item.question.topicType === TopicType.LIKERT ? item.question.scaleMinLabel!.trim() : null,
+            scaleMaxLabel: item.question.topicType === TopicType.LIKERT ? item.question.scaleMaxLabel!.trim() : null,
+            scalePoints: item.question.topicType === TopicType.LIKERT ? item.question.scalePoints! : null,
             maxSelections: item.question.topicType === TopicType.MULTI_SELECT ? item.question.maxSelections! : null,
             options: { create: item.optionCreates },
           },
@@ -691,13 +811,189 @@ export class TopicsService {
     return { ...serialized, questionCount: questions.length, ...(result.share ?? {}) };
   }
 
-  private async fanOutChannelNewTopic(tx: Prisma.TransactionClient, channelOwnerId: bigint, topic: { id: bigint; kind: TopicKind; title: string }) {
-    const followers = await tx.channelFollow.findMany({
+  async createStaged(userId: bigint, dto: CreateStagedTopicDto) {
+    await this.policy.assertSeniorMember(userId);
+    const title = dto.title.trim();
+    assertClean(title, '標題');
+    const questionTitle = dto.question.title.trim();
+    assertClean(questionTitle, '題目');
+    const optionCreates = this.prepareQuickQuestion(dto.question);
+
+    await this.categories.assertActiveCategory('quick');
+
+    const duplicate = await this.prisma.topic.findFirst({
+      where: { title: { equals: title, mode: 'insensitive' }, moderationStatus: { not: 'REJECTED' } },
+      select: { id: true },
+    });
+    if (duplicate) throw new ConflictException('已有相同標題的議題，請先參與既有討論');
+
+    const voteEndAt = new Date(Date.now() + dto.voteDurationHours * 3_600_000);
+    const audience = dto.audience ?? TopicAudience.MEMBER_ONLY;
+    const visibility = dto.visibility ?? TopicVisibility.PUBLIC;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const parent = await tx.topic.create({
+        data: {
+          title,
+          kind: TopicKind.STAGED,
+          topicType: TopicType.STAGED,
+          category: 'quick',
+          status: 'OPEN',
+          moderationStatus: 'APPROVED',
+          creatorId: userId,
+          audienceOwnerId: userId,
+          audience,
+          visibility,
+          voteDurationHours: dto.voteDurationHours,
+          minVotes: dto.minVotes ?? null,
+          totalRounds: dto.totalRounds,
+          voteEndAt,
+        },
+        include: {
+          options: { orderBy: { id: 'asc' } },
+          creator: { select: { nickname: true, avatarUrl: true } },
+        },
+      });
+      await tx.topic.create({
+        data: {
+          title: questionTitle,
+          kind: TopicKind.QUICK,
+          parentTopicId: parent.id,
+          sortOrder: 0,
+          category: 'quick',
+          topicType: dto.question.topicType,
+          description: dto.question.topicType === TopicType.SHORT_ANSWER ? dto.question.prompt?.trim() || null : null,
+          status: 'OPEN',
+          moderationStatus: 'APPROVED',
+          creatorId: userId,
+          audienceOwnerId: userId,
+          audience,
+          visibility,
+          voteDurationHours: dto.voteDurationHours,
+          voteEndAt,
+          scaleMinLabel: dto.question.topicType === TopicType.LIKERT ? dto.question.scaleMinLabel!.trim() : null,
+          scaleMaxLabel: dto.question.topicType === TopicType.LIKERT ? dto.question.scaleMaxLabel!.trim() : null,
+          scalePoints: dto.question.topicType === TopicType.LIKERT ? dto.question.scalePoints! : null,
+          maxSelections: dto.question.topicType === TopicType.MULTI_SELECT ? dto.question.maxSelections! : null,
+          options: { create: optionCreates },
+        },
+      });
+      if (visibility === TopicVisibility.PUBLIC) await this.fanOutChannelNewTopic(tx, userId, parent);
+      const share = visibility === TopicVisibility.PRIVATE_LINK
+        ? await this.access.createShareLink(tx, parent.id)
+        : null;
+      return { parent, share };
+    });
+
+    const serialized = this.serialize(result.parent, false);
+    return { ...serialized, totalRounds: dto.totalRounds, currentRound: 1, ...(result.share ?? {}) };
+  }
+
+  async publishRound(stagedId: bigint, userId: bigint, dto: PublishRoundDto) {
+    const parent = await this.prisma.topic.findFirst({
+      where: { id: stagedId, kind: TopicKind.STAGED },
+      include: { questions: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] } },
+    });
+    if (!parent) throw new NotFoundException('回合快問不存在');
+    if (parent.audienceOwnerId !== userId) throw new ForbiddenException('只有建立者可以發布下一回合');
+    if (parent.status !== 'OPEN') throw new BadRequestException('此回合快問已結束');
+    if ((parent as { totalRounds: number | null }).totalRounds == null) throw new BadRequestException('此回合快問缺少總回合數設定');
+    const rounds = (parent as { questions: Array<{ id: bigint; sortOrder: number; status: string }> }).questions;
+    if (rounds.length >= (parent as { totalRounds: number }).totalRounds) {
+      throw new BadRequestException('已達總回合數，無法再發布新回合');
+    }
+    const feedback = dto.feedback.trim();
+    const questionTitle = dto.question.title.trim();
+    assertClean(questionTitle, '題目');
+    const optionCreates = this.prepareQuickQuestion(dto.question);
+
+    const newRound = await this.prisma.$transaction(async (tx) => {
+      const latest = rounds[rounds.length - 1];
+      if (latest && latest.status === 'OPEN') {
+        await tx.topic.update({
+          where: { id: latest.id },
+          data: { status: 'LOCKED', roundFeedback: feedback },
+        });
+      }
+      const voteEndAt = new Date(Date.now() + (parent.voteDurationHours ?? 24) * 3_600_000);
+      await tx.topic.update({ where: { id: parent.id }, data: { voteEndAt } });
+      return tx.topic.create({
+        data: {
+          title: questionTitle,
+          kind: TopicKind.QUICK,
+          parentTopicId: parent.id,
+          sortOrder: rounds.length,
+          category: 'quick',
+          topicType: dto.question.topicType,
+          description: dto.question.topicType === TopicType.SHORT_ANSWER ? dto.question.prompt?.trim() || null : null,
+          status: 'OPEN',
+          moderationStatus: 'APPROVED',
+          creatorId: parent.creatorId,
+          audienceOwnerId: parent.audienceOwnerId,
+          audience: parent.audience,
+          visibility: parent.visibility,
+          voteDurationHours: parent.voteDurationHours,
+          voteEndAt,
+          scaleMinLabel: dto.question.topicType === TopicType.LIKERT ? dto.question.scaleMinLabel!.trim() : null,
+          scaleMaxLabel: dto.question.topicType === TopicType.LIKERT ? dto.question.scaleMaxLabel!.trim() : null,
+          scalePoints: dto.question.topicType === TopicType.LIKERT ? dto.question.scalePoints! : null,
+          maxSelections: dto.question.topicType === TopicType.MULTI_SELECT ? dto.question.maxSelections! : null,
+          options: { create: optionCreates },
+        },
+        include: {
+          options: { orderBy: { id: 'asc' } },
+          creator: { select: { nickname: true, avatarUrl: true } },
+        },
+      });
+    });
+    return { ...this.serialize(newRound, false), roundNumber: rounds.length + 1 };
+  }
+
+  async finishStaged(stagedId: bigint, userId: bigint, dto: FinishStagedDto) {
+    const parent = await this.prisma.topic.findFirst({
+      where: { id: stagedId, kind: TopicKind.STAGED },
+      include: { questions: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], select: { id: true, status: true } } },
+    });
+    if (!parent) throw new NotFoundException('回合快問不存在');
+    if (parent.audienceOwnerId !== userId) throw new ForbiddenException('只有建立者可以結束回合快問');
+    if (parent.status !== 'OPEN') throw new BadRequestException('此回合快問已結束');
+    const feedback = dto.feedback.trim();
+    const rounds = (parent as { questions: Array<{ id: bigint }> }).questions;
+
+    await this.prisma.$transaction(async (tx) => {
+      if (rounds.length) {
+        await tx.topic.updateMany({
+          where: { parentTopicId: parent.id },
+          data: { status: 'LOCKED' },
+        });
+        const latest = rounds[rounds.length - 1];
+        await tx.topic.update({
+          where: { id: latest.id },
+          data: { roundFeedback: feedback },
+        });
+      }
+      await tx.topic.update({ where: { id: parent.id }, data: { status: 'SETTLED' } });
+    });
+    const settled = await this.prisma.topic.findUnique({
+      where: { id: parent.id },
+      include: {
+        options: { orderBy: { id: 'asc' } },
+        creator: { select: { nickname: true, avatarUrl: true } },
+      },
+    });
+    return {
+      ...this.serialize(settled, false),
+      totalRounds: (parent as { totalRounds: number | null }).totalRounds,
+      currentRound: rounds.length,
+    };
+  }
+
+  private async fanOutChannelNewTopic(tx: Prisma.TransactionClient, channelOwnerId: bigint, topic: { id: bigint; kind: TopicKind; title: string }) {    const followers = await tx.channelFollow.findMany({
       where: { channelOwnerId },
       select: { followingId: true },
     });
     if (followers.length === 0) return;
-    const kindLabel = topic.kind === TopicKind.QUICK ? '快問' : topic.kind === TopicKind.SURVEY ? '問卷' : '議題';
+    const kindLabel = topic.kind === TopicKind.QUICK ? '快問' : topic.kind === TopicKind.SURVEY ? '問卷' : topic.kind === TopicKind.STAGED ? '回合快問' : '議題';
     const creator = await tx.user.findUnique({
       where: { id: channelOwnerId },
       select: { nickname: true },
@@ -1173,6 +1469,8 @@ export class TopicsService {
       if (!lockedTopic.length) throw new NotFoundException('議題不存在');
       const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: true } });
       if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.topicType === TopicType.SCRATCH) throw new BadRequestException('刮刮樂請使用 scratch-draw 端點');
+      if (topic.kind === TopicKind.STAGED) throw new BadRequestException('回合快問請直接對各回合題目投票');
       if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
       if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
       if (!topic.voteEndAt) throw new ForbiddenException('議題尚未設定投票期限');
@@ -1229,43 +1527,53 @@ export class TopicsService {
       });
 
       const before = lock[0]?.points_balance ?? BigInt(0);
-      let rewardPoints = 0;
-      let rewardTopicId = topicId;
-      let rewardTitle = topic.title;
-      if (topic.parentTopicId == null) {
-        rewardPoints = configuredRewardPoints;
-      } else if (await this.isSurveyComplete(tx, topic.parentTopicId, userId)) {
-        const parent = await tx.topic.findUnique({ where: { id: topic.parentTopicId }, select: { title: true } });
+
+      // Survey completion marker is count-only (no points awarded).
+      if (topic.parentTopicId != null && await this.isSurveyComplete(tx, topic.parentTopicId, userId)) {
         await this.ensureSurveyCompletionVote(tx, topic.parentTopicId, userId);
-        rewardPoints = configuredRewardPoints;
-        rewardTopicId = topic.parentTopicId;
-        rewardTitle = parent?.title ?? topic.title;
       }
-      const idempotencyKey = topic.parentTopicId != null
-        ? `SURVEY_${topic.parentTopicId}_${userId}`
-        : `VOTE_${topicId}_${userId}`;
-      if (rewardPoints > 0) {
+
+      // Reward gate: only FORMAL topics grant points. QUICK single questions,
+      // survey sub-questions and survey completion all return rewardPoints: 0
+      // without creating a pointTransaction.
+      let rewardPoints = 0;
+      if (topic.kind === TopicKind.FORMAL) {
+        rewardPoints = configuredRewardPoints;
+        const idempotencyKey = `VOTE_${topicId}_${userId}`;
         const alreadyGranted = await tx.pointTransaction.findFirst({ where: { idempotencyKey }, select: { id: true } });
         if (alreadyGranted) rewardPoints = 0;
-      }
-      const after = before + BigInt(rewardPoints);
+        const afterFormal = before + BigInt(rewardPoints);
+        if (rewardPoints > 0) {
+          await tx.pointTransaction.create({
+            data: {
+              userId,
+              amount: rewardPoints,
+              balanceBefore: before,
+              balanceAfter: afterFormal,
+              txType: 'VOTE_REWARD',
+              referenceType: 'VOTE',
+              referenceId: topicId.toString(),
+              idempotencyKey,
+              note: `投票獎勵：${topic.title}`,
+            },
+          });
+          await tx.user.update({ where: { id: userId }, data: { pointsBalance: afterFormal } });
+        }
+        const after = afterFormal;
 
-      if (rewardPoints > 0) {
-        await tx.pointTransaction.create({
-          data: {
-            userId,
-            amount: rewardPoints,
-            balanceBefore: before,
-            balanceAfter: after,
-            txType: 'VOTE_REWARD',
-            referenceType: 'VOTE',
-            referenceId: rewardTopicId.toString(),
-            idempotencyKey,
-            note: `投票獎勵：${rewardTitle}`,
-          },
-        });
-        await tx.user.update({ where: { id: userId }, data: { pointsBalance: after } });
+        return {
+          voteId: createdVote.id,
+          votedAt: createdVote.createdAt,
+          after,
+          optionId: optionId?.toString() ?? null,
+          optionIds: optionIds.map(String),
+          answerText,
+          rewardPoints,
+          topicType: topic.topicType,
+        };
       }
+
+      const after = before;
 
       return {
         voteId: createdVote.id,
@@ -1303,6 +1611,79 @@ export class TopicsService {
     };
   }
 
+  async scratchDraw(topicId: bigint, userId: bigint) {
+    await this.policy.assertPublicAction(userId, 'VOTE');
+    await this.assertTopicInteraction(topicId, userId);
+
+    const draw = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${userId})`;
+      const lockedTopic = await tx.$queryRaw<Array<{ id: bigint }>>`SELECT id FROM topics WHERE id = ${topicId} FOR UPDATE`;
+      if (!lockedTopic.length) throw new NotFoundException('議題不存在');
+      const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: { orderBy: { id: 'asc' } } } });
+      if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.topicType !== TopicType.SCRATCH) throw new BadRequestException('此題型不支援刮刮樂抽取');
+      if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
+
+      const existing = await tx.vote.findUnique({
+        where: { userId_topicId: { userId, topicId } },
+        include: { option: true },
+      });
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
+      if (existing) {
+        if (!existing.option) throw new BadRequestException('既有刮刮樂結果資料不完整');
+        return { voteId: existing.id, option: existing.option, balance: user?.pointsBalance ?? 0n, isNew: false };
+      }
+      if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
+      if (!topic.voteEndAt || topic.voteEndAt.getTime() <= Date.now()) throw new ForbiddenException('議題已截止投票');
+      if (topic.options.length < 1) throw new BadRequestException('刮刮樂尚未設定結果');
+
+      const weighted = topic.options.map((option) => ({ option, weight: this.scratchOptionData(option.data).weight }));
+      const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+      let target = Math.random() * totalWeight;
+      let selected = weighted[weighted.length - 1].option;
+      for (const item of weighted) {
+        target -= item.weight;
+        if (target < 0) {
+          selected = item.option;
+          break;
+        }
+      }
+
+      const vote = await tx.vote.create({ data: { userId, topicId, optionId: selected.id } });
+      await tx.topicOption.update({ where: { id: selected.id }, data: { voteCount: { increment: 1 } } });
+      await tx.topic.update({
+        where: { id: topicId },
+        data: { totalVotes: { increment: 1 }, voterCount: { increment: 1 } },
+      });
+      if (topic.parentTopicId != null && await this.isSurveyComplete(tx, topic.parentTopicId, userId)) {
+        await this.ensureSurveyCompletionVote(tx, topic.parentTopicId, userId);
+      }
+      return { voteId: vote.id, option: selected, balance: user?.pointsBalance ?? 0n, isNew: true };
+    });
+
+    if (draw.isNew) {
+      await this.createDemographicSnapshot(draw.voteId, userId);
+      const [optionCounts, updatedTopic] = await Promise.all([
+        this.loadOptionCounts(topicId),
+        this.prisma.topic.findUnique({ where: { id: topicId }, select: { totalVotes: true } }),
+      ]);
+      await this.realtime.broadcastTopicVotes(topicId, optionCounts, updatedTopic?.totalVotes);
+    }
+    const data = this.scratchOptionData(draw.option.data);
+    return {
+      success: true,
+      isNew: draw.isNew,
+      result: {
+        optionId: draw.option.id.toString(),
+        label: draw.option.label,
+        revealImageUrl: resolveOptionImageUrl(data.scratchRevealImageUrl),
+        showText: data.scratchShowText,
+      },
+      rewardPoints: 0,
+      newBalance: draw.balance.toString(),
+    };
+  }
+
   async revote(topicId: bigint, userId: bigint, dto: VoteDto): Promise<VoteResult> {
     await this.policy.assertPublicAction(userId, 'VOTE');
     await this.assertTopicInteraction(topicId, userId);
@@ -1323,7 +1704,9 @@ export class TopicsService {
       if (!lockedTopic.length) throw new NotFoundException('議題不存在');
       const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: true } });
       if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.topicType === TopicType.SCRATCH) throw new BadRequestException('刮刮樂結果不可更改');
       if (topic.kind !== TopicKind.QUICK) throw new ForbiddenException('此議題送出後不可更改');
+      if (topic.parentTopicId != null) throw new ForbiddenException('問卷送出後不可更改');
       if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
       if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
       if (!topic.voteEndAt) throw new ForbiddenException('議題尚未設定投票期限');
@@ -1461,6 +1844,91 @@ export class TopicsService {
     };
   }
 
+  async withdrawVote(topicId: bigint, userId: bigint) {
+    await this.policy.assertPublicAction(userId, 'VOTE');
+    await this.assertTopicInteraction(topicId, userId);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${userId})`;
+      const lockedTopic = await tx.$queryRaw<Array<{ id: bigint }>>`SELECT id FROM topics WHERE id = ${topicId} FOR UPDATE`;
+      if (!lockedTopic.length) throw new NotFoundException('議題不存在');
+      const topic = await tx.topic.findUnique({ where: { id: topicId } });
+      if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.kind !== TopicKind.QUICK) throw new ForbiddenException('此議題不支援取消投票');
+      if (topic.parentTopicId != null) throw new ForbiddenException('問卷送出後不可取消');
+      if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
+      if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
+      if (!topic.voteEndAt || topic.voteEndAt.getTime() <= Date.now()) throw new ForbiddenException('議題已截止投票');
+
+      const existing = await tx.vote.findUnique({
+        where: { userId_topicId: { userId, topicId } },
+        include: { selections: { select: { optionId: true } } },
+      });
+      if (!existing) throw new NotFoundException('尚未投票，無法取消');
+
+      const selectionOptionIds = (existing.selections ?? []).map((selection) => selection.optionId);
+      const singleOptionId = (existing as { optionId: bigint | null }).optionId ?? null;
+      const decrementedOptionIds = singleOptionId ? [singleOptionId] : selectionOptionIds;
+
+      await tx.voteSelection.deleteMany({ where: { voteId: existing.id } });
+      await tx.vote.delete({ where: { id: existing.id } });
+      for (const selectedOptionId of decrementedOptionIds) {
+        await tx.topicOption.update({ where: { id: selectedOptionId }, data: { voteCount: { decrement: 1 } } });
+      }
+      await tx.topic.update({
+        where: { id: topicId },
+        data: { totalVotes: { decrement: 1 }, voterCount: { decrement: 1 } },
+      });
+
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
+      return {
+        spectrumValue: (existing as { spectrumValue: number | null }).spectrumValue ?? null,
+        newBalance: user?.pointsBalance ?? BigInt(0),
+      };
+    });
+
+    if (result.spectrumValue !== null) {
+      await this.recomputeSpectrum(topicId);
+    }
+    const [optionCounts, updatedTopic] = await Promise.all([
+      this.loadOptionCounts(topicId),
+      this.prisma.topic.findUnique({ where: { id: topicId }, select: { totalVotes: true } }),
+    ]);
+    await this.realtime.broadcastTopicVotes(topicId, optionCounts, updatedTopic?.totalVotes);
+
+    // Point transactions are intentionally untouched (no clawback, no re-grant).
+    return { success: true, newBalance: result.newBalance.toString() };
+  }
+
+  async withdrawRank(topicId: bigint, userId: bigint) {
+    await this.policy.assertPublicAction(userId, 'VOTE');
+    await this.assertTopicInteraction(topicId, userId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${userId})`;
+      const lockedTopic = await tx.$queryRaw<Array<{ id: bigint }>>`SELECT id FROM topics WHERE id = ${topicId} FOR UPDATE`;
+      if (!lockedTopic.length) throw new NotFoundException('議題不存在');
+      const topic = await tx.topic.findUnique({ where: { id: topicId } });
+      if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.topicType !== TopicType.IMAGE_RANK) throw new BadRequestException('此題型不支援排名結果');
+      if (topic.parentTopicId != null) throw new ForbiddenException('問卷送出後不可取消');
+      if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放狀態');
+      if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
+      if (!topic.voteEndAt || topic.voteEndAt.getTime() <= Date.now()) throw new ForbiddenException('議題已截止');
+
+      const existing = await tx.topicRankResult.findUnique({
+        where: { userId_topicId: { userId, topicId: topic.id } },
+        select: { id: true },
+      });
+      if (!existing) throw new NotFoundException('尚未參與排名，無法取消');
+
+      await tx.topicRankResult.delete({ where: { id: existing.id } });
+      await tx.topic.update({ where: { id: topic.id }, data: { voterCount: { decrement: 1 } } });
+    });
+
+    return { success: true };
+  }
+
   async saveRank(topicId: bigint, userId: bigint, dto: SaveRankDto) {
     await this.policy.assertPublicAction(userId, 'VOTE');
     await this.assertTopicInteraction(topicId, userId);
@@ -1492,6 +1960,7 @@ export class TopicsService {
         where: { userId_topicId: { userId, topicId: topic.id } },
         select: { id: true },
       });
+      if (previous && topic.parentTopicId != null) throw new ForbiddenException('問卷送出後不可更改');
 
       await tx.topicRankResult.upsert({
         where: { userId_topicId: { userId, topicId: topic.id } },
@@ -1538,6 +2007,8 @@ export class TopicsService {
   }
 
   private async isSurveyComplete(tx: Prisma.TransactionClient, parentTopicId: bigint, userId: bigint): Promise<boolean> {
+    const parent = await tx.topic.findUnique({ where: { id: parentTopicId }, select: { kind: true } });
+    if (parent?.kind !== TopicKind.SURVEY) return false;
     const questions = await tx.topic.findMany({
       where: { parentTopicId },
       select: { id: true, topicType: true },
@@ -1783,6 +2254,17 @@ export class TopicsService {
     return imageUrl ? { imageUrl } : undefined;
   }
 
+  private scratchOptionData(data: Prisma.JsonValue | null | undefined) {
+    const value = data && typeof data === 'object' && !Array.isArray(data) ? data as Prisma.JsonObject : {};
+    const weight = typeof value.weight === 'number' && Number.isSafeInteger(value.weight) && value.weight > 0 ? value.weight : 1;
+    return {
+      scratchCoverImageUrl: typeof value.scratchCoverImageUrl === 'string' ? value.scratchCoverImageUrl : null,
+      scratchRevealImageUrl: typeof value.scratchRevealImageUrl === 'string' ? value.scratchRevealImageUrl : null,
+      scratchShowText: typeof value.scratchShowText === 'boolean' ? value.scratchShowText : true,
+      weight,
+    };
+  }
+
   private appendAnd(where: Prisma.TopicWhereInput, condition: Prisma.TopicWhereInput) {
     const existing = where.AND;
     where.AND = [
@@ -1794,10 +2276,19 @@ export class TopicsService {
   private async assertTopicInteraction(topicId: bigint, userId: bigint) {
     const topic = await this.prisma.topic.findUnique({
       where: { id: topicId },
-      select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true },
+      select: {
+        id: true,
+        kind: true,
+        visibility: true,
+        audience: true,
+        audienceOwnerId: true,
+        parentTopic: {
+          select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true },
+        },
+      },
     });
     if (!topic) throw new NotFoundException('議題不存在');
-    await this.access.assertCanInteract(topic, userId);
+    await this.access.assertCanInteract(topic.parentTopic ?? topic, userId);
   }
 
   private voteChoice(vote: {
@@ -1819,6 +2310,7 @@ export class TopicsService {
       description: topic.description,
       category: topic.category,
       kind: topic.kind,
+      parentTopicId: topic.parentTopicId != null ? topic.parentTopicId.toString() : null,
       visibility: topic.visibility ?? TopicVisibility.PUBLIC,
       audience: topic.audience ?? TopicAudience.MEMBER_ONLY,
       featuredOrder: topic.featuredOrder ?? null,
@@ -1837,6 +2329,7 @@ export class TopicsService {
           :           topic.creatorId && topic.creator && (
           topic.kind === TopicKind.QUICK ||
           topic.kind === TopicKind.SURVEY ||
+          topic.kind === TopicKind.STAGED ||
           topic.reviewedAt ||
           topic.moderationStatus === 'PENDING_REVIEW'
         )
@@ -1859,8 +2352,11 @@ export class TopicsService {
       voteDurationDays: topic.voteDurationDays,
       voteDurationHours: topic.voteDurationHours ?? null,
       minVotes: topic.minVotes ?? null,
+      totalRounds: topic.totalRounds ?? null,
+      roundFeedback: topic.roundFeedback ?? null,
       scaleMinLabel: topic.scaleMinLabel ?? null,
       scaleMaxLabel: topic.scaleMaxLabel ?? null,
+      scalePoints: topic.scalePoints ?? null,
       maxSelections: topic.maxSelections ?? null,
       totalVotes: topic.totalVotes.toString(),
       voterCount: topic.voterCount.toString(),
@@ -1879,12 +2375,24 @@ export class TopicsService {
         sourceUrl: item.sourceUrl ?? null,
         occurredAt: item.occurredAt ?? null,
       })),
-      options: (topic.options || []).map((o: any) => ({
-        id: o.id.toString(),
-        label: o.label,
-        voteCount: o.voteCount.toString(),
-        data: o.data ?? null,
-      })),
+      options: (topic.options || []).map((o: any) => {
+        const data = topic.topicType === TopicType.SCRATCH
+          ? this.scratchOptionData(o.data)
+          : o.data ?? null;
+        return {
+          id: o.id.toString(),
+          label: o.label,
+          voteCount: o.voteCount.toString(),
+          data: data ? {
+            ...data,
+            ...(data.imageUrl ? { imageUrl: resolveOptionImageUrl(data.imageUrl) } : {}),
+            ...(topic.topicType === TopicType.SCRATCH ? {
+              scratchCoverImageUrl: resolveOptionImageUrl(data.scratchCoverImageUrl),
+              scratchRevealImageUrl: resolveOptionImageUrl(data.scratchRevealImageUrl),
+            } : {}),
+          } : null,
+        };
+      }),
     };
   }
 }

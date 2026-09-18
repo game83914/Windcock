@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { TopicAudience, TopicContentBlockType, TopicModerationStatus, TopicType, TopicVisibility } from '@prisma/client';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsIn,
@@ -26,6 +27,69 @@ import {
 export const VOTE_DURATIONS = [3, 7, 14, 30] as const;
 export const QUICK_VOTE_DURATION_HOURS = [6, 12, 24, 48] as const;
 export const MAX_FEATURED_TOPICS = 5;
+
+export enum ScratchRevealMode {
+  SHARED = 'SHARED',
+  PER_RESULT = 'PER_RESULT',
+}
+
+export class ScratchResultDto {
+  @ApiProperty({ example: '恭喜中獎' })
+  @Transform(({ obj, key }) => obj[key], { toClassOnly: true })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  label: string;
+
+  @ApiPropertyOptional({ description: '此結果的揭曉圖片，可使用上傳圖片相對路徑或 HTTP(S) URL' })
+  @IsOptional()
+  @Transform(({ obj, key }) => obj[key], { toClassOnly: true })
+  @IsString()
+  @MaxLength(2048)
+  revealImageUrl?: string;
+
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @ValidateIf((_object, value) => value !== undefined)
+  @Transform(({ obj, key }) => obj[key], { toClassOnly: true })
+  @IsInt()
+  @Min(1)
+  weight?: number;
+}
+
+export class ScratchCardDto {
+  @ApiPropertyOptional({ description: '刮開前的覆蓋圖片，可使用上傳圖片相對路徑或 HTTP(S) URL' })
+  @IsOptional()
+  @Transform(({ obj, key }) => obj[key], { toClassOnly: true })
+  @IsString()
+  @MaxLength(2048)
+  coverImageUrl?: string;
+
+  @ApiPropertyOptional({ enum: ScratchRevealMode, default: ScratchRevealMode.SHARED })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsEnum(ScratchRevealMode)
+  revealMode: ScratchRevealMode = ScratchRevealMode.SHARED;
+
+  @ApiPropertyOptional({ description: 'SHARED 模式共用的揭曉圖片，可使用上傳圖片相對路徑或 HTTP(S) URL' })
+  @IsOptional()
+  @Transform(({ obj, key }) => obj[key], { toClassOnly: true })
+  @IsString()
+  @MaxLength(2048)
+  sharedRevealImageUrl?: string;
+
+  @ApiPropertyOptional({ default: true, description: '揭曉時是否顯示結果文字' })
+  @ValidateIf((_object, value) => value !== undefined)
+  @Transform(({ obj, key }) => obj[key], { toClassOnly: true })
+  @IsBoolean()
+  showText: boolean = true;
+
+  @ApiProperty({ type: [ScratchResultDto], minItems: 2, maxItems: 9 })
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(9)
+  @ValidateNested({ each: true })
+  @Type(() => ScratchResultDto)
+  results: ScratchResultDto[];
+}
 
 export class CreateTopicContentBlockDto {
   @ApiProperty({ enum: TopicContentBlockType, example: TopicContentBlockType.CASE })
@@ -136,17 +200,23 @@ export class CreateQuickTopicDto {
   @IsString()
   category?: string;
 
-  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT_5, TopicType.LIKERT_7, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY], description: '快問題型' })
-  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT_5, TopicType.LIKERT_7, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY])
+  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY], description: '快問題型' })
+  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY])
   topicType: Exclude<TopicType, 'SURVEY'>;
 
-  @ApiPropertyOptional({ description: '選項題（2~10）、連連看（2~6）、拼圖題（2~4）、刮刮樂（1~9）、轉盤抽獎（2~8）、日式搖獎（2~10）、二選一排名賽（4~50）；光譜題與簡答題不需選項' })
+  @ApiPropertyOptional({ description: '選項題（2~10）、連連看（2~6）、拼圖題（2~4）、刮刮樂（2~9）、轉盤抽獎（2~8）、日式搖獎（2~10）、二選一排名賽（4~50）；光譜題與簡答題不需選項' })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50)
   @IsString({ each: true })
   @MaxLength(50, { each: true })
   options?: string[];
+
+  @ApiPropertyOptional({ type: ScratchCardDto, description: '刮刮樂卡片與隨機結果設定；SCRATCH 題型必填' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ScratchCardDto)
+  scratchCard?: ScratchCardDto;
 
   @ApiPropertyOptional({ description: '圖片選項題（IMAGE_MULTIPLE）與二選一排名賽（IMAGE_RANK）必填：與 options 對齊的選項圖片相對路徑（如 /api/v1/option-images/xxxx），每個選項都必須有圖；其他題型請勿提供' })
   @IsOptional()
@@ -188,6 +258,13 @@ export class CreateQuickTopicDto {
   @MaxLength(50)
   scaleMaxLabel?: string;
 
+  @ApiPropertyOptional({ description: '量表點數（LIKERT 必填，3~10）', minimum: 3, maximum: 10 })
+  @IsOptional()
+  @IsInt()
+  @Min(3)
+  @Max(10)
+  scalePoints?: number;
+
   @ApiPropertyOptional({ description: '複選題最多可選數量' })
   @IsOptional()
   @IsInt()
@@ -214,17 +291,23 @@ export class CreateSurveyQuestionDto {
   @Length(2, 100)
   title: string;
 
-  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT_5, TopicType.LIKERT_7, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY], description: '問卷題目可組合快問支援的各種題型' })
-  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT_5, TopicType.LIKERT_7, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY])
+  @ApiProperty({ enum: [TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY], description: '問卷題目可組合快問支援的各種題型' })
+  @IsEnum([TopicType.BINARY, TopicType.MULTIPLE, TopicType.STAR_RATING, TopicType.LIKERT, TopicType.MULTI_SELECT, TopicType.IMAGE_MULTIPLE, TopicType.IMAGE_RANK, TopicType.SPECTRUM, TopicType.SHORT_ANSWER, TopicType.MATCHING, TopicType.PUZZLE, TopicType.SCRATCH, TopicType.SPIN_WHEEL, TopicType.LOTTERY])
   topicType: Exclude<TopicType, 'SURVEY'>;
 
-  @ApiPropertyOptional({ description: '選項題（2~10）、連連看（2~6）、拼圖題（2~4）、刮刮樂（1~9）、轉盤抽獎（2~8）、日式搖獎（2~10）、二選一排名賽（4~50）；光譜題與簡答題不需選項' })
+  @ApiPropertyOptional({ description: '選項題（2~10）、連連看（2~6）、拼圖題（2~4）、刮刮樂（2~9）、轉盤抽獎（2~8）、日式搖獎（2~10）、二選一排名賽（4~50）；光譜題與簡答題不需選項' })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50)
   @IsString({ each: true })
   @MaxLength(50, { each: true })
   options?: string[];
+
+  @ApiPropertyOptional({ type: ScratchCardDto, description: '刮刮樂卡片與隨機結果設定；SCRATCH 題型必填' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ScratchCardDto)
+  scratchCard?: ScratchCardDto;
 
   @ApiPropertyOptional({ description: '圖片選項題（IMAGE_MULTIPLE）與二選一排名賽（IMAGE_RANK）必填：與 options 對齊的選項圖片相對路徑，每個選項都必須有圖；其他題型請勿提供' })
   @IsOptional()
@@ -265,6 +348,13 @@ export class CreateSurveyQuestionDto {
   @IsString()
   @MaxLength(50)
   scaleMaxLabel?: string;
+
+  @ApiPropertyOptional({ description: '量表點數（LIKERT 必填，3~10）', minimum: 3, maximum: 10 })
+  @IsOptional()
+  @IsInt()
+  @Min(3)
+  @Max(10)
+  scalePoints?: number;
 
   @ApiPropertyOptional({ description: '複選題最多可選數量' })
   @IsOptional()
@@ -311,6 +401,67 @@ export class CreateSurveyDto {
   minVotes?: number;
 }
 
+export class CreateStagedTopicDto {
+  @ApiPropertyOptional({ enum: TopicVisibility, default: TopicVisibility.PUBLIC })
+  @IsOptional()
+  @IsEnum(TopicVisibility)
+  visibility?: TopicVisibility;
+
+  @ApiPropertyOptional({ enum: TopicAudience, default: TopicAudience.MEMBER_ONLY })
+  @IsOptional()
+  @IsEnum(TopicAudience)
+  audience?: TopicAudience;
+
+  @ApiProperty({ example: '連續三天的晚餐抉擇挑戰' })
+  @IsString()
+  @IsNotEmpty()
+  @Length(5, 100)
+  title: string;
+
+  @ApiProperty({ example: 3, description: '總回合數，2 到 10 回合' })
+  @IsInt()
+  @Min(2)
+  @Max(10)
+  totalRounds: number;
+
+  @ApiProperty({ type: CreateSurveyQuestionDto, description: '第 1 回合題目' })
+  @ValidateNested()
+  @Type(() => CreateSurveyQuestionDto)
+  question: CreateSurveyQuestionDto;
+
+  @ApiProperty({ enum: QUICK_VOTE_DURATION_HOURS, default: 24, description: '每回合投票時長（小時）' })
+  @IsInt()
+  @IsIn(QUICK_VOTE_DURATION_HOURS)
+  voteDurationHours: number;
+
+  @ApiPropertyOptional({ example: 20, description: '達到此票數即視為有效快問' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  minVotes?: number;
+}
+
+export class PublishRoundDto {
+  @ApiProperty({ example: '上一回合大家偏好火鍋，今晚換個口味吧！', description: '上一回合回饋，1 到 2000 字' })
+  @IsString()
+  @IsNotEmpty()
+  @Length(1, 2000)
+  feedback: string;
+
+  @ApiProperty({ type: CreateSurveyQuestionDto, description: '下一回合題目' })
+  @ValidateNested()
+  @Type(() => CreateSurveyQuestionDto)
+  question: CreateSurveyQuestionDto;
+}
+
+export class FinishStagedDto {
+  @ApiProperty({ example: '三回合挑戰結束，感謝大家參與！', description: '最終回饋，1 到 2000 字' })
+  @IsString()
+  @IsNotEmpty()
+  @Length(1, 2000)
+  feedback: string;
+}
+
 export class ListTopicsQuery {
   @ApiPropertyOptional({ description: '僅列出指定會員建立的議題' })
   @IsOptional()
@@ -333,10 +484,10 @@ export class ListTopicsQuery {
   @IsIn(['POPULAR', 'NEWEST', 'ENDING_SOON', 'ACTIVITY'])
   sort?: 'POPULAR' | 'NEWEST' | 'ENDING_SOON' | 'ACTIVITY';
 
-  @ApiPropertyOptional({ enum: ['FORMAL', 'QUICK', 'SURVEY', 'ALL'], description: '議題類型，預設僅正式議題' })
+  @ApiPropertyOptional({ enum: ['FORMAL', 'QUICK', 'SURVEY', 'STAGED', 'ALL'], description: '議題類型，預設僅正式議題' })
   @IsOptional()
-  @IsIn(['FORMAL', 'QUICK', 'SURVEY', 'ALL'])
-  kind?: 'FORMAL' | 'QUICK' | 'SURVEY' | 'ALL';
+  @IsIn(['FORMAL', 'QUICK', 'SURVEY', 'STAGED', 'ALL'])
+  kind?: 'FORMAL' | 'QUICK' | 'SURVEY' | 'STAGED' | 'ALL';
 
   @ApiPropertyOptional({ enum: ['ALL', 'VOTED', 'UNVOTED', 'FOLLOWING'] })
   @IsOptional()

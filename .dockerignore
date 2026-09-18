@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.nuxt
+**/.nuxt-build
+**/.output
+**/.local
+.git
+**/*.log
+**/.DS_Store
+.env
+.env.*

@@ -34,7 +34,7 @@ import { topicTypeLabel } from '~/utils/topic';
 const props = defineProps<{ topic: Topic }>();
 const emit = defineEmits<{ refreshed: [] }>();
 
-const questions = computed(() => props.topic.questions ?? []);
+const questions = computed(() => (props.topic.questions ?? []).map((question) => question.parentTopicId == null ? { ...question, parentTopicId: props.topic.id } : question));
 const answeredCount = computed(() => props.topic.surveyAnsweredCount ?? questions.value.filter((question) => question.hasVoted).length);
 const allAnswered = computed(() => questions.value.length > 0 && answeredCount.value >= questions.value.length);
 const progressPercent = computed(() => {

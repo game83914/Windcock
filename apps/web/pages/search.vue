@@ -117,8 +117,9 @@ const topicStatus = ref<'ACTIVE' | 'ENDED' | 'ALL'>('ALL');
 const searchInputEl = ref<HTMLInputElement | null>(null);
 const quickCategoryChip = { key: 'quick', label: '快問', eyebrow: 'UGC 微投票', color: '#b0761f', soft: '#fff0d7' };
 const surveyCategoryChip = { key: 'survey', label: '問卷', eyebrow: '多題組合', color: '#b0761f', soft: '#fff0d7' };
-const filterChips = computed(() => [surveyCategoryChip, quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
-const kindForFetch = computed<'FORMAL' | 'QUICK' | 'SURVEY' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : activeCategory.value === 'survey' ? 'SURVEY' : 'FORMAL');
+const stagedCategoryChip = { key: 'staged', label: '回合', eyebrow: '回合制快問', color: '#b0761f', soft: '#fff0d7' };
+const filterChips = computed(() => [stagedCategoryChip, surveyCategoryChip, quickCategoryChip, ...activeCategories.value.filter((category) => category.key !== 'quick')]);
+const kindForFetch = computed<'FORMAL' | 'QUICK' | 'SURVEY' | 'STAGED' | 'ALL'>(() => activeCategory.value === 'all' ? 'ALL' : activeCategory.value === 'quick' ? 'QUICK' : activeCategory.value === 'survey' ? 'SURVEY' : activeCategory.value === 'staged' ? 'STAGED' : 'FORMAL');
 
 const [{ data, status, error, refresh }] = await Promise.all([
   useAsyncData(

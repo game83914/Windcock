@@ -43,7 +43,9 @@
               v-model:prompt="prompt"
               v-model:scale-min-label="scaleMinLabel"
               v-model:scale-max-label="scaleMaxLabel"
+              v-model:points="points"
               v-model:max-selections="maxSelections"
+              v-model:scratch-card="scratchCard"
             />
           </div>
 
@@ -96,9 +98,10 @@
             <p class="mt-2 text-xs font-bold text-[#8f5d14]">1～5 星評分</p>
           </div>
 
-          <div v-else-if="builderType === 'LIKERT_5' || builderType === 'LIKERT_7'" class="mt-6 border-t border-[#f0e6d2] pt-4">
-            <div class="grid gap-2" :style="{ gridTemplateColumns: `repeat(${builderType === 'LIKERT_7' ? 7 : 5}, minmax(0, 1fr))` }"><span v-for="point in builderType === 'LIKERT_7' ? 7 : 5" :key="point" class="grid aspect-square place-items-center rounded-full border border-[#e0c9a0] bg-white text-xs font-black text-[#8f5d14]">{{ point }}</span></div>
+          <div v-else-if="builderType === 'LIKERT'" class="mt-6 border-t border-[#f0e6d2] pt-4">
+            <div class="grid gap-2" :style="{ gridTemplateColumns: `repeat(${normalizedPoints}, minmax(0, 1fr))` }"><span v-for="point in normalizedPoints" :key="point" class="grid aspect-square place-items-center rounded-full border border-[#e0c9a0] bg-white text-xs font-black text-[#8f5d14]">{{ point }}</span></div>
             <div class="mt-2 flex justify-between gap-4 text-xs font-bold text-[#8f5d14]"><span>{{ scaleMinLabel || '最低' }}</span><span class="text-right">{{ scaleMaxLabel || '最高' }}</span></div>
+            <p class="mt-2 text-xs font-bold text-[#8f5d14]">{{ normalizedPoints }} 點量表</p>
           </div>
 
           <div v-else-if="builderType === 'SPECTRUM'" class="mt-6 border-t border-[#f0e6d2] pt-4">
@@ -110,6 +113,14 @@
             <p v-if="prompt" class="text-sm font-bold text-[#6d6861]">{{ prompt }}</p>
             <div class="mt-3 rounded-2xl border border-dashed border-[#c9a15e] bg-white p-3 text-sm text-[#8b857d]">輸入你的回答…</div>
             <p class="mt-2 text-xs text-[#8f5d14]">回答公開顯示・{{ totalVotesLabel }}</p>
+          </div>
+
+          <div v-else-if="builderType === 'SCRATCH'" class="mt-6 border-t border-[#f0e6d2] pt-4">
+            <div class="relative mx-auto aspect-[8/5] max-w-xs overflow-hidden rounded-2xl border-2 border-[#d6b16d] bg-gradient-to-br from-[#fff1c9] via-[#f7d98a] to-[#c98b2b] shadow-sm">
+              <img v-if="scratchCard.coverImageUrl" :src="scratchCard.coverImageUrl" alt="刮刮卡封面預覽" class="h-full w-full object-cover" />
+              <div v-else class="grid h-full place-items-center text-center text-[#805410]"><span><strong class="block text-xl">SCRATCH</strong><span class="mt-1 block text-xs font-bold tracking-widest">刮開揭曉</span></span></div>
+            </div>
+            <p class="mt-2 text-center text-xs font-bold text-[#8f5d14]">1 張卡片 · {{ filledRows.length }} 種隨機結果</p>
           </div>
 
           <div v-else class="mt-6 space-y-2 border-t border-[#f0e6d2] pt-4">
@@ -138,7 +149,7 @@
 import type { Topic, TopicAudience, TopicVisibility } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
 import type { CapabilitySummary } from '~/stores/auth';
-import { BUILDER_RULES, isImageBuilder, questionPayload, seedRows, type BuilderRow, type BuilderType } from '~/utils/questionBuilder';
+import { BUILDER_RULES, createScratchCardDraft, isImageBuilder, normalizeLikertPoints, questionPayload, seedRows, type BuilderRow, type BuilderType } from '~/utils/questionBuilder';
 
 definePageMeta({ middleware: 'auth' });
 
@@ -160,7 +171,9 @@ const rows = ref<BuilderRow[]>(seedRows('OPTION'));
 const prompt = ref('');
 const scaleMinLabel = ref('');
 const scaleMaxLabel = ref('');
+const points = ref(5);
 const maxSelections = ref(1);
+const scratchCard = ref(createScratchCardDraft());
 const voteDurationHours = ref(24);
 const visibility = ref<TopicVisibility>('PUBLIC');
 const audience = ref<TopicAudience>('MEMBER_ONLY');
@@ -170,7 +183,7 @@ const submitting = ref(false);
 const formError = ref('');
 const fieldErrors = reactive<Record<string, string>>({});
 const savedTopic = ref<Topic | null>(null);
-const lightboxSrc = ref<string | null>(null);
+const { src: lightboxSrc } = useLightbox();
 const builderRef = ref<{ validate: () => { firstField: string | null; formError: string } } | null>(null);
 const eligibility = computed(() => auth.capabilitySummary?.seniorEligibility);
 const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
@@ -186,6 +199,7 @@ const advancedSummary = computed(() => {
   return [durationLabel.value, visibilityLabel, audienceLabel].filter(Boolean).join('・');
 });
 const currentBuilder = computed(() => BUILDER_RULES[builderType.value]);
+const normalizedPoints = computed(() => normalizeLikertPoints(points.value));
 const isImageType = computed(() => isImageBuilder(builderType.value));
 const filledRows = computed(() => rows.value.filter((row) => row.label.trim() || (isImageType.value && row.image)));
 const totalVotesLabel = '投完即見';
@@ -245,9 +259,11 @@ async function submit() {
         type: builderType.value,
         rows: rows.value,
         prompt: prompt.value,
+        points: points.value,
         scaleMinLabel: scaleMinLabel.value,
         scaleMaxLabel: scaleMaxLabel.value,
         maxSelections: maxSelections.value,
+        scratchCard: scratchCard.value,
       }),
     };
     savedTopic.value = await api.post<Topic>('/topics/quick', payload);

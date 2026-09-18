@@ -90,7 +90,7 @@ export class TopicAccessService {
       where: { tokenHash: this.hash(token) },
       include: { topic: { select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true } } },
     });
-    if (!link?.enabled || (link.topic.kind !== TopicKind.QUICK && link.topic.kind !== TopicKind.SURVEY) || link.topic.visibility !== TopicVisibility.PRIVATE_LINK) {
+    if (!link?.enabled || (link.topic.kind !== TopicKind.QUICK && link.topic.kind !== TopicKind.SURVEY && link.topic.kind !== TopicKind.STAGED) || link.topic.visibility !== TopicVisibility.PRIVATE_LINK) {
       throw new NotFoundException('私密連結無效或已停用');
     }
     if (link.topic.audience === TopicAudience.FOLLOWERS_ONLY) await this.assertFollower(link.topic, userId);
@@ -121,7 +121,7 @@ export class TopicAccessService {
 
   private async ownedQuick(topicId: bigint, userId: bigint) {
     const topic = await this.prisma.topic.findFirst({
-      where: { id: topicId, kind: { in: [TopicKind.QUICK, TopicKind.SURVEY] }, audienceOwnerId: userId },
+      where: { id: topicId, kind: { in: [TopicKind.QUICK, TopicKind.SURVEY, TopicKind.STAGED] }, audienceOwnerId: userId },
       select: { id: true, kind: true, visibility: true, audience: true, audienceOwnerId: true },
     });
     if (!topic) throw new NotFoundException('內容不存在');

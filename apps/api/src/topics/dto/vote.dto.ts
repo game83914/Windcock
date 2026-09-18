@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class VoteDto {
@@ -13,6 +14,7 @@ export class VoteDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(10)
+  @Type(() => Number)
   @IsInt({ each: true })
   @Min(1, { each: true })
   optionIds?: number[];

@@ -1,6 +1,6 @@
 # 輿論測風向（Windcock）
 
-一人一門號、一人一票的即時公共議題民調平台。支援正式議題、快問投票與多題組合問卷。
+一人一帳號、一人一票的即時公共議題民調平台。支援正式議題、快問投票與多題組合問卷。
 
 ## 架構總覽
 
@@ -42,6 +42,6 @@ npm run build -w apps/api && npx jest src/topics --runInBand  # apps/api 底下�
 
 ## 注意事項
 
-- 正式環境簡訊供應商尚未串接，production 無法發送 OTP（見 `docs/deployment.md`）。
-- 登入受 `ALLOWED_LOGIN_PHONES` 白名單限制。
+- Email 註冊 v1 只做格式＋唯一性檢查，不發驗證信；忘記密碼流程尚未提供。
+- 手機為選填，不再要求綁定驗證即可使用。
 - DB 有既有 drift 紀錄：禁止 `prisma migrate dev`／reset，流程見 `docs/database.md`。

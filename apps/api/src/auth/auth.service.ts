@@ -1,23 +1,22 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
   ServiceUnavailableException,
   HttpException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { randomInt } from 'crypto';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { SmsService } from './sms.service';
 import { resolveAvatarUrl } from '../avatars/avatar-url';
+import { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
 
-export interface OtpResult {
-  success: boolean;
-  expireInSeconds: number;
-  devCode?: string;
-}
+const BCRYPT_COST = 12;
+const INVALID_CREDENTIALS_MESSAGE = '帳號或密碼不正確';
 
 @Injectable()
 export class AuthService {
@@ -27,7 +26,6 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly jwt: JwtService,
-    private readonly sms: SmsService,
   ) {}
 
   private async checkRateLimit(key: string, max: number, windowSeconds: number): Promise<void> {
@@ -36,85 +34,88 @@ export class AuthService {
       await this.redis.expire(key, windowSeconds);
     }
     if (count > max) {
-      throw new HttpException('OTP 發送次數過多，請稍後再試', 429);
+      throw new HttpException('嘗試次數過多，請稍後再試', 429);
     }
   }
 
-  async sendOtp(phoneNumber: string, turnstileToken?: string, requestIp?: string): Promise<OtpResult> {
-    const normalized = this.normalizePhone(phoneNumber);
-    this.assertLoginAllowed(normalized);
+  async register(dto: RegisterDto, requestIp?: string) {
+    await this.verifyTurnstile(dto.turnstileToken, requestIp);
 
-    await this.verifyTurnstile(turnstileToken, requestIp);
+    const maxRegPerIpDay = Number(process.env.REGISTER_MAX_PER_IP_DAY || 20);
+    if (requestIp) {
+      await this.checkRateLimit(`reg:ip:${requestIp}:d1`, maxRegPerIpDay, 86400);
+    }
 
-    const maxPerHour = Number(process.env.OTP_MAX_PER_HOUR || 3);
-    const maxPerDay = Number(process.env.OTP_MAX_PER_DAY || 5);
-    const maxPerIpDay = Number(process.env.OTP_MAX_PER_IP_DAY || 20);
-    const expireSeconds = Number(process.env.OTP_EXPIRE_SECONDS || 300);
+    const email = this.normalizeEmail(dto.email);
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('此 Email 已被註冊');
+    }
 
-    await this.checkRateLimit(`otp:ph:${normalized}:h1`, maxPerHour, 3600);
-    await this.checkRateLimit(`otp:ph:${normalized}:d1`, maxPerDay, 86400);
-    if (requestIp) await this.checkRateLimit(`otp:ip:${requestIp}:d1`, maxPerIpDay, 86400);
+    let phoneNumber: string | null = null;
+    if (dto.phoneNumber !== undefined && dto.phoneNumber !== null && dto.phoneNumber !== '') {
+      phoneNumber = this.normalizePhone(dto.phoneNumber);
+      const phoneOwner = await this.prisma.user.findUnique({ where: { phoneNumber } });
+      if (phoneOwner) {
+        throw new ConflictException('此手機門號已被使用');
+      }
+    }
 
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
-    await this.redis.set(`otp:code:${normalized}`, code, expireSeconds);
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST);
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+        phoneNumber,
+        nickname: dto.nickname.trim(),
+        avatarUrl: null,
+        pointsBalance: 0,
+        isPhoneVerified: false,
+      },
+    });
 
-    await this.sms.sendOtp(normalized, code, expireSeconds);
-
-    const exposeDevCode = process.env.NODE_ENV !== 'production' && !process.env.SMS_PROVIDER;
-    return { success: true, expireInSeconds: expireSeconds, ...(exposeDevCode ? { devCode: code } : {}) };
+    return this.session(user.id, email);
   }
 
-  async verifyOtp(phoneNumber: string, code: string) {
-    const normalized = this.normalizePhone(phoneNumber);
-    this.assertLoginAllowed(normalized);
-    const key = `otp:code:${normalized}`;
-    const attemptKey = `otp:attempts:${normalized}`;
-    const attempts = await this.redis.incr(attemptKey);
-    if (attempts === 1) await this.redis.expire(attemptKey, Number(process.env.OTP_EXPIRE_SECONDS || 300));
-    if (attempts > 5) {
-      await this.redis.del(key);
-      throw new HttpException('驗證失敗次數過多，請重新取得驗證碼', 429);
-    }
-    const stored = await this.redis.get(key);
+  async login(dto: LoginDto, requestIp?: string) {
+    await this.verifyTurnstile(dto.turnstileToken, requestIp);
 
-    if (!stored || stored !== code.trim().toUpperCase() || !(await this.redis.consumeIfMatches(key, stored))) {
-      throw new BadRequestException('驗證碼不正確或已過期');
+    const maxPerIpDay = Number(process.env.LOGIN_MAX_PER_IP_DAY || 100);
+    if (requestIp) {
+      await this.checkRateLimit(`login:ip:${requestIp}:d1`, maxPerIpDay, 86400);
     }
-    await this.redis.del(attemptKey);
 
-    const existing = await this.prisma.user.findUnique({ where: { phoneNumber: normalized } });
-    if (existing && existing.status !== 'ACTIVE') {
+    const email = this.normalizeEmail(dto.email);
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !user.passwordHash || !(await bcrypt.compare(dto.password, user.passwordHash))) {
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    const maxPerAcctHour = Number(process.env.LOGIN_MAX_PER_ACCT_HOUR || 10);
+    await this.checkRateLimit(`login:acct:${user.id.toString()}:h1`, maxPerAcctHour, 3600);
+
+    if (user.status !== 'ACTIVE') {
       throw new ForbiddenException('此帳號目前無法登入');
     }
 
-    const user = existing
-      ? await this.prisma.user.update({
-          where: { id: existing.id },
-          data: { isPhoneVerified: true },
-        })
-      : await this.prisma.user.create({
-          data: {
-        phoneNumber: normalized,
-        nickname: `用戶${normalized.slice(-4)}`,
-        avatarUrl: null,
-        pointsBalance: 0,
-        isPhoneVerified: true,
-          },
-        });
+    return this.session(user.id, user.email ?? email);
+  }
 
-    const payload = { sub: user.id.toString(), phone: masked(normalized) };
-    return {
-      accessToken: await this.jwt.signAsync(payload),
-      user: {
-        id: user.id.toString(),
-        nickname: user.nickname,
-        avatarUrl: resolveAvatarUrl(user.avatarUrl),
-        points: user.pointsBalance.toString(),
-        role: user.role,
-        status: user.status,
-        isPhoneVerified: user.isPhoneVerified,
+  async changePassword(userId: bigint, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new BadRequestException('帳號不存在');
+    if (!user.passwordHash || !(await bcrypt.compare(dto.oldPassword, user.passwordHash))) {
+      throw new BadRequestException('舊密碼不正確');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: await bcrypt.hash(dto.newPassword, BCRYPT_COST),
+        passwordUpdatedAt: new Date(),
       },
-    };
+    });
+    return { success: true };
   }
 
   async getMe(userId: bigint) {
@@ -122,6 +123,7 @@ export class AuthService {
       where: { id: userId },
       select: {
         id: true,
+        email: true,
         nickname: true,
         avatarUrl: true,
         pointsBalance: true,
@@ -133,6 +135,7 @@ export class AuthService {
     if (!user) throw new BadRequestException('帳號不存在');
     return {
       id: user.id.toString(),
+      email: user.email,
       nickname: user.nickname,
       avatarUrl: resolveAvatarUrl(user.avatarUrl),
       points: user.pointsBalance.toString(),
@@ -140,6 +143,40 @@ export class AuthService {
       status: user.status,
       isPhoneVerified: user.isPhoneVerified,
     };
+  }
+
+  private async session(userId: bigint, email: string | null) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        nickname: true,
+        avatarUrl: true,
+        pointsBalance: true,
+        role: true,
+        status: true,
+        isPhoneVerified: true,
+      },
+    });
+    const payload = { sub: user.id.toString(), email: user.email ?? email };
+    return {
+      accessToken: await this.jwt.signAsync(payload),
+      user: {
+        id: user.id.toString(),
+        email: user.email,
+        nickname: user.nickname,
+        avatarUrl: resolveAvatarUrl(user.avatarUrl),
+        points: user.pointsBalance.toString(),
+        role: user.role,
+        status: user.status,
+        isPhoneVerified: user.isPhoneVerified,
+      },
+    };
+  }
+
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
   }
 
   private normalizePhone(phoneNumber: string): string {
@@ -153,14 +190,6 @@ export class AuthService {
       throw new BadRequestException('請輸入有效的台灣手機門號（09xxxxxxxx）');
     }
     return p;
-  }
-
-  private assertLoginAllowed(phoneNumber: string) {
-    const allowed = (process.env.ALLOWED_LOGIN_PHONES || process.env.DEV_IDENTITY_OPERATOR_PHONE || '0911111111')
-      .split(',')
-      .map((phone) => phone.trim())
-      .filter(Boolean);
-    if (!allowed.includes(phoneNumber)) throw new ForbiddenException('此門號目前不開放登入');
   }
 
   private async verifyTurnstile(token?: string, remoteIp?: string): Promise<void> {
@@ -178,8 +207,4 @@ export class AuthService {
       throw new ServiceUnavailableException('人機驗證服務暫時無法使用');
     }
   }
-}
-
-function masked(p: string): string {
-  return p.slice(0, 4) + '****' + p.slice(-2);
 }

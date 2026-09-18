@@ -26,9 +26,9 @@ git diff --check
 
 ## 測試現況
 
-- `src/topics`：10 suites／54 tests 全過（含問卷、複選投票測試）。
-- 全量 API suite 有一個既有失敗：`auth.service.spec.ts`「rate-limits OTP sends by requester IP」，與功能無關；CI（`.github/workflows/ci.yml`，跑全量 `npm run test`）會因此紅燈，開 PR 到 master 前需處理。
-- Web 無單元測試，以 `typecheck`＋`build` 驗證。
+- 全量 API suite：22 suites／124 tests 全過（`src/topics` 佔 10 suites／54 tests）。
+- 全量 API suite 應全數通過；CI（`.github/workflows/ci.yml`，跑全量 `npm run test`）紅燈時優先處理，不得直接合併。
+- Web 以 vitest 覆蓋純函數（`utils/questionBuilder`、`utils/topic`），元件以 `typecheck`＋`build` 驗證。
 
 ## 工作區規範
 

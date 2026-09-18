@@ -79,6 +79,11 @@ body {
 .field-input-error {
   border-color: #d84a36;
 }
+/* 移除原生下拉選單箭頭（全站 select 一致無箭頭） */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+}
 .surface-card {
   border: 1px solid #ded7cb;
   border-radius: 1rem;

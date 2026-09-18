@@ -44,7 +44,7 @@
         </section>
 
         <section v-if="trendAccess?.available" id="analytics-result-trends" class="mt-10 scroll-mt-28 border-t-4 border-[#3157d5] pt-5">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow text-[#3157d5]">01 / 結果與趨勢</p><h3 class="mt-1 text-2xl font-black">票流如何形成</h3></div><p v-if="trends" class="text-xs text-[#77716a]">最近更新 {{ formatTime(trends.generatedAt) }}</p></div>
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow text-[#3157d5]">01 / 結果與趨勢</p><h3 class="mt-1 text-2xl font-black">票流如何形成</h3></div><p v-if="trends" class="text-xs text-[#77716a]">最近更新 {{ formatDateTime(trends.generatedAt) }}</p></div>
           <div v-if="moduleLoading.RESULT_TRENDS" class="mt-5 h-80 animate-pulse bg-[#e5e0d6]" />
           <template v-else-if="trends">
             <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -115,6 +115,7 @@
 import type { RouteLocationRaw } from 'vue-router';
 import type { DemographicDimension } from '~/types/profile';
 import type { AnalyticsAccess, AnalyticsModule, DemographicAnalytics, DemographicAnalyticsGroup, StanceAnalytics, TrendAnalytics } from '~/types/analytics';
+import { formatDateTime } from '~/utils/format';
 
 const props = defineProps<{ topicId: string }>();
 const api = useApi();
@@ -227,7 +228,6 @@ function formatMetric(value: number | null) { return value === null ? '—' : St
 function formatDate(value: string) { return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }).format(new Date(`${value}T00:00:00+08:00`)); }
 function privateCount(value: number | null) { return value === null ? '—' : String(value); }
 function stanceLink(stanceId: string, discussion = false): RouteLocationRaw { return { path: route.path, query: { section: 'stances', stance: stanceId, ...(discussion ? { tab: 'discussion' } : {}) } }; }
-function formatTime(value: string) { return new Date(value).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 async function scrollToModule(module: AnalyticsModule) { await nextTick(); document.getElementById(moduleMeta[module].anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 watch(() => props.topicId, () => { trends.value = null; demographics.value = null; stances.value = null; load(); });
 onMounted(load);

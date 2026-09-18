@@ -15,6 +15,40 @@
       </select>
     </label>
 
+    <div v-if="isScratch" class="space-y-5 border-t border-[#f0e6d2] pt-5">
+      <div>
+        <span class="mb-2 block text-sm font-bold">刮刮卡封面（選填）</span>
+        <TopicsOptionImageInput v-model="scratchCard.coverImageUrl" @preview="lightboxSrc = $event" />
+        <p class="mt-2 text-xs leading-5 text-[#77716a]">未上傳時會使用預設刮刮卡封面。</p>
+      </div>
+      <fieldset>
+        <legend class="mb-2 text-sm font-bold">揭曉圖片</legend>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-[#ded7cb] bg-white p-3 text-sm">
+            <input v-model="scratchCard.revealMode" type="radio" value="SHARED" class="mt-0.5 accent-[#b0761f]" />
+            <span><strong class="block">共用圖片</strong><span class="mt-0.5 block text-xs text-[#77716a]">所有結果使用同一張揭曉圖</span></span>
+          </label>
+          <label class="flex cursor-pointer items-start gap-2 rounded-xl border border-[#ded7cb] bg-white p-3 text-sm">
+            <input v-model="scratchCard.revealMode" type="radio" value="PER_RESULT" class="mt-0.5 accent-[#b0761f]" />
+            <span><strong class="block">各結果圖片</strong><span class="mt-0.5 block text-xs text-[#77716a]">每個結果可設定不同圖片</span></span>
+          </label>
+        </div>
+      </fieldset>
+      <div v-if="scratchCard.revealMode === 'SHARED'">
+        <span class="mb-2 block text-sm font-bold">共用揭曉圖片（選填）</span>
+        <TopicsOptionImageInput v-model="scratchCard.sharedRevealImageUrl" @preview="lightboxSrc = $event" />
+      </div>
+      <label class="flex items-center justify-between gap-4 rounded-xl bg-[#fff8ec] px-4 py-3">
+        <span><strong class="block text-sm">顯示結果文字</strong><span class="mt-0.5 block text-xs text-[#77716a]">在揭曉圖片上顯示結果名稱</span></span>
+        <input v-model="scratchCard.showText" type="checkbox" class="h-5 w-5 shrink-0 accent-[#b0761f]" />
+      </label>
+      <p v-if="scratchImageWarning" class="rounded-xl border-l-4 border-[#d89a36] bg-[#fff4dc] p-3 text-xs font-bold leading-5 text-[#8f5d14]">{{ scratchImageWarning }}</p>
+      <div class="relative mx-auto aspect-[8/5] max-w-sm overflow-hidden rounded-2xl border-2 border-[#d6b16d] bg-gradient-to-br from-[#fff1c9] via-[#f7d98a] to-[#c98b2b] shadow-sm">
+        <img v-if="scratchCard.coverImageUrl" :src="scratchCard.coverImageUrl" alt="刮刮卡封面預覽" class="h-full w-full object-cover" />
+        <div v-else class="grid h-full place-items-center text-center text-[#805410]"><span><strong class="block text-xl">SCRATCH</strong><span class="mt-1 block text-xs font-bold tracking-widest">刮開揭曉</span></span></div>
+      </div>
+    </div>
+
     <div v-if="usesRows" class="border-t border-[#f0e6d2] pt-5">
       <div class="flex items-center justify-between">
         <span class="text-sm font-bold">{{ rowHeading }}</span>
@@ -23,15 +57,17 @@
       <div ref="rowsEl" class="mt-3 space-y-3">
         <div v-for="(row, index) in rows" :key="row.id" class="flex items-center gap-3">
           <span data-drag-handle class="grid h-8 w-8 shrink-0 cursor-grab place-items-center rounded-full bg-[#f0e6d2] text-xs font-black text-[#8f5d14] active:cursor-grabbing" title="拖曳以排序" aria-label="拖曳以排序">{{ index + 1 }}</span>
-          <TopicsOptionImageInput v-if="isImageType" v-model="rows[index].image" @preview="lightboxSrc = $event" />
+          <TopicsOptionImageInput v-if="isImageType || (isScratch && scratchCard.revealMode === 'PER_RESULT')" v-model="rows[index].image" @preview="lightboxSrc = $event" />
           <input v-model.trim="rows[index].label" :data-field="`option-${index}`" maxlength="50" :placeholder="rowPlaceholder" class="field-input" :class="{ 'field-input-error': fieldErrors[`option-${index}`] }" />
           <input v-if="type === 'MATCHING'" v-model.trim="rows[index].match" :data-field="`match-${index}`" maxlength="50" placeholder="右側配對" class="field-input" :class="{ 'field-input-error': fieldErrors[`match-${index}`] }" />
           <input v-if="type === 'SPIN_WHEEL'" v-model.trim="rows[index].weight" :data-field="`weight-${index}`" maxlength="4" inputmode="numeric" placeholder="權重" class="field-input w-20" :class="{ 'field-input-error': fieldErrors[`weight-${index}`] }" />
+          <input v-if="isScratch" v-model.trim="rows[index].weight" :data-field="`weight-${index}`" maxlength="6" inputmode="numeric" placeholder="權重（選填）" class="field-input w-28" :class="{ 'field-input-error': fieldErrors[`weight-${index}`] }" />
           <button v-if="rows.length > minRows" type="button" class="focus-ring rounded-full px-2 text-xl text-[#8b857d]" aria-label="刪除項目" @click="removeRow(index)">&times;</button>
         </div>
       </div>
       <button v-if="rows.length < maxRows" type="button" class="focus-ring mt-3 rounded-full text-xs font-bold text-[#b0761f] hover:underline" @click="rows.push({ id: nextRowId(), label: '', match: '', weight: '', image: null })">＋ 新增{{ type === 'MATCHING' ? '配對' : '項目' }}</button>
       <p v-if="type === 'SPIN_WHEEL'" class="mt-2 text-xs leading-5 text-[#77716a]">權重為選填的轉盤機率（正整數）：數字愈大愈容易被轉到；留空則每格機率相同。</p>
+      <p v-if="isScratch" class="mt-2 text-xs leading-5 text-[#77716a]">權重為選填的正整數；留空皆視為相同權重。圖片也可留空，系統會使用預設揭曉圖。</p>
       <label v-if="type === 'MULTI_SELECT'" class="mt-4 block">
         <span class="mb-2 block text-sm font-bold">每人最多可選</span>
         <select v-model.number="maxSelections" data-field="max-selections" class="field-input w-full font-bold sm:w-48">
@@ -47,7 +83,15 @@
     </div>
 
     <div v-if="isLikert" class="border-t border-[#f0e6d2] pt-5">
-      <span class="mb-3 block text-sm font-bold">量表端點</span>
+      <span class="mb-3 block text-sm font-bold">量表設定</span>
+      <label class="block">
+        <span class="mb-2 block text-sm font-bold">點數（3～10）</span>
+        <select v-model.number="points" data-field="scale-points" class="field-input w-full font-bold sm:w-48" :class="{ 'field-input-error': fieldErrors['scale-points'] }">
+          <option v-for="n in likertPointOptions" :key="n" :value="n">{{ n }} 點</option>
+        </select>
+      </label>
+      <p v-if="fieldErrors['scale-points']" class="mt-2 text-xs font-bold text-[#a63222]">{{ fieldErrors['scale-points'] }}</p>
+      <span class="mb-3 mt-4 block text-sm font-bold">量表端點</span>
       <div class="grid gap-3 sm:grid-cols-2">
         <label><span class="mb-1 block text-xs font-bold text-[#77716a]">最低分代表</span><input v-model.trim="scaleMinLabel" data-field="scale-min-label" maxlength="30" placeholder="例如：非常不同意" class="field-input" :class="{ 'field-input-error': fieldErrors['scale-min-label'] }" /></label>
         <label><span class="mb-1 block text-xs font-bold text-[#77716a]">最高分代表</span><input v-model.trim="scaleMaxLabel" data-field="scale-max-label" maxlength="30" placeholder="例如：非常同意" class="field-input" :class="{ 'field-input-error': fieldErrors['scale-max-label'] }" /></label>
@@ -88,8 +132,13 @@ import {
   builderPlaceholder,
   seedRows,
   nextRowId,
+  normalizeLikertPoints,
+  LIKERT_POINTS_MIN,
+  LIKERT_POINTS_MAX,
+  createScratchCardDraft,
   type BuilderRow,
   type BuilderType,
+  type ScratchCardDraft,
 } from '~/utils/questionBuilder';
 
 const props = withDefaults(defineProps<{ showTypeSelect?: boolean; showTitleInput?: boolean }>(), { showTypeSelect: true, showTitleInput: false });
@@ -100,11 +149,13 @@ const prompt = defineModel<string>('prompt', { default: '' });
 const questionTitle = defineModel<string>('questionTitle', { default: '' });
 const scaleMinLabel = defineModel<string>('scaleMinLabel', { default: '' });
 const scaleMaxLabel = defineModel<string>('scaleMaxLabel', { default: '' });
+const points = defineModel<number>('points', { default: 5 });
 const maxSelections = defineModel<number>('maxSelections', { default: 1 });
+const scratchCard = defineModel<ScratchCardDraft>('scratchCard', { default: createScratchCardDraft });
 
 const fieldErrors = reactive<Record<string, string>>({});
 const formError = ref('');
-const lightboxSrc = ref<string | null>(null);
+const { src: lightboxSrc } = useLightbox();
 const rowsEl = ref<HTMLElement | null>(null);
 
 const currentBuilder = computed(() => BUILDER_RULES[type.value]);
@@ -117,8 +168,17 @@ const isImageType = computed(() => isImageBuilder(type.value));
 const rowPlaceholder = computed(() => builderPlaceholder(type.value));
 const filledLabels = computed(() => rows.value.map((row) => row.label.trim()).filter(Boolean));
 const filledCount = computed(() => (isImageType.value ? rows.value.filter((row) => row.image).length : filledLabels.value.length));
-const isLikert = computed(() => type.value === 'LIKERT_5' || type.value === 'LIKERT_7');
-const likertPoints = computed(() => type.value === 'LIKERT_7' ? 7 : 5);
+const isLikert = computed(() => type.value === 'LIKERT');
+const isScratch = computed(() => type.value === 'SCRATCH');
+const scratchImageWarning = computed(() => {
+  if (!isScratch.value || scratchCard.value.showText || rows.value.length < 2) return '';
+  if (scratchCard.value.revealMode === 'SHARED') return '已隱藏結果文字，但所有結果使用同一張揭曉圖，玩家將無法分辨抽到哪個結果。';
+  const images = rows.value.map((row) => row.image).filter((image): image is string => !!image);
+  if (images.length !== rows.value.length || new Set(images).size !== images.length) return '已隱藏結果文字，請為每個結果設定不重複的揭曉圖片，否則玩家可能無法分辨結果。';
+  return '';
+});
+const likertPointOptions = computed(() => Array.from({ length: LIKERT_POINTS_MAX - LIKERT_POINTS_MIN + 1 }, (_, index) => LIKERT_POINTS_MIN + index));
+const likertPoints = computed(() => normalizeLikertPoints(points.value));
 
 function onBuilderTypeChange() {
   rows.value = seedRows(type.value);
@@ -152,6 +212,10 @@ function validate(): { firstField: string | null; formError: string } {
     valid = false;
   }
   if (isLikert.value) {
+    if (!Number.isInteger(points.value) || points.value < LIKERT_POINTS_MIN || points.value > LIKERT_POINTS_MAX) {
+      fieldErrors['scale-points'] = `量表點數需為 ${LIKERT_POINTS_MIN}～${LIKERT_POINTS_MAX} 的整數`;
+      valid = false;
+    }
     if (!scaleMinLabel.value.trim()) {
       fieldErrors['scale-min-label'] = '請填寫最低分代表的文字';
       valid = false;
@@ -211,6 +275,16 @@ function validate(): { firstField: string | null; formError: string } {
           valid = false;
         }
       }
+    }
+    if (isScratch.value) {
+      rows.value.forEach((row, index) => {
+        if (!row.weight.trim()) return;
+        const value = Number(row.weight.trim());
+        if (!Number.isInteger(value) || value < 1) {
+          fieldErrors[`weight-${index}`] = '權重需為正整數';
+          valid = false;
+        }
+      });
     }
     if (type.value === 'MULTI_SELECT' && (!Number.isInteger(maxSelections.value) || maxSelections.value < 1 || maxSelections.value > rows.value.length)) {
       fieldErrors['max-selections'] = '最多可選數必須介於 1 與選項數之間';

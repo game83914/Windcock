@@ -2,10 +2,18 @@ export interface TopicOption {
   id: string;
   label: string;
   voteCount: string;
-  data?: { match?: string; weight?: number; imageUrl?: string; value?: number } | null;
+  data?: {
+    match?: string;
+    weight?: number;
+    imageUrl?: string;
+    value?: number;
+    scratchCoverImageUrl?: string | null;
+    scratchRevealImageUrl?: string | null;
+    scratchShowText?: boolean;
+  } | null;
 }
 
-export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'IMAGE_RANK' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY' | 'STAR_RATING' | 'LIKERT_5' | 'LIKERT_7' | 'MULTI_SELECT';
+export type QuickTopicType = 'BINARY' | 'MULTIPLE' | 'IMAGE_MULTIPLE' | 'IMAGE_RANK' | 'SPECTRUM' | 'SHORT_ANSWER' | 'MATCHING' | 'PUZZLE' | 'SCRATCH' | 'SPIN_WHEEL' | 'LOTTERY' | 'STAR_RATING' | 'LIKERT' | 'MULTI_SELECT';
 export type TopicVisibility = 'PUBLIC' | 'PRIVATE_LINK';
 export type TopicAudience = 'MEMBER_ONLY' | 'FOLLOWERS_ONLY';
 
@@ -45,13 +53,14 @@ export interface Topic {
   id: string;
   title: string;
   description?: string | null;
+  parentTopicId?: string | null;
   category: string;
-  kind?: 'FORMAL' | 'QUICK' | 'SURVEY';
+  kind?: 'FORMAL' | 'QUICK' | 'SURVEY' | 'STAGED';
   visibility: TopicVisibility;
   audience: TopicAudience;
   sharePath?: string;
   featuredOrder?: number | null;
-  topicType: QuickTopicType | 'SURVEY';
+  topicType: QuickTopicType | 'SURVEY' | 'STAGED';
   status: string;
   moderationStatus: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
   moderationNote?: string | null;
@@ -68,6 +77,7 @@ export interface Topic {
   voteDurationDays: number;
   voteDurationHours?: number | null;
   minVotes?: number | null;
+  scalePoints?: number | null;
   scaleMinLabel?: string | null;
   scaleMaxLabel?: string | null;
   maxSelections?: number | null;
@@ -76,7 +86,7 @@ export interface Topic {
   spectrumMedian?: string | null;
   spectrumStddev?: string | null;
   hasVoted: boolean;
-  myVote?: { choice: string; optionId?: string | null; optionIds?: string[]; spectrumValue: number | null } | null;
+  myVote?: { choice: string; optionId?: string | null; optionIds?: string[]; spectrumValue: number | null; answerText?: string | null } | null;
   myRanking?: string[] | null;
   myRankingComparisons?: number;
   responses?: TopicShortAnswer[];
@@ -85,6 +95,9 @@ export interface Topic {
   questions?: Topic[];
   surveyQuestionCount?: number;
   surveyAnsweredCount?: number;
+  totalRounds?: number | null;
+  currentRound?: number;
+  rounds?: Array<Topic & { roundNumber: number; roundFeedback?: string | null }>;
 }
 
 export interface Category {

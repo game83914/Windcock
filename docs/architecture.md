@@ -22,7 +22,7 @@
 
 ## 後端（apps/api）
 
-- NestJS，`trust proxy = 1`，全域 `ValidationPipe（whitelist + transform）`。
+- NestJS，`trust proxy = 1`，全域 `ValidationPipe（whitelist + transform + implicit conversion）`。
 - 健康檢查：`GET /api/v1/health`（檢查 PostgreSQL `SELECT 1`）。
 - 即時更新：Socket.IO rooms，狀態保存在 process 記憶體（見部署限制）。
 - 背景工作皆為 process-local：GIF 清理（每小時）、圖片處理 queue、room expiry timer。
@@ -37,8 +37,8 @@
 
 ## 認證
 
-- 門號 OTP 登入；`SMS_PROVIDER` 未設定時 dev 模式僅 console 顯示 OTP，production 直接 503。
-- `ALLOWED_LOGIN_PHONES` 白名單限制可登入門號。
+- Email＋密碼註冊／登入；手機為選填，`isPhoneVerified` 僅表示是否已綁定驗證手機。
+- `SMS_PROVIDER` 未設定時 dev 模式僅 console 顯示 OTP（監護人流程用），production 直接 503。
 - JWT 預設效期 7 天（`JWT_EXPIRES_IN`）。
 
 ## 關鍵架構決策

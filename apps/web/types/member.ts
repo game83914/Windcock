@@ -2,7 +2,7 @@ export interface MemberDashboard {
   member: {
     nickname: string;
     avatarUrl: string | null;
-    maskedPhone: string;
+    maskedPhone: string | null;
     points: string;
     role: 'USER' | 'ADMIN';
     isPhoneVerified: boolean;

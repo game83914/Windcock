@@ -43,7 +43,7 @@
         <label v-if="editable(item)" class="mb-3 flex items-center gap-2 text-xs font-black"><input v-model="selectedIds" type="checkbox" :value="item.id" :disabled="selectedItems.length > 0 && selectedItems[0]?.topicId !== item.topicId && !selectedIds.includes(item.id)" />納入多來源整理</label>
         <div class="flex flex-wrap items-center gap-2 text-xs">
           <span class="bg-[#171717] px-2 py-1 font-black text-white">{{ statusLabel(item.status) }}</span>
-          <span class="text-[#77716a]">{{ item.submitter?.nickname }} · {{ formatTime(item.createdAt) }}</span>
+          <span class="text-[#77716a]">{{ item.submitter?.nickname }} · {{ formatLocaleDateTime(item.createdAt) }}</span>
         </div>
         <div class="mt-3 border-l-4 border-[#3157d5] bg-[#e7ecff] p-3 text-xs"><NuxtLink :to="`/topic/${item.topicId}?section=stances${item.parentStanceId ? `&stance=${item.parentStanceId}` : ''}`" class="focus-ring font-black text-[#3157d5]">議題：{{ item.target.topic.title }}</NuxtLink><p class="mt-1 text-[#5f5a53]">回應位置：{{ targetPath(item) }}</p></div>
 
@@ -85,6 +85,7 @@
 <script setup lang="ts">
 import type { StanceApplication } from '~/types/application';
 import type { StanceNode, StanceTreeResponse } from '~/types/topic';
+import { formatLocaleDateTime } from '~/utils/format';
 definePageMeta({ middleware: 'editorial' });
 useSeoMeta({ title: '立場提案工作台｜輿論測風向' });
 const api = useApi();
@@ -106,7 +107,6 @@ const selectedItems = computed(() => items.value.filter((item) => selectedIds.va
 const mixedSourceLocations = computed(() => new Set(selectedItems.value.map((item) => item.parentStanceId || 'TOPIC')).size > 1);
 const labels: Record<string, string> = { PENDING: '已送出 · 會員可修改', IN_REVIEW: '審閱中 · 會員已鎖定', APPROVED: '已轉為正式立場', REJECTED: '已退回修改', WITHDRAWN: '已撤回' };
 const statusLabel = (value: string) => labels[value] || value;
-const formatTime = (value: string) => new Date(value).toLocaleString('zh-TW');
 const editable = (item: StanceApplication) => item.status === 'PENDING' || item.status === 'IN_REVIEW';
 function hasScopedRole(item: StanceApplication, roles: string[]) {
   if (auth.role === 'ADMIN') return true;

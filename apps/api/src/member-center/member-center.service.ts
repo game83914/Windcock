@@ -17,6 +17,7 @@ export class MemberCenterService {
       select: {
         nickname: true,
         avatarUrl: true,
+        email: true,
         phoneNumber: true,
         pointsBalance: true,
         role: true,
@@ -110,6 +111,7 @@ export class MemberCenterService {
       member: {
         nickname: user.nickname,
         avatarUrl: resolveAvatarUrl(user.avatarUrl),
+        email: user.email,
         maskedPhone: maskPhone(user.phoneNumber),
         points: user.pointsBalance.toString(),
         role: user.role,
@@ -198,10 +200,11 @@ export class MemberCenterService {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: { nickname: dto.nickname.trim() },
-      select: { id: true, nickname: true, avatarUrl: true, pointsBalance: true, role: true, status: true, isPhoneVerified: true },
+      select: { id: true, email: true, nickname: true, avatarUrl: true, pointsBalance: true, role: true, status: true, isPhoneVerified: true },
     });
     return {
       id: user.id.toString(),
+      email: user.email,
       nickname: user.nickname,
       avatarUrl: resolveAvatarUrl(user.avatarUrl),
       points: user.pointsBalance.toString(),
@@ -263,10 +266,11 @@ export class MemberCenterService {
   private async sessionUser(userId: bigint) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, nickname: true, avatarUrl: true, pointsBalance: true, role: true, status: true, isPhoneVerified: true },
+      select: { id: true, email: true, nickname: true, avatarUrl: true, pointsBalance: true, role: true, status: true, isPhoneVerified: true },
     });
     return {
       id: user.id.toString(),
+      email: user.email,
       nickname: user.nickname,
       avatarUrl: resolveAvatarUrl(user.avatarUrl),
       points: user.pointsBalance.toString(),
@@ -277,6 +281,7 @@ export class MemberCenterService {
   }
 }
 
-function maskPhone(phone: string) {
+function maskPhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
   return phone.slice(0, 4) + '****' + phone.slice(-2);
 }

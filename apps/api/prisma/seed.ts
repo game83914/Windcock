@@ -1,4 +1,5 @@
 import { PrismaClient, TopicContentBlockType, TopicStatus, TopicType } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import sharp from 'sharp';
@@ -288,10 +289,16 @@ async function ensureTopic(seed: SeedTopic) {
 
 async function main() {
   if (process.env.NODE_ENV === 'production') throw new Error('Production seeding is disabled');
+  // Seed-only admin credentials. MUST be changed in real environments (use env-based provisioning instead).
+  const adminEmail = 'admin@windcock.local';
+  const adminPasswordHash = await bcrypt.hash('Admin12345', 12);
   const user = await prisma.user.upsert({
     where: { phoneNumber: '0911111111' },
-    update: { nickname: '最高管理員', role: 'ADMIN', membershipTier: 'SENIOR', status: 'ACTIVE', isPhoneVerified: true },
+    update: { email: adminEmail, passwordHash: adminPasswordHash, passwordUpdatedAt: new Date(), nickname: '最高管理員', role: 'ADMIN', membershipTier: 'SENIOR', status: 'ACTIVE', isPhoneVerified: true },
     create: {
+      email: adminEmail,
+      passwordHash: adminPasswordHash,
+      passwordUpdatedAt: new Date(),
       phoneNumber: '0911111111',
       nickname: '最高管理員',
       pointsBalance: 500,

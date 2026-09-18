@@ -115,18 +115,16 @@ describe('TopicsService createQuick option labels', () => {
     expect(data.scaleMaxLabel).toBeNull();
   });
 
-  it.each([
-    ['LIKERT_5', 5],
-    ['LIKERT_7', 7],
-  ])('generates fixed numeric options for %s and persists scale labels', async (topicType, size) => {
+  it.each([5, 7])('generates %i fixed numeric options for LIKERT and persists scale labels', async (size) => {
     const { service, create } = createService();
     create.mockResolvedValue(createdTopic([]));
 
     await service.createQuick(1n, baseDto({
-      topicType,
+      topicType: 'LIKERT',
       options: ['client supplied'],
       scaleMinLabel: '非常不同意',
       scaleMaxLabel: '非常同意',
+      scalePoints: size,
     }) as never);
 
     const data = create.mock.calls[0][0].data;
@@ -135,13 +133,31 @@ describe('TopicsService createQuick option labels', () => {
     );
     expect(data.scaleMinLabel).toBe('非常不同意');
     expect(data.scaleMaxLabel).toBe('非常同意');
+    expect(data.scalePoints).toBe(size);
+  });
+
+  it.each([
+    ['missing scalePoints', {}],
+    ['too few points', { scalePoints: 2 }],
+    ['too many points', { scalePoints: 11 }],
+  ])('rejects LIKERT with %s', async (_label, extra) => {
+    const { service, create } = createService();
+
+    await expect(service.createQuick(1n, baseDto({
+      topicType: 'LIKERT',
+      scaleMinLabel: '非常不同意',
+      scaleMaxLabel: '非常同意',
+      ...extra,
+    }) as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('rejects identical Likert endpoint labels', async () => {
     const { service } = createService();
 
     await expect(service.createQuick(1n, baseDto({
-      topicType: 'LIKERT_5',
+      topicType: 'LIKERT',
+      scalePoints: 5,
       scaleMinLabel: '相同',
       scaleMaxLabel: '相同',
     }) as never)).rejects.toBeInstanceOf(BadRequestException);
@@ -156,5 +172,55 @@ describe('TopicsService createQuick option labels', () => {
     expect(create.mock.calls[0][0].data.maxSelections).toBe(2);
     await expect(service.createQuick(1n, baseDto({ topicType: 'MULTI_SELECT', options: ['甲', '乙'], maxSelections: 3 }) as never))
       .rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('expands one scratch card into weighted result options with shared defaults', async () => {
+    const { service, create } = createService();
+    create.mockResolvedValue(createdTopic([]));
+
+    await service.createQuick(1n, baseDto({
+      topicType: 'SCRATCH',
+      scratchCard: {
+        coverImageUrl: imageUrl('cover'),
+        sharedRevealImageUrl: imageUrl('reveal'),
+        results: [{ label: '中獎', weight: 3 }, { label: '再試一次' }],
+      },
+    }) as never);
+
+    expect(create.mock.calls[0][0].data.options.create).toEqual([
+      {
+        label: '中獎',
+        data: {
+          scratchCoverImageUrl: imageUrl('cover'),
+          scratchRevealImageUrl: imageUrl('reveal'),
+          scratchShowText: true,
+          weight: 3,
+        },
+      },
+      {
+        label: '再試一次',
+        data: {
+          scratchCoverImageUrl: imageUrl('cover'),
+          scratchRevealImageUrl: imageUrl('reveal'),
+          scratchShowText: true,
+          weight: 1,
+        },
+      },
+    ]);
+  });
+
+  it('rejects malformed or type-mismatched scratch configuration', async () => {
+    const { service, create } = createService();
+
+    await expect(service.createQuick(1n, baseDto({ topicType: 'SCRATCH', options: ['甲', '乙'] }) as never))
+      .rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.createQuick(1n, baseDto({
+      topicType: 'SCRATCH',
+      scratchCard: { revealMode: 'PER_RESULT', sharedRevealImageUrl: imageUrl('shared'), results: [{ label: '甲' }, { label: '乙' }] },
+    }) as never)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.createQuick(1n, baseDto({
+      topicType: 'MULTIPLE', options: ['甲', '乙'], scratchCard: { results: [{ label: '甲' }, { label: '乙' }] },
+    }) as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(create).not.toHaveBeenCalled();
   });
 });
