@@ -18,12 +18,22 @@ Base URL：`/api/v1`。完整 schema 見 Swagger `/api/docs`。需登入端點�
 | GET | `/topics` | 公開列表；`kind=FORMAL｜QUICK｜SURVEY｜ALL`，子題一律排除 |
 | GET | `/topics/:id` | 詳情（含 `myVote`、`responses`；問卷含 `questions` 與作答進度） |
 | POST | `/topics/quick` | 建立快問（資深會員，可自動核准） |
-| POST | `/topics/surveys` | 建立問卷（2～20 題子題；子題可用全部 15 種快問題型） |
+| POST | `/topics/surveys` | 建立問卷（2～20 題子題；子題可用全部快問題型） |
+| POST | `/topics/staged` | 建立回合制（父層容器＋第一回合） |
+| POST | `/topics/:id/rounds` | 發布下一回合（建立者；鎖定上一回合＋回饋） |
+| POST | `/topics/:id/finish` | 結束回合制並結算 |
 | GET | `/topics/me/quick` | 我的快問 |
 | GET | `/topics/me/surveys` | 我的問卷 |
-| POST | `/topics/:id/vote` | 首投；複選傳 `optionIds[]` |
-| PATCH | `/topics/:id/vote` | 重投（僅 QUICK；複選只更新差異 selections） |
+| GET | `/me/drafts?kind=QUICK｜SURVEY&template=true｜false` | 我的發起草稿／自存範本（各上限 20 份） |
+| POST | `/me/drafts` | 儲存草稿或範本（資深會員；`kind`、`name`、`payload`、`isTemplate`） |
+| PATCH | `/me/drafts/:id` | 改名／更新內容／草稿與範本互轉（僅擁有者） |
+| DELETE | `/me/drafts/:id` | 刪除草稿或範本（僅擁有者） |
+| POST | `/topics/:id/vote` | 首投；複選傳 `optionIds[]`；刮刮樂請走 scratch-draw |
+| PATCH | `/topics/:id/vote` | 重投（僅 QUICK；複選只更新差異 selections；刮刮樂不可改） |
+| DELETE | `/topics/:id/vote` | 取消投票並重計（問卷子題除外；刮刮樂可重置重抽） |
+| POST | `/topics/:id/scratch-draw` | 刮刮樂加權抽取（冪等、零獎勵） |
 | POST | `/topics/:id/rank` | 排名題作答 |
+| DELETE | `/topics/:id/rank` | 取消排名（問卷子題除外） |
 | POST/DELETE | `/topics/:id/share-link` | 私密連結產生／停用（QUICK、SURVEY） |
 
 ## 其他模組

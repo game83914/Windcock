@@ -15,6 +15,7 @@
     "prisma:backup": "node --env-file=.env -r ts-node/register prisma/backup.ts",
     "prisma:single-account-cleanup": "node --env-file=.env -r ts-node/register prisma/single-account-cleanup.ts",
     "prisma:dev-analytics-fixture": "node --env-file=.env -r ts-node/register prisma/dev-analytics-fixture.ts",
+    "ai:dev-content": "node --env-file=.env -r ts-node/register prisma/ai-dev-content.ts",
     "test": "jest --runInBand"
   },
   "dependencies": {

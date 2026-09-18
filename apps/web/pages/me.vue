@@ -109,6 +109,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: '我的議題', to: '/me/topics' },
       { label: '我的快問', to: '/me/quick' },
+      { label: '草稿與範本', to: '/me/drafts' },
       { label: '我的追蹤', to: '/me/channel' },
       { label: '投票紀錄', to: '/me/votes' },
     ],

@@ -43,6 +43,18 @@ npm ci
 npm run build -w apps/web
 ```
 
+## Docker Compose 自託管
+
+`docker-compose.yml` 內含完整四服務（`db`、`redis`、`api`、`web`；另有 `mediadata` 持久化媒體檔）：
+
+```bash
+docker compose up --build -d
+docker compose exec api npm run prisma:deploy -w apps/api  # 首次執行 migration（失敗則先排查再放行）
+```
+
+- 只需本機 DB／Redis 開發時：`docker compose up db redis -d`（`npm run dev` 的 `devdb.sh` 走本機二進位制，不經 compose，兩者擇一即可，勿同時佔用 5432／6379）。
+- 正式環境請以環境變數覆寫預設值（`DATABASE_URL`、`JWT_SECRET`、`CORS_ORIGINS`、`NUXT_PUBLIC_API_BASE` 等），並將 `MEDIA_ROOT` 指向持久化 volume。
+
 ## 環境變數
 
 Web：
@@ -71,6 +83,18 @@ MEDIA_PUBLIC_BASE_URL=https://api.example.com/api/v1
 ```
 
 登入／註冊：`SMS_PROVIDER`（監護人 OTP 用）、註冊／登入限流（`REGISTER_MAX_PER_IP_DAY`、`LOGIN_MAX_PER_IP_DAY`、`LOGIN_MAX_PER_ACCT_HOUR`）、`TURNSTILE_SECRET`＋`NUXT_PUBLIC_TURNSTILE_SITE_KEY`。
+
+投票獎勵：`VOTE_REWARD_POINTS`（預設 5，僅正式議題發放）。
+
+AI（預設全關，開發／測試才開）：`AI_AUTHORING_ENABLED`、`OPENAI_BASE_URL`、`OPENAI_API_KEY`、`OPENAI_MODEL`、`OPENAI_RESPONSE_FORMAT`、`AI_AUTHORING_TIMEOUT_MS`、`AI_AUTHORING_MAX_OUTPUT_TOKENS`、`AI_AUTHORING_SESSION_TTL_SECONDS`、世代限流（`AI_AUTHORING_MAX_GENERATIONS_PER_HOUR／_PER_DAY／_PER_IP_HOUR`）、`AI_AUTHORING_MAX_RESPONSE_BYTES`。AI 開發內容 CLI 不需額外變數。
+
+草稿與範本（`/me/drafts`）不需額外環境變數；資料隨 `topic_drafts` 表走正常 migration＋備份。
+
+## 首次部署 seed
+
+```bash
+npm run prisma:seed -w apps/api   # 建分類、最高管理員（admin@windcock.local），正式環境請立即更換密碼
+```
 
 ## 上線阻擋事項（尚未完成）
 

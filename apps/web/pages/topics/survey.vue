@@ -100,6 +100,23 @@
                 <select v-model="audience" class="field-input w-full font-bold"><option v-for="item in audienceOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
               </label>
               <p class="text-xs leading-5 text-[#77716a] sm:col-span-3">{{ settingHint }}</p>
+              <div class="border-t border-[#f0e6d2] pt-5 sm:col-span-3">
+                <span class="mb-2 block text-sm font-bold">草稿與範本</span>
+                <p class="text-xs leading-5 text-[#77716a]">將目前內容存成草稿，或載入之前的草稿、自存範本快速發起。<NuxtLink to="/me/drafts" class="font-bold text-[#b0761f] hover:underline">前往管理</NuxtLink></p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <input v-model.trim="draftName" maxlength="50" placeholder="草稿名稱（例如：週末出遊調查）" class="field-input min-w-0 flex-1" />
+                  <UiButton variant="outline" size="sm" :disabled="savingDraft" @click="saveCurrentDraft">{{ savingDraft ? '儲存中…' : '儲存草稿' }}</UiButton>
+                </div>
+                <div v-if="draftOptions.length" class="mt-3 flex flex-wrap gap-2">
+                  <select v-model="selectedDraftId" class="field-input min-w-0 flex-1 font-bold">
+                    <option value="" disabled>選擇草稿或範本載入…</option>
+                    <option v-for="item in draftOptions" :key="item.id" :value="item.id">{{ item.isTemplate ? '【範本】' : '【草稿】' }}{{ item.name }}</option>
+                  </select>
+                  <UiButton variant="outline" size="sm" :disabled="!selectedDraftId" @click="applySelectedDraft">載入</UiButton>
+                </div>
+                <p v-if="draftError" class="mt-2 text-xs font-bold text-[#a63222]">{{ draftError }}</p>
+                <p v-if="draftMessage" class="mt-2 text-xs font-bold text-[#3f7a58]">{{ draftMessage }}</p>
+              </div>
             </div>
           </details>
         </section>
@@ -144,8 +161,12 @@ import type { Topic, TopicAudience, TopicVisibility } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
 import type { CapabilitySummary } from '~/stores/auth';
 import { BUILDER_RULES, createScratchCardDraft, normalizeLikertPoints, questionPayload, seedRows, type BuilderRow, type BuilderType, type ScratchCardDraft } from '~/utils/questionBuilder';
+import { applySurveyPayload, serializeSurveyForm } from '~/utils/draftSerializer';
+import type { DraftItem } from '~/types/draft';
 
 definePageMeta({ middleware: 'auth' });
+
+const route = useRoute();
 
 interface SurveyQuestionDraft {
   id: string;
@@ -331,6 +352,85 @@ async function submit() {
   }
 }
 
+const { listDrafts, saveDraft } = useDrafts();
+const draftName = ref('');
+const draftOptions = ref<DraftItem[]>([]);
+const selectedDraftId = ref('');
+const savingDraft = ref(false);
+const draftError = ref('');
+const draftMessage = ref('');
+
+const hasDraftableContent = computed(() =>
+  title.value.trim() !== ''
+  || questions.value.some((question) => question.questionTitle.trim() !== '' || question.prompt.trim() !== ''
+    || question.scaleMinLabel.trim() !== '' || question.scaleMaxLabel.trim() !== ''
+    || question.rows.some((row) => row.label.trim() !== '' || row.match.trim() !== '' || row.weight.trim() !== '' || row.image !== null)),
+);
+
+function applySurveyState(state: ReturnType<typeof applySurveyPayload>) {
+  if (!state) {
+    draftError.value = '草稿格式不正確，無法載入。';
+    return false;
+  }
+  title.value = state.title;
+  questions.value = state.questions.map((question) => ({ ...question, id: `q-${questionSeq++}`, expanded: true }));
+  voteDurationHours.value = state.voteDurationHours;
+  visibility.value = state.visibility;
+  audience.value = state.audience;
+  return true;
+}
+
+async function refreshDraftOptions() {
+  draftOptions.value = await listDrafts('SURVEY');
+  if (selectedDraftId.value && !draftOptions.value.some((item) => item.id === selectedDraftId.value)) {
+    selectedDraftId.value = '';
+  }
+}
+
+async function saveCurrentDraft() {
+  draftError.value = '';
+  draftMessage.value = '';
+  const name = draftName.value.trim();
+  if (!name) {
+    draftError.value = '請先填寫草稿名稱。';
+    return;
+  }
+  savingDraft.value = true;
+  try {
+    const payload = serializeSurveyForm({
+      title: title.value,
+      questions: questions.value.map(({ questionTitle, type, rows, prompt, points, scaleMinLabel, scaleMaxLabel, maxSelections, scratchCard }) => ({
+        questionTitle, type, rows, prompt, points, scaleMinLabel, scaleMaxLabel, maxSelections, scratchCard,
+      })),
+      voteDurationHours: voteDurationHours.value,
+      visibility: visibility.value,
+      audience: audience.value,
+    });
+    const saved = await saveDraft('SURVEY', name, payload, false);
+    if (!saved) return;
+    draftName.value = '';
+    draftMessage.value = `已儲存草稿「${saved.name}」。`;
+    await refreshDraftOptions();
+  } finally {
+    savingDraft.value = false;
+  }
+}
+
+async function applyDraftItem(item: DraftItem) {
+  if (hasDraftableContent.value && !window.confirm('載入將覆蓋目前已填寫的內容，確定要繼續嗎？')) return;
+  draftError.value = '';
+  draftMessage.value = '';
+  if (applySurveyState(applySurveyPayload(item.payload))) {
+    draftMessage.value = `已載入「${item.name}」。`;
+  }
+}
+
+async function applySelectedDraft() {
+  const item = draftOptions.value.find((entry) => entry.id === selectedDraftId.value);
+  if (!item) return;
+  await applyDraftItem(item);
+}
+
 onMounted(async () => {
   try {
     const summary = await api.get<CapabilitySummary>('/me/capabilities');
@@ -339,6 +439,17 @@ onMounted(async () => {
     formError.value = errorMessage(error);
   } finally {
     loading.value = false;
+  }
+  await refreshDraftOptions();
+  const draftId = typeof route.query.draftId === 'string' ? route.query.draftId : '';
+  if (draftId) {
+    const item = draftOptions.value.find((entry) => entry.id === draftId);
+    if (item) {
+      selectedDraftId.value = item.id;
+      await applyDraftItem(item);
+    } else {
+      draftError.value = '找不到指定的草稿。';
+    }
   }
 });
 </script>

@@ -1,6 +1,6 @@
 # 輿論測風向（Windcock）
 
-一人一帳號、一人一票的即時公共議題民調平台。支援正式議題、快問投票與多題組合問卷。
+一人一帳號、一人一票的即時公共議題民調平台。支援正式議題、快問投票（單選、圖片、光譜、簡答、連連看、拼圖、刮刮樂、轉盤、搖獎、評分、量表、複選）、多題組合問卷與回合制快問，另有發起草稿／自存範本與 JSON 匯入。
 
 ## 架構總覽
 
@@ -29,6 +29,7 @@ npm run dev      # 同時啟動 API + Web（含本機 PostgreSQL / Redis）
 ```bash
 npm run build                    # 先 API，後 Web
 npm run typecheck -w apps/web
+npm run test -w apps/web         # Web vitest（發起頁工具函數等）
 npm run build -w apps/api && npx jest src/topics --runInBand  # apps/api 底下執行
 ```
 

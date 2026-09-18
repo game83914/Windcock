@@ -71,6 +71,34 @@
                 <select v-model="audience" class="field-input w-full font-bold"><option v-for="item in audienceOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select>
               </label>
               <p class="text-xs leading-5 text-[#77716a] sm:col-span-3">{{ settingHint }}</p>
+              <div class="border-t border-[#f0e6d2] pt-5 sm:col-span-3">
+                <span class="mb-2 block text-sm font-bold">匯入數據</span>
+                <p class="text-xs leading-5 text-[#77716a]">下載依目前題型產生的 JSON 範例檔，修改後上傳即可帶入欄位。圖片需手動上傳；匯入會覆蓋已填寫的內容。</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <UiButton variant="outline" size="sm" @click="downloadExample">下載範例檔</UiButton>
+                  <UiButton variant="outline" size="sm" @click="triggerImport">上傳 JSON 匯入</UiButton>
+                  <input ref="importInput" type="file" accept=".json,application/json" class="hidden" @change="onImportFile" />
+                </div>
+                <p v-if="importError" class="mt-2 text-xs font-bold text-[#a63222]">{{ importError }}</p>
+                <p v-if="importMessage" class="mt-2 text-xs font-bold text-[#3f7a58]">{{ importMessage }}</p>
+              </div>
+              <div class="border-t border-[#f0e6d2] pt-5 sm:col-span-3">
+                <span class="mb-2 block text-sm font-bold">草稿與範本</span>
+                <p class="text-xs leading-5 text-[#77716a]">將目前內容存成草稿，或載入之前的草稿、自存範本快速發起。<NuxtLink to="/me/drafts" class="font-bold text-[#b0761f] hover:underline">前往管理</NuxtLink></p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <input v-model.trim="draftName" maxlength="50" placeholder="草稿名稱（例如：午餐投票）" class="field-input min-w-0 flex-1" />
+                  <UiButton variant="outline" size="sm" :disabled="savingDraft" @click="saveCurrentDraft">{{ savingDraft ? '儲存中…' : '儲存草稿' }}</UiButton>
+                </div>
+                <div v-if="draftOptions.length" class="mt-3 flex flex-wrap gap-2">
+                  <select v-model="selectedDraftId" class="field-input min-w-0 flex-1 font-bold">
+                    <option value="" disabled>選擇草稿或範本載入…</option>
+                    <option v-for="item in draftOptions" :key="item.id" :value="item.id">{{ item.isTemplate ? '【範本】' : '【草稿】' }}{{ item.name }}</option>
+                  </select>
+                  <UiButton variant="outline" size="sm" :disabled="!selectedDraftId" @click="applySelectedDraft">載入</UiButton>
+                </div>
+                <p v-if="draftError" class="mt-2 text-xs font-bold text-[#a63222]">{{ draftError }}</p>
+                <p v-if="draftMessage" class="mt-2 text-xs font-bold text-[#3f7a58]">{{ draftMessage }}</p>
+              </div>
             </div>
           </details>
         </section>
@@ -149,7 +177,10 @@
 import type { Topic, TopicAudience, TopicVisibility } from '~/types/topic';
 import { errorMessage } from '~/composables/useApi';
 import type { CapabilitySummary } from '~/stores/auth';
-import { BUILDER_RULES, createScratchCardDraft, isImageBuilder, normalizeLikertPoints, questionPayload, seedRows, type BuilderRow, type BuilderType } from '~/utils/questionBuilder';
+import { BUILDER_RULES, createScratchCardDraft, isImageBuilder, nextRowId, normalizeLikertPoints, questionPayload, seedRows, type BuilderRow, type BuilderType } from '~/utils/questionBuilder';
+import { buildQuickImportExample, parseQuickImport } from '~/utils/quickImport';
+import { applyQuickPayload, serializeQuickForm } from '~/utils/draftSerializer';
+import type { DraftItem } from '~/types/draft';
 
 definePageMeta({ middleware: 'auth' });
 
@@ -184,7 +215,7 @@ const formError = ref('');
 const fieldErrors = reactive<Record<string, string>>({});
 const savedTopic = ref<Topic | null>(null);
 const { src: lightboxSrc } = useLightbox();
-const builderRef = ref<{ validate: () => { firstField: string | null; formError: string } } | null>(null);
+const builderRef = ref<{ validate: () => { firstField: string | null; formError: string }; reset: () => void } | null>(null);
 const eligibility = computed(() => auth.capabilitySummary?.seniorEligibility);
 const canCreateQuick = computed(() => auth.isAuthed && (auth.canAuthorTopics || auth.capabilitySummary?.membershipTier === 'SENIOR'));
 const durationLabel = computed(() => durationOptions.find((item) => item.value === voteDurationHours.value)?.label ?? `${voteDurationHours.value} 小時`);
@@ -215,6 +246,160 @@ const audienceOptions = [
 async function copySharePath(path: string) {
   await navigator.clipboard.writeText(new URL(path, window.location.origin).toString());
   copied.value = true;
+}
+
+const importInput = ref<HTMLInputElement | null>(null);
+const importError = ref('');
+const importMessage = ref('');
+
+const hasFormContent = computed(() =>
+  title.value.trim() !== '' || prompt.value.trim() !== ''
+  || scaleMinLabel.value.trim() !== '' || scaleMaxLabel.value.trim() !== ''
+  || rows.value.some((row) => row.label.trim() !== '' || row.match.trim() !== '' || row.weight.trim() !== '' || row.image !== null),
+);
+
+function downloadExample() {
+  importError.value = '';
+  importMessage.value = '';
+  const example = buildQuickImportExample(builderType.value);
+  const blob = new Blob([JSON.stringify(example, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `quick-${builderType.value.toLowerCase()}-example.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function triggerImport() {
+  importInput.value?.click();
+}
+
+async function onImportFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  importError.value = '';
+  importMessage.value = '';
+  if (!file) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    importError.value = '無法解析 JSON 檔案，請確認檔案格式正確。';
+    return;
+  }
+  const result = parseQuickImport(parsed);
+  if (!result.ok) {
+    importError.value = result.error;
+    return;
+  }
+  if (hasFormContent.value && !window.confirm('匯入將覆蓋目前已填寫的內容，確定要繼續嗎？')) return;
+  const draft = result.draft;
+  if (draft.title !== null) title.value = draft.title;
+  builderType.value = draft.type;
+  rows.value = draft.rows.map((row) => ({ id: nextRowId(), label: row.label, match: row.match, weight: row.weight, image: null }));
+  prompt.value = draft.prompt;
+  points.value = draft.points;
+  scaleMinLabel.value = draft.scaleMinLabel;
+  scaleMaxLabel.value = draft.scaleMaxLabel;
+  maxSelections.value = draft.maxSelections;
+  scratchCard.value = draft.scratchCard;
+  builderRef.value?.reset();
+  importMessage.value = `已匯入「${BUILDER_RULES[draft.type].label}」資料，請檢查後送出。`;
+}
+
+const { listDrafts, saveDraft } = useDrafts();
+const draftName = ref('');
+const draftOptions = ref<DraftItem[]>([]);
+const selectedDraftId = ref('');
+const savingDraft = ref(false);
+const draftError = ref('');
+const draftMessage = ref('');
+
+const hasDraftableContent = computed(() =>
+  title.value.trim() !== '' || prompt.value.trim() !== ''
+  || scaleMinLabel.value.trim() !== '' || scaleMaxLabel.value.trim() !== ''
+  || rows.value.some((row) => row.label.trim() !== '' || row.match.trim() !== '' || row.weight.trim() !== '' || row.image !== null),
+);
+
+function applyQuickState(state: ReturnType<typeof applyQuickPayload>) {
+  if (!state) {
+    draftError.value = '草稿格式不正確，無法載入。';
+    return false;
+  }
+  title.value = state.title;
+  builderType.value = state.builderType;
+  rows.value = state.rows;
+  prompt.value = state.prompt;
+  points.value = state.points;
+  scaleMinLabel.value = state.scaleMinLabel;
+  scaleMaxLabel.value = state.scaleMaxLabel;
+  maxSelections.value = state.maxSelections;
+  scratchCard.value = state.scratchCard;
+  voteDurationHours.value = state.voteDurationHours;
+  visibility.value = state.visibility;
+  audience.value = state.audience;
+  builderRef.value?.reset();
+  return true;
+}
+
+async function refreshDraftOptions() {
+  draftOptions.value = await listDrafts('QUICK');
+  if (selectedDraftId.value && !draftOptions.value.some((item) => item.id === selectedDraftId.value)) {
+    selectedDraftId.value = '';
+  }
+}
+
+async function saveCurrentDraft() {
+  draftError.value = '';
+  draftMessage.value = '';
+  const name = draftName.value.trim();
+  if (!name) {
+    draftError.value = '請先填寫草稿名稱。';
+    return;
+  }
+  savingDraft.value = true;
+  try {
+    const payload = serializeQuickForm({
+      title: title.value,
+      builderType: builderType.value,
+      rows: rows.value,
+      prompt: prompt.value,
+      points: points.value,
+      scaleMinLabel: scaleMinLabel.value,
+      scaleMaxLabel: scaleMaxLabel.value,
+      maxSelections: maxSelections.value,
+      scratchCard: scratchCard.value,
+      voteDurationHours: voteDurationHours.value,
+      visibility: visibility.value,
+      audience: audience.value,
+    });
+    const saved = await saveDraft('QUICK', name, payload, false);
+    if (!saved) return;
+    draftName.value = '';
+    draftMessage.value = `已儲存草稿「${saved.name}」。`;
+    await refreshDraftOptions();
+  } finally {
+    savingDraft.value = false;
+  }
+}
+
+async function applyDraftItem(item: DraftItem) {
+  if (hasDraftableContent.value && !window.confirm('載入將覆蓋目前已填寫的內容，確定要繼續嗎？')) return;
+  draftError.value = '';
+  draftMessage.value = '';
+  if (applyQuickState(applyQuickPayload(item.payload))) {
+    draftMessage.value = `已載入「${item.name}」。`;
+  }
+}
+
+async function applySelectedDraft() {
+  const item = draftOptions.value.find((entry) => entry.id === selectedDraftId.value);
+  if (!item) return;
+  await applyDraftItem(item);
 }
 
 function validateForm() {
@@ -282,6 +467,17 @@ onMounted(async () => {
     formError.value = errorMessage(error);
   } finally {
     loading.value = false;
+  }
+  await refreshDraftOptions();
+  const draftId = typeof route.query.draftId === 'string' ? route.query.draftId : '';
+  if (draftId) {
+    const item = draftOptions.value.find((entry) => entry.id === draftId);
+    if (item) {
+      selectedDraftId.value = item.id;
+      await applyDraftItem(item);
+    } else {
+      draftError.value = '找不到指定的草稿。';
+    }
   }
 });
 </script>

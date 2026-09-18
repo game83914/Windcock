@@ -20,8 +20,11 @@ COPY package.json package-lock.json .npmrc ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/api/prisma ./apps/api/prisma
-# postinstall regenerates the Prisma client into node_modules
-RUN npm ci --omit=dev
+# --ignore-scripts：prisma CLI 屬 devDeps 已被移除，client 改由 build 階段複製現成產物
+RUN npm ci --omit=dev --ignore-scripts
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://localhost:'+(process.env.PORT||3001)+'/api/v1/health').then((r)=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["node", "apps/api/dist/main.js"]

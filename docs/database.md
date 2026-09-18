@@ -4,8 +4,9 @@ Schema：`apps/api/prisma/schema.prisma`（PostgreSQL，Prisma 6）。
 
 ## 核心資料表
 
-- `topics`：議題本體。問卷子題以 `parent_topic_id`＋`sort_order` 自關聯；量表端點（`scale_min_label`／`scale_max_label`）、複選上限（`max_selections`）存於本表。
-- `topic_options`：選項，`vote_count` 累計被選次數；`data`（JSON）放 `imageUrl`／`match`／`weight`／`value`。
+- `topics`：議題本體。問卷子題、回合制各回合以 `parent_topic_id`＋`sort_order` 自關聯；量表端點（`scale_min_label`／`scale_max_label`）、複選上限（`max_selections`）、回合數（`total_rounds`）存於本表。
+- `topic_options`：選項，`vote_count` 累計被選次數；`data`（JSON）放 `imageUrl`／`match`／`weight`／`value`，刮刮樂另放 `scratchCoverImageUrl`／`scratchRevealImageUrl`／`scratchShowText`。
+- `topic_drafts`：會員發起草稿與自存範本（`kind`：QUICK／SURVEY；`is_template` 區分草稿／範本；`payload` JSON 存完整表單狀態；擁有者級聯刪除）。
 - `votes`：每人每題一筆（`@@unique([userId, topicId])`），容納單一 `option_id`、`spectrum_value` 或 `answer_text`。
 - `vote_selections`：複選關聯（`vote_id, option_id` 複合主鍵；vote cascade、option restrict）。
 - `topic_rank_results`、`topic_content_blocks`、`topic_share_links`、`channel_follows`、`vote_demographic_snapshots` 等。

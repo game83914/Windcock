@@ -1,5 +1,5 @@
-version: '3.8'
-
+# Windcock：本機 DB/Redis（docker compose up db redis）或完整自託管（docker compose up --build）。
+# 正式部署請以環境變數覆寫以下預設值，特別是 JWT_SECRET、PROFILE_ENCRYPTION_KEY 系列與 CORS_ORIGINS。
 services:
   db:
     image: postgres:16
@@ -21,5 +21,49 @@ services:
     ports:
       - '6379:6379'
 
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: windcock-api
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://windcock:windcock@db:5432/windcock?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PROFILE_ENCRYPTION_KEY: ${PROFILE_ENCRYPTION_KEY:-}
+      PROFILE_ENCRYPTION_KEY_VERSION: ${PROFILE_ENCRYPTION_KEY_VERSION:-1}
+      PROFILE_HASH_PEPPER: ${PROFILE_HASH_PEPPER:-replace-with-a-random-secret}
+      MEDIA_ROOT: /data/media
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-http://localhost:3001/api/v1}
+      VOTE_REWARD_POINTS: ${VOTE_REWARD_POINTS:-5}
+    volumes:
+      - mediadata:/data/media
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: windcock-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '3000:3000'
+    environment:
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-http://localhost:3001/api/v1}
+      NUXT_PUBLIC_WS_BASE: ${NUXT_PUBLIC_WS_BASE:-http://localhost:3001}
+      API_PROXY_TARGET: http://api:3001
+
 volumes:
   dbdata:
+  mediadata:

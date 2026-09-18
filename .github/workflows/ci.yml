@@ -38,6 +38,8 @@ jobs:
         run: npm run test -w apps/api
       - name: Typecheck Web
         run: npm run typecheck -w apps/web
+      - name: Test Web
+        run: npm run test -w apps/web
       - name: Build Web
         run: npm run build -w apps/web
       - name: Build API image
