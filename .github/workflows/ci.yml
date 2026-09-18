@@ -29,9 +29,13 @@ jobs:
       - name: Prisma validate
         run: npx prisma validate --schema prisma/schema.prisma
         working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://windcock:windcock@localhost:5432/windcock?schema=public
       - name: Prisma generate
         run: npm run prisma:generate
         working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://windcock:windcock@localhost:5432/windcock?schema=public
       - name: Build API
         run: npm run build -w apps/api
       - name: Test API
