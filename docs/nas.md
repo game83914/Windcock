@@ -9,7 +9,7 @@
    - `JWT_SECRET`：換高熵隨機字串。
    - `PROFILE_ENCRYPTION_KEY`：`openssl rand -base64 32` 產生，必填（缺了 API 無法啟動）。
    - 區網階段其餘預設值即可。
-3. GHCR 套件可見度：首次推送後，到 GitHub → 帳號 → Packages → `windcock-api`／`windcock-web` → Package settings → **Change visibility → Public**，NAS 才能免登入拉取（不公開則需在 NAS 的 Registry 登入 PAT，此處不贅述）。
+3. 登入私密映像檔：Container Manager → **登錄** → 新增 → Registry URL 填 `https://ghcr.io`、使用者名稱填 GitHub 帳號、密碼貼上 `read:packages` 的 classic token。之後本文件所有拉取動作都會自動帶認證；映像檔保持私密，外人看不到也拉不到。
 
 ## 部署步驟
 
