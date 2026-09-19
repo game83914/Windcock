@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveJwtSecret } from './jwt-secret';
 
 export interface JwtPayload {
   sub: string;
@@ -24,7 +25,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET') || 'dev-secret',
+      // 與簽發端共用同一驗證，避免兩端 fallback 不一致
+      secretOrKey: resolveJwtSecret(process.env),
     });
   }
 

@@ -207,7 +207,7 @@ async function main() {
   const client = new OpenAiCompatibleClient();
   const categories = await prisma.category.findMany({ where: { isActive: true }, select: { key: true } });
   const categoryKeys = categories.map((category) => category.key);
-  if (!categoryKeys.length) throw new Error('找不到啟用中的分類，請先執行 seed');
+  if (!categoryKeys.length) throw new Error('找不到啟用中的分類，請先執行 migration');
 
   const output = await client.complete(
     [

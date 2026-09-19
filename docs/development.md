@@ -9,6 +9,12 @@ npm run dev        # API（:3001，含本機 DB/Redis）＋ Web（:3000）
 
 本機 DB：`postgresql://windcock:windcock@localhost:5432/windcock`（見 `apps/api/.env.example`），由 `scripts/devdb.sh` 啟動。
 
+需要完整展示資料時可明確執行開發專用 seed；它會建立固定管理員、測試議題、示範組織與 GIF，不得用於正式部署：
+
+```bash
+ALLOW_DEMO_SEED=true npm run prisma:seed:demo
+```
+
 ## 驗證指令
 
 ```bash

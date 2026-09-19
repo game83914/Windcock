@@ -288,7 +288,11 @@ async function ensureTopic(seed: SeedTopic) {
 }
 
 async function main() {
-  if (process.env.NODE_ENV === 'production') throw new Error('Production seeding is disabled');
+  // fail-closed：只擋 NODE_ENV 不夠（維運機通常沒設該變數），必須顯式允許。
+  // 正式 DB 誤執行會建立固定帳密管理員，因此預設拒絕。
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DEMO_SEED !== 'true') {
+    throw new Error('Demo seeding is disabled. Set ALLOW_DEMO_SEED=true with NODE_ENV != production to run it.');
+  }
   // Seed-only admin credentials. MUST be changed in real environments (use env-based provisioning instead).
   const adminEmail = 'admin@windcock.local';
   const adminPasswordHash = await bcrypt.hash('Admin12345', 12);

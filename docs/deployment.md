@@ -47,15 +47,21 @@ npm run build -w apps/web
 
 ## Docker Compose 自託管
 
-`docker-compose.yml` 內含完整四服務（`db`、`redis`、`api`、`web`；另有 `mediadata` 持久化媒體檔）：
+`docker-compose.yml` 內含完整服務（`db`、`redis`、`migrate` one-shot、`api`、`web`；另有 `mediadata` 持久化媒體檔）。`db`／`redis` 不對外開 port，只走內網：
 
 ```bash
+POSTGRES_PASSWORD='高熵隨機值' \
+JWT_SECRET='至少 32 字元高熵隨機值' \
+PROFILE_ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+PROFILE_HASH_PEPPER='另一組高熵隨機值' \
 docker compose up --build -d
-docker compose exec api npm run prisma:deploy -w apps/api  # 首次執行 migration（失敗則先排查再放行）
+# migrate 服務會在 api 啟動前自動執行 prisma migrate deploy；失敗則 api 不啟動（fail-closed）
 ```
 
-- 只需本機 DB／Redis 開發時：`docker compose up db redis -d`（`npm run dev` 的 `devdb.sh` 走本機二進位制，不經 compose，兩者擇一即可，勿同時佔用 5432／6379）。
-- 正式環境請以環境變數覆寫預設值（`DATABASE_URL`、`JWT_SECRET`、`CORS_ORIGINS`、`NUXT_PUBLIC_API_BASE` 等），並將 `MEDIA_ROOT` 指向持久化 volume。
+- runtime image 刻意不含 Prisma CLI，**不可** `docker compose exec api npm run prisma:deploy`（該指令已失效）。migration 只走 `migrate` 服務，或維運機用 repo 執行 `npm run prisma:deploy -w apps/api`。
+- 只需本機 DB／Redis 開發時：`POSTGRES_PASSWORD=x docker compose up db redis -d`（`npm run dev` 的 `devdb.sh` 走本機二進位制，不經 compose，兩者擇一即可，勿同時佔用 5432／6379）。
+- 區網維運需直連 DB 時，自行在 `db` 加 `ports`（如 `'127.0.0.1:15432:5432'`，用完即關），不要長期開放。
+- `JWT_SECRET` 缺失／公開預設值／短於 32 字元時 API 拒絕啟動；`TRUST_PROXY` 預設 `false`（直連部署保持關閉，只有反向代理之後才設 `true`）。
 
 ## 環境變數
 
@@ -92,10 +98,23 @@ AI（預設全關，開發／測試才開）：`AI_AUTHORING_ENABLED`、`OPENAI_
 
 草稿與範本（`/me/drafts`）不需額外環境變數；資料隨 `topic_drafts` 表走正常 migration＋備份。
 
-## 首次部署 seed
+## 首次部署管理員
 
 ```bash
-npm run prisma:seed -w apps/api   # 建分類、最高管理員（admin@windcock.local），正式環境請立即更換密碼
+ADMIN_EMAIL=admin@example.com \
+ADMIN_PASSWORD='至少 8 字元的高熵密碼' \
+npm run prisma:provision-admin
+```
+
+該指令不會無警告接管既有一般帳號；目標 email 已存在且非 ACTIVE 管理員時，必須另設 `ADMIN_ALLOW_TAKEOVER=yes` 才會提升。
+
+分類由 migration 建立；正式環境執行 `prisma:seed:demo` 必須同時符合 `ALLOW_DEMO_SEED=true` 且 `NODE_ENV != production`，該指令只供本機開發建立測試議題、示範組織與 GIF。
+
+曾執行舊版 `prisma:seed` 的環境，可先 dry-run 預覽再一次性移除已知 demo 議題、示範組織與官方 GIF 記錄；已有真實投票／貼文／立場的議題會被拒刪（改用下架），使用者自行建立的議題不會被匹配：
+
+```bash
+npm run prisma:remove-demo-content                                    # 預設 dry-run，只列清單不刪除
+CONFIRM_REMOVE_DEMO_CONTENT=yes npm run prisma:remove-demo-content    # 確認後執行
 ```
 
 ## 上線阻擋事項（尚未完成）

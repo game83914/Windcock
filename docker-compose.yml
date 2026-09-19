@@ -1,5 +1,9 @@
-# Windcock：本機 DB/Redis（docker compose up db redis）或完整自託管（docker compose up --build）。
-# 正式部署請以環境變數覆寫以下預設值，特別是 JWT_SECRET、PROFILE_ENCRYPTION_KEY 系列與 CORS_ORIGINS。
+# Windcock 自託管 compose（區網 NAS／自有主機）。
+# 本機開發請用 `npm run dev`（scripts/devdb.sh 啟動本機 DB/Redis），不要用這個檔案。
+# Production 安全預設：
+# - db／redis 不對外開 port，只走內網；migration 走 migrate one-shot 服務。
+# - 所有 secrets 必填（:?...），未設定會直接報錯，不用公開預設值啟動。
+# - 需要從區網直連 DB 維運時，自行在 db 加 ports（例如 '127.0.0.1:15432:5432'），用完即關。
 services:
   db:
     image: postgres:16
@@ -7,10 +11,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: windcock
-      POSTGRES_PASSWORD: windcock
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (set a strong random value)}
       POSTGRES_DB: windcock
-    ports:
-      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U windcock']
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - dbdata:/var/lib/postgresql/data
 
@@ -18,8 +25,21 @@ services:
     image: redis:7
     container_name: windcock-redis
     restart: unless-stopped
-    ports:
-      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: ghcr.io/game83914/windcock-migrator:latest
+    container_name: windcock-migrate
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://windcock:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/windcock?schema=public
 
   api:
     # NAS 自託管用預建映像檔（ghcr.io），本機開發改 image 可直接 docker compose build
@@ -30,24 +50,29 @@ services:
     container_name: windcock-api
     restart: unless-stopped
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
     ports:
       - '3001:3001'
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://windcock:windcock@db:5432/windcock?schema=public
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DATABASE_URL: postgresql://windcock:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/windcock?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (min 32 chars, high-entropy random value)}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      PROFILE_ENCRYPTION_KEY: ${PROFILE_ENCRYPTION_KEY:-}
+      PROFILE_ENCRYPTION_KEY: ${PROFILE_ENCRYPTION_KEY:?PROFILE_ENCRYPTION_KEY is required}
       PROFILE_ENCRYPTION_KEY_VERSION: ${PROFILE_ENCRYPTION_KEY_VERSION:-1}
-      PROFILE_HASH_PEPPER: ${PROFILE_HASH_PEPPER:-replace-with-a-random-secret}
+      PROFILE_HASH_PEPPER: ${PROFILE_HASH_PEPPER:?PROFILE_HASH_PEPPER is required}
       MEDIA_ROOT: /data/media
       MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-http://localhost:3001/api/v1}
       VOTE_REWARD_POINTS: ${VOTE_REWARD_POINTS:-5}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
     volumes:
       - mediadata:/data/media
 

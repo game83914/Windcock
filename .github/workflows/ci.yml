@@ -79,6 +79,17 @@ jobs:
           tags: |
             ghcr.io/game83914/windcock-api:latest
             ghcr.io/game83914/windcock-api:${{ github.sha }}
+      - name: Build and push migrator image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: migrator
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/game83914/windcock-migrator:latest
+            ghcr.io/game83914/windcock-migrator:${{ github.sha }}
       - name: Build and push Web image
         uses: docker/build-push-action@v6
         with:

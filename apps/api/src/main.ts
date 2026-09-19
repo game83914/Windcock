@@ -5,7 +5,10 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  // 預設不信任 proxy：直連部署時信任 X-Forwarded-For 等於允許偽造 IP 繞過限流。
+  // 只有在反向代理之後運行時，才設 TRUST_PROXY=true。
+  const trustProxy = process.env.TRUST_PROXY === 'true';
+  app.getHttpAdapter().getInstance().set('trust proxy', trustProxy ? 1 : false);
   app.setGlobalPrefix('api/v1');
   const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
     .split(',')
