@@ -22,6 +22,7 @@ import { Capability, PolicyScope, PolicyService } from '../identity/policy.servi
 import { CategoriesService } from '../categories/categories.service';
 import { assertClean } from '../common/sensitive';
 import { TopicAccessService } from './topic-access.service';
+import { randomInt } from 'crypto';
 
 export interface VoteResult {
   success: boolean;
@@ -1470,6 +1471,8 @@ export class TopicsService {
       const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: true } });
       if (!topic) throw new NotFoundException('議題不存在');
       if (topic.topicType === TopicType.SCRATCH) throw new BadRequestException('刮刮樂請使用 scratch-draw 端點');
+      if (topic.topicType === TopicType.LOTTERY) throw new BadRequestException('搖獎請使用 game-draw 端點');
+      if (topic.topicType === TopicType.SPIN_WHEEL) throw new BadRequestException('轉盤請使用 game-draw 端點');
       if (topic.kind === TopicKind.STAGED) throw new BadRequestException('回合快問請直接對各回合題目投票');
       if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
       if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
@@ -1637,17 +1640,8 @@ export class TopicsService {
       if (!topic.voteEndAt || topic.voteEndAt.getTime() <= Date.now()) throw new ForbiddenException('議題已截止投票');
       if (topic.options.length < 1) throw new BadRequestException('刮刮樂尚未設定結果');
 
-      const weighted = topic.options.map((option) => ({ option, weight: this.scratchOptionData(option.data).weight }));
-      const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
-      let target = Math.random() * totalWeight;
-      let selected = weighted[weighted.length - 1].option;
-      for (const item of weighted) {
-        target -= item.weight;
-        if (target < 0) {
-          selected = item.option;
-          break;
-        }
-      }
+      const selectedId = this.weightedPick(topic.options);
+      const selected = topic.options.find((option) => option.id === selectedId)!;
 
       const vote = await tx.vote.create({ data: { userId, topicId, optionId: selected.id } });
       await tx.topicOption.update({ where: { id: selected.id }, data: { voteCount: { increment: 1 } } });
@@ -1662,12 +1656,7 @@ export class TopicsService {
     });
 
     if (draw.isNew) {
-      await this.createDemographicSnapshot(draw.voteId, userId);
-      const [optionCounts, updatedTopic] = await Promise.all([
-        this.loadOptionCounts(topicId),
-        this.prisma.topic.findUnique({ where: { id: topicId }, select: { totalVotes: true } }),
-      ]);
-      await this.realtime.broadcastTopicVotes(topicId, optionCounts, updatedTopic?.totalVotes);
+      await this.finalizeDraw(topicId, draw.voteId, userId);
     }
     const data = this.scratchOptionData(draw.option.data);
     return {
@@ -1678,6 +1667,64 @@ export class TopicsService {
         label: draw.option.label,
         revealImageUrl: resolveOptionImageUrl(data.scratchRevealImageUrl),
         showText: data.scratchShowText,
+      },
+      rewardPoints: 0,
+      newBalance: draw.balance.toString(),
+    };
+  }
+
+  async gameDraw(topicId: bigint, userId: bigint) {
+    await this.policy.assertPublicAction(userId, 'VOTE');
+    await this.assertTopicInteraction(topicId, userId);
+
+    const draw = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${userId})`;
+      const lockedTopic = await tx.$queryRaw<Array<{ id: bigint }>>`SELECT id FROM topics WHERE id = ${topicId} FOR UPDATE`;
+      if (!lockedTopic.length) throw new NotFoundException('議題不存在');
+      const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: { orderBy: { id: 'asc' } } } });
+      if (!topic) throw new NotFoundException('議題不存在');
+      if (topic.topicType !== TopicType.LOTTERY && topic.topicType !== TopicType.SPIN_WHEEL) {
+        throw new BadRequestException('此題型不支援抽獎抽取');
+      }
+      if (topic.moderationStatus !== 'APPROVED') throw new ForbiddenException('議題尚未通過複核');
+
+      const existing = await tx.vote.findUnique({
+        where: { userId_topicId: { userId, topicId } },
+        include: { option: true },
+      });
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { pointsBalance: true } });
+      if (existing) {
+        if (!existing.option) throw new BadRequestException('既有抽獎結果資料不完整');
+        return { voteId: existing.id, option: existing.option, balance: user?.pointsBalance ?? 0n, isNew: false };
+      }
+      if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
+      if (!topic.voteEndAt || topic.voteEndAt.getTime() <= Date.now()) throw new ForbiddenException('議題已截止投票');
+      if (topic.options.length < 1) throw new BadRequestException('抽獎尚未設定結果');
+
+      const selectedId = this.weightedPick(topic.options);
+      const selected = topic.options.find((option) => option.id === selectedId)!;
+
+      const vote = await tx.vote.create({ data: { userId, topicId, optionId: selected.id } });
+      await tx.topicOption.update({ where: { id: selected.id }, data: { voteCount: { increment: 1 } } });
+      await tx.topic.update({
+        where: { id: topicId },
+        data: { totalVotes: { increment: 1 }, voterCount: { increment: 1 } },
+      });
+      if (topic.parentTopicId != null && await this.isSurveyComplete(tx, topic.parentTopicId, userId)) {
+        await this.ensureSurveyCompletionVote(tx, topic.parentTopicId, userId);
+      }
+      return { voteId: vote.id, option: selected, balance: user?.pointsBalance ?? 0n, isNew: true };
+    });
+
+    if (draw.isNew) {
+      await this.finalizeDraw(topicId, draw.voteId, userId);
+    }
+    return {
+      success: true,
+      isNew: draw.isNew,
+      result: {
+        optionId: draw.option.id.toString(),
+        label: draw.option.label,
       },
       rewardPoints: 0,
       newBalance: draw.balance.toString(),
@@ -1705,6 +1752,8 @@ export class TopicsService {
       const topic = await tx.topic.findUnique({ where: { id: topicId }, include: { options: true } });
       if (!topic) throw new NotFoundException('議題不存在');
       if (topic.topicType === TopicType.SCRATCH) throw new BadRequestException('刮刮樂結果不可更改');
+      if (topic.topicType === TopicType.LOTTERY) throw new BadRequestException('搖獎結果不可更改');
+      if (topic.topicType === TopicType.SPIN_WHEEL) throw new BadRequestException('轉盤結果不可更改');
       if (topic.kind !== TopicKind.QUICK) throw new ForbiddenException('此議題送出後不可更改');
       if (topic.parentTopicId != null) throw new ForbiddenException('問卷送出後不可更改');
       if (topic.status !== 'OPEN') throw new ForbiddenException('議題不在開放投票狀態');
@@ -2263,6 +2312,33 @@ export class TopicsService {
       scratchShowText: typeof value.scratchShowText === 'boolean' ? value.scratchShowText : true,
       weight,
     };
+  }
+
+  private optionWeight(data: Prisma.JsonValue | null | undefined) {
+    return this.scratchOptionData(data).weight;
+  }
+
+  private weightedPick(options: Array<{ id: bigint; data: Prisma.JsonValue | null | undefined }>) {
+    // CSPRNG(unbiased) 加權抽取：randomInt 為整數且無取模偏差，totalWeight 上限 2^48。
+    const weighted = options.map((option) => ({ id: option.id, weight: this.optionWeight(option.data) }));
+    const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+    if (!weighted.length) throw new BadRequestException('此題尚未設定結果');
+    if (totalWeight <= 0 || totalWeight >= 2 ** 48) throw new BadRequestException('結果權重總和不合法');
+    let target = randomInt(totalWeight);
+    for (const item of weighted) {
+      target -= item.weight;
+      if (target < 0) return item.id;
+    }
+    return weighted[weighted.length - 1].id;
+  }
+
+  private async finalizeDraw(topicId: bigint, voteId: bigint, userId: bigint) {
+    await this.createDemographicSnapshot(voteId, userId);
+    const [optionCounts, updatedTopic] = await Promise.all([
+      this.loadOptionCounts(topicId),
+      this.prisma.topic.findUnique({ where: { id: topicId }, select: { totalVotes: true } }),
+    ]);
+    await this.realtime.broadcastTopicVotes(topicId, optionCounts, updatedTopic?.totalVotes);
   }
 
   private appendAnd(where: Prisma.TopicWhereInput, condition: Prisma.TopicWhereInput) {

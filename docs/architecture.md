@@ -34,7 +34,7 @@
 - `TopicKind`：`FORMAL`（正式議題）、`QUICK`（快問）、`SURVEY`（問卷容器）、`STAGED`（回合制容器）。
 - `TopicType`：`BINARY`、`MULTIPLE`（多選項單選，UI 稱「單選題」）、`IMAGE_MULTIPLE`、`IMAGE_RANK`、`SPECTRUM`、`SHORT_ANSWER`、`MATCHING`、`PUZZLE`、`SCRATCH`、`SPIN_WHEEL`、`LOTTERY`、`STAR_RATING`、`LIKERT`（3～10 點，舊 `LIKERT_5`／`LIKERT_7` 已合併）、`MULTI_SELECT`、`SURVEY`、`STAGED`。
 - 問卷 = 父層 `SURVEY` topic＋子題 `QUICK` topics（`parentTopicId`、`sortOrder`）；回合制 = 父層 `STAGED`＋各回合 `QUICK` 子題；公開列表一律排除子題。
-- 刮刮樂：結果與權重存於選項 `data`（`scratchCoverImageUrl`／`scratchRevealImageUrl`／`scratchShowText`／`weight`），由伺服器加權抽取（`POST /topics/:id/scratch-draw`，冪等、不發獎勵）；一般投票／改票路徑拒絕 SCRATCH，可重置重抽（問卷子題除外）。
+- 抽獎類題型（刮刮樂、搖獎、轉盤）：結果與權重存於選項 `data`（`weight`，刮刮樂另含 `scratchCoverImageUrl`／`scratchRevealImageUrl`／`scratchShowText`），一律由伺服器端 CSPRNG 加權抽取（`POST /topics/:id/scratch-draw`／`POST /topics/:id/game-draw`，冪等、不發獎勵）；前端動畫只呈現伺服器回傳的落點。一般投票／改票路徑拒絕這三種題型，可重置重抽（問卷子題除外）。
 - 投票 = 每人每題一筆 `Vote`（`@@unique([userId, topicId])`）；複選另存 `VoteSelection` 關聯，topic 票數每人只加 1，選項票數逐項累計，選取率加總可超過 100%。
 - 投票獎勵：只有 `FORMAL` 議題發放（`VOTE_REWARD_POINTS`，冪等）；問卷完成標記只計數、不發點數；快問子題與回合子題不發獎勵。取消投票不回收已發點數。
 - 會員草稿／範本：`topic_drafts`（`kind`＋`isTemplate` 區分快問／問卷、草稿／範本，各上限 20 份），完整題型驗證留到正式發佈時。

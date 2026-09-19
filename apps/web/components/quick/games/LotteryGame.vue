@@ -39,21 +39,33 @@
 </template>
 
 <script setup lang="ts">
-import type { Topic, TopicOption } from '~/types/topic';
+import { errorMessage } from '~/composables/useApi';
+import type { Topic } from '~/types/topic';
+
+interface GameDrawResponse {
+  success: boolean;
+  isNew: boolean;
+  result: {
+    optionId: string;
+    label: string;
+  };
+  newBalance: string;
+}
 
 const props = withDefaults(defineProps<{ topic: Topic; hideStats?: boolean }>(), { hideStats: false });
 const emit = defineEmits<{ refreshed: [] }>();
 
 const auth = useAuthStore();
+const api = useApi();
+const { error: toastError } = useToast();
 
 const isInteractionLocked = computed(() => !auth.isAuthed);
 function emitRefreshed() { emit('refreshed'); }
 
-const { voting, submitQuickVote, changeQuickVote, withdrawVote } = useVoteMutation(() => props.topic, emitRefreshed);
+const { voting, withdrawVote } = useVoteMutation(() => props.topic, emitRefreshed);
 const isSubQuestion = computed(() => props.topic.parentTopicId != null);
 
 const votedOptionIndex = computed(() => props.topic.options.findIndex((option) => option.id === props.topic.myVote?.optionId));
-const myVoteOptionId = computed(() => props.topic.myVote?.optionId ?? (votedOptionIndex.value >= 0 ? props.topic.options[votedOptionIndex.value]?.id ?? null : null));
 const votedChoice = computed(() => props.topic.myVote?.choice || (votedOptionIndex.value >= 0 ? `選項 ${votedOptionIndex.value + 1}` : ''));
 const hasVotedGame = computed(() => !!props.topic.hasVoted);
 
@@ -62,7 +74,7 @@ const lotteryConfettiKey = ref('');
 
 async function handleLotteryClick() {
   if (!hasVotedGame.value) {
-    shakeLottery();
+    await shakeLottery();
     return;
   }
   if (isSubQuestion.value) return;
@@ -76,30 +88,33 @@ async function resetLottery() {
   lotteryConfettiKey.value = '';
 }
 
-async function submitLanded(option: TopicOption) {
-  if (voting.value) return;
-  if (option.id === myVoteOptionId.value) return;
-  if (isSubQuestion.value && props.topic.hasVoted) return;
-  if (props.topic.hasVoted) await changeQuickVote(option.id);
-  else await submitQuickVote(option.id);
-}
-
-function shakeLottery() {
+async function shakeLottery() {
   const options = props.topic.options;
+  const topicId = props.topic.id;
   if (!options.length || lotteryState.value === 'shaking' || lotteryState.value === 'drawing' || voting.value || isInteractionLocked.value || hasVotedGame.value) return;
   lotteryState.value = 'shaking';
-  const idx = Math.floor(Math.random() * options.length);
-  window.setTimeout(() => {
-    const option = options[idx];
+  try {
+    // 結果由伺服器端 CSPRNG 決定，搖獎只是配樂
+    const result = await api.post<GameDrawResponse>(`/topics/${topicId}/game-draw`);
+    if (props.topic.id !== topicId) return;
+    const option = props.topic.options.find((item) => item.id === result.result.optionId);
+    if (!option) throw new Error('無法識別抽獎結果');
+    auth.updatePoints(result.newBalance);
+    const start = Date.now();
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, 1080 - (Date.now() - start))));
+    if (props.topic.id !== topicId) return;
     lotteryState.value = 'drawing';
-    window.setTimeout(() => {
-      lotteryState.value = 'result';
-      lotteryConfettiKey.value = `${option.id}-${Date.now()}`;
-      window.setTimeout(async () => {
-        await submitLanded(option);
-      }, 620);
-    }, 520);
-  }, 1080);
+    await new Promise((resolve) => setTimeout(resolve, 520));
+    if (props.topic.id !== topicId) return;
+    lotteryState.value = 'result';
+    lotteryConfettiKey.value = `${option.id}-${Date.now()}`;
+    emitRefreshed();
+  } catch (error) {
+    if (props.topic.id !== topicId) return;
+    lotteryState.value = 'idle';
+    const message = errorMessage(error);
+    toastError(message);
+  }
 }
 
 watch(() => props.topic.id, (nextId, previousId) => {

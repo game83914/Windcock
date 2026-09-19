@@ -1,6 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
 import { TopicKind, TopicType } from '@prisma/client';
+import * as crypto from 'crypto';
 import { TopicsService } from './topics.service';
+
+jest.mock('crypto', () => {
+  const actual = jest.requireActual('crypto');
+  return Object.assign(Object.create(actual), { randomInt: jest.fn() });
+});
+
+function mockRandomInt(value: number) {
+  (crypto.randomInt as jest.Mock).mockReturnValue(value);
+}
 
 function scratchTopic() {
   return {
@@ -64,7 +74,7 @@ describe('TopicsService scratch draw', () => {
 
   it('selects by positive integer weights and records a zero-reward vote', async () => {
     const { service, tx } = setup();
-    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    mockRandomInt(2);
 
     const result = await service.scratchDraw(10n, 1n);
 

@@ -28,10 +28,11 @@ Base URL：`/api/v1`。完整 schema 見 Swagger `/api/docs`。需登入端點�
 | POST | `/me/drafts` | 儲存草稿或範本（資深會員；`kind`、`name`、`payload`、`isTemplate`） |
 | PATCH | `/me/drafts/:id` | 改名／更新內容／草稿與範本互轉（僅擁有者） |
 | DELETE | `/me/drafts/:id` | 刪除草稿或範本（僅擁有者） |
-| POST | `/topics/:id/vote` | 首投；複選傳 `optionIds[]`；刮刮樂請走 scratch-draw |
-| PATCH | `/topics/:id/vote` | 重投（僅 QUICK；複選只更新差異 selections；刮刮樂不可改） |
-| DELETE | `/topics/:id/vote` | 取消投票並重計（問卷子題除外；刮刮樂可重置重抽） |
-| POST | `/topics/:id/scratch-draw` | 刮刮樂加權抽取（冪等、零獎勵） |
+| POST | `/topics/:id/vote` | 首投；複選傳 `optionIds[]`；刮刮樂、搖獎、轉盤請走 draw 端點 |
+  | PATCH | `/topics/:id/vote` | 重投（僅 QUICK；複選只更新差異 selections；刮刮樂／搖獎／轉盤結果不可改） |
+  | DELETE | `/topics/:id/vote` | 取消投票並重計（問卷子題除外；抽獎題可重置重抽） |
+  | POST | `/topics/:id/scratch-draw` | 刮刮樂加權抽取（冪等、零獎勵） |
+  | POST | `/topics/:id/game-draw` | 搖獎／轉盤加權抽取（CSPRNG、冪等、零獎勵） |
 | POST | `/topics/:id/rank` | 排名題作答 |
 | DELETE | `/topics/:id/rank` | 取消排名（問卷子題除外） |
 | POST/DELETE | `/topics/:id/share-link` | 私密連結產生／停用（QUICK、SURVEY） |

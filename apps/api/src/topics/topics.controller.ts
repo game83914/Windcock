@@ -254,6 +254,13 @@ export class TopicsController {
     return this.topicsService.scratchDraw(id, user.userId);
   }
 
+  @Post(':id/game-draw')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  gameDraw(@Param('id', ParsedIdPipe) id: bigint, @CurrentUser() user: AuthUser) {
+    return this.topicsService.gameDraw(id, user.userId);
+  }
+
   @Patch(':id/vote')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()

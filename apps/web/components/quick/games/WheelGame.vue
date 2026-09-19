@@ -33,21 +33,34 @@
 </template>
 
 <script setup lang="ts">
-import type { Topic, TopicOption } from '~/types/topic';
+import { errorMessage } from '~/composables/useApi';
+import { wheelSegmentRotation } from '~/utils/wheel';
+import type { Topic } from '~/types/topic';
+
+interface GameDrawResponse {
+  success: boolean;
+  isNew: boolean;
+  result: {
+    optionId: string;
+    label: string;
+  };
+  newBalance: string;
+}
 
 const props = withDefaults(defineProps<{ topic: Topic; hideStats?: boolean }>(), { hideStats: false });
 const emit = defineEmits<{ refreshed: [] }>();
 
 const auth = useAuthStore();
+const api = useApi();
+const { error: toastError } = useToast();
 
 const isInteractionLocked = computed(() => !auth.isAuthed);
 function emitRefreshed() { emit('refreshed'); }
 
-const { voting, submitQuickVote, changeQuickVote, withdrawVote } = useVoteMutation(() => props.topic, emitRefreshed);
+const { voting, withdrawVote } = useVoteMutation(() => props.topic, emitRefreshed);
 const isSubQuestion = computed(() => props.topic.parentTopicId != null);
 
 const votedOptionIndex = computed(() => props.topic.options.findIndex((option) => option.id === props.topic.myVote?.optionId));
-const myVoteOptionId = computed(() => props.topic.myVote?.optionId ?? (votedOptionIndex.value >= 0 ? props.topic.options[votedOptionIndex.value]?.id ?? null : null));
 const votedChoice = computed(() => props.topic.myVote?.choice || (votedOptionIndex.value >= 0 ? `選項 ${votedOptionIndex.value + 1}` : ''));
 const hasVotedGame = computed(() => !!props.topic.hasVoted);
 
@@ -55,11 +68,12 @@ const wheelDeg = ref(0);
 const wheelSpinning = ref(false);
 const wheelHitIndex = ref<number | null>(null);
 const wheelConfettiKey = ref('');
+const userSpunOnce = ref(false);
 const wheelColors = ['#b0761f', '#3157d5', '#3f7a58', '#9a6a12', '#7c3aed', '#c2410c', '#0e7490', '#be185d'];
 
 async function handleGoClick() {
   if (!hasVotedGame.value) {
-    spinWheel();
+    await spinWheel();
     return;
   }
   if (isSubQuestion.value) return;
@@ -91,52 +105,51 @@ function wheelLabel(index: number) {
   return { x, y, rotate: mid };
 }
 
-async function submitLanded(option: TopicOption) {
-  if (voting.value) return;
-  if (option.id === myVoteOptionId.value) return;
-  if (isSubQuestion.value && props.topic.hasVoted) return;
-  if (props.topic.hasVoted) await changeQuickVote(option.id);
-  else await submitQuickVote(option.id);
-}
-
-function weightedIndex(): number {
+async function spinWheel() {
   const options = props.topic.options;
-  const weights = options.map((option) => Math.max(Number(option.data?.weight ?? 1), 1));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  let random = Math.random() * total;
-  for (let i = 0; i < weights.length; i++) {
-    random -= weights[i];
-    if (random <= 0) return i;
-  }
-  return weights.length - 1;
-}
-
-function spinWheel() {
-  const options = props.topic.options;
+  const topicId = props.topic.id;
   if (!options.length || wheelSpinning.value || voting.value || isInteractionLocked.value) return;
-  const idx = weightedIndex();
-  const size = 360 / options.length;
-  const phi = idx * size + Math.random() * size;
-  const desired = (360 - (phi % 360) + 360) % 360;
-  const current = ((wheelDeg.value % 360) + 360) % 360;
-  const delta = ((desired - current + 360) % 360) + 1080;
   wheelSpinning.value = true;
   wheelHitIndex.value = null;
-  wheelDeg.value += delta;
-  window.setTimeout(() => {
+  try {
+    // 落點由伺服器端 CSPRNG 決定，轉動角度只是呈現結果
+    const result = await api.post<GameDrawResponse>(`/topics/${topicId}/game-draw`);
+    if (props.topic.id !== topicId) return;
+    const idx = props.topic.options.findIndex((item) => item.id === result.result.optionId);
+    if (idx < 0) throw new Error('無法辨識轉盤結果');
+    auth.updatePoints(result.newBalance);
+    // jitter 僅為視覺微調，落點區段已由伺服器決定
+    const desired = wheelSegmentRotation(idx, options.length, Math.random());
+    const current = ((wheelDeg.value % 360) + 360) % 360;
+    const delta = ((desired - current + 360) % 360) + 1080;
+    userSpunOnce.value = true;
+    wheelDeg.value += delta;
+    await new Promise((resolve) => setTimeout(resolve, 2800));
+    if (props.topic.id !== topicId) return;
     wheelSpinning.value = false;
-    const option = options[idx];
     wheelHitIndex.value = idx;
-    wheelConfettiKey.value = `${option.id}-${Date.now()}`;
-    window.setTimeout(async () => {
-      await submitLanded(option);
-    }, 620);
-  }, 2800);
+    wheelConfettiKey.value = `${options[idx].id}-${Date.now()}`;
+    emitRefreshed();
+  } catch (error) {
+    if (props.topic.id !== topicId) return;
+    wheelSpinning.value = false;
+    const message = errorMessage(error);
+    toastError(message);
+  }
 }
+
+watch(() => props.topic.myVote?.optionId, (optionId) => {
+  if (userSpunOnce.value || !optionId) return;
+  // 重新進入頁面時，讓指標指向伺服器決定的落點
+  const idx = props.topic.options.findIndex((option) => option.id === optionId);
+  if (idx >= 0) wheelDeg.value = wheelSegmentRotation(idx, props.topic.options.length, 0.5);
+}, { immediate: true });
 
 watch(() => props.topic.id, (nextId, previousId) => {
   if (nextId === previousId) return;
+  wheelDeg.value = 0;
   wheelHitIndex.value = null;
+  userSpunOnce.value = false;
 });
 </script>
 
